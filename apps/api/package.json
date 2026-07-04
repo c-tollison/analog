@@ -1,0 +1,34 @@
+{
+    "name": "@analog/api",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "dev": "concurrently -n server,types -c blue,yellow \"tsx watch --conditions=development --env-file=.env src/index.ts\" \"tsc --watch --preserveWatchOutput\"",
+        "dev:server": "tsx watch --conditions=development --env-file=.env src/index.ts",
+        "dev:types": "tsc --watch --preserveWatchOutput",
+        "build": "tsc",
+        "start": "node --env-file=.env dist/index.js"
+    },
+    "dependencies": {
+        "@hono/node-server": "^2.0.6",
+        "@analog/db": "workspace:*",
+        "@analog/server": "workspace:*",
+        "@analog/types": "workspace:*",
+        "hono": "catalog:",
+        "toml": "^4.1.2",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@types/node": "^26.0.1",
+        "concurrently": "^10.0.3",
+        "tsx": "^4.22.4",
+        "typescript": "~6.0.3"
+    }
+}

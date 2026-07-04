@@ -1,0 +1,93 @@
+{
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    },
+    "files": {
+        "includes": [
+            "**",
+            "!node_modules",
+            "!**/node_modules",
+            "!.vscode",
+            "!**/.vscode",
+            "!.claude",
+            "!**/.claude",
+            "!dist",
+            "!**/dist",
+            "!build",
+            "!**/build",
+            "!packages/db/drizzle/meta"
+        ]
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 80,
+        "lineEnding": "lf"
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "single",
+            "trailingCommas": "es5",
+            "semicolons": "always"
+        }
+    },
+    "css": {
+        "parser": {
+            "tailwindDirectives": true
+        }
+    },
+    "json": {
+        "formatter": {
+            "enabled": true
+        },
+        "parser": {
+            "allowComments": true,
+            "allowTrailingCommas": true
+        }
+    },
+    "assist": {
+        "actions": {
+            "source": {
+                "organizeImports": {
+                    "level": "on",
+                    "options": {
+                        "groups": [
+                            ":PACKAGE:",
+                            ":BLANK_LINE:",
+                            ":NODE:",
+                            ":BLANK_LINE:",
+                            ["@api/**", "@ui/**"],
+                            ":BLANK_LINE:",
+                            ["./**"]
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "overrides": [
+        {
+            "includes": ["apps/api/src/**"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noConsole": "error"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["**/*.d.ts"],
+            "linter": {
+                "rules": {
+                    "correctness": {
+                        "noUnusedVariables": "off"
+                    }
+                }
+            }
+        }
+    ]
+}
