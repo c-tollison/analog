@@ -55,13 +55,15 @@
                     "level": "on",
                     "options": {
                         "groups": [
-                            ":PACKAGE:",
+                            [":NODE:", ":BUN:"],
                             ":BLANK_LINE:",
-                            ":NODE:",
+                            ["PACKAGE:", "!@analog/**"],
                             ":BLANK_LINE:",
-                            ["@api/**", "@ui/**"],
+                            "@analog/**",
+                            ":BLANK_LINE",
+                            "@/**",
                             ":BLANK_LINE:",
-                            ["./**"]
+                            [":PATH:"]
                         ]
                     }
                 }
