@@ -1,6 +1,6 @@
 # analog
 
-A personal physical media tracker — catalog film, vinyl, books, and other physical collections, with a built-in
+A personal physical media tracker. CDs, video games, books, and other physical collections, with a built-in
 photo scanner for quick upload.
 
 TypeScript monorepo: Hono API, React (Vite) frontend, Postgres via Drizzle ORM, with full-stack type safety end to
