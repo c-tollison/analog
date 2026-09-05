@@ -70,16 +70,6 @@
     },
     "overrides": [
         {
-            "includes": ["apps/api/src/**"],
-            "linter": {
-                "rules": {
-                    "suspicious": {
-                        "noConsole": "error"
-                    }
-                }
-            }
-        },
-        {
             "includes": ["**/*.d.ts"],
             "linter": {
                 "rules": {
