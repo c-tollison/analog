@@ -7,6 +7,7 @@
         "check": "pnpm biome:fix . && pnpm prettier:fix \"**/*.vue\"",
         "check:ci": "biome check . && prettier --check \"**/*.vue\"",
         "dev": "concurrently -n web -c green \"pnpm --filter @analog/web dev\"",
+        "add-component": "node scripts/add-component.mjs",
         "build": "pnpm -r --stream run build"
     },
     "devEngines": {

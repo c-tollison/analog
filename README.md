@@ -28,7 +28,23 @@ pnpm dev
 
 # Build every workspace package
 pnpm build
+
+# Add one or more shadcn-vue components to the web app
+pnpm add-component button
+pnpm add-component button card dialog
 ```
+
+### Adding shadcn-vue components
+
+`pnpm add-component <name...>` wraps the shadcn-vue CLI (`scripts/add-component.mjs`):
+
+1. Runs `shadcn-vue add` from inside `apps/web` so it picks up
+   `apps/web/components.json`. Components land in
+   `apps/web/src/components/shadcn-components/` (the `ui` alias).
+2. Formats the generated files: Biome over the new components and `src/lib`,
+   then Prettier over the new `*.vue` files.
+
+Passing no component name drops into shadcn-vue's interactive picker.
 
 ### Formatting & linting
 

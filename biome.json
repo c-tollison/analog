@@ -111,6 +111,20 @@
                     }
                 }
             }
+        },
+        {
+            "includes": ["apps/web/src/components/shadcn-components/**"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noExplicitAny": "off"
+                    },
+                    "style": {
+                        "noNonNullAssertion": "off",
+                        "useVueMultiWordComponentNames": "off"
+                    }
+                }
+            }
         }
     ]
 }
