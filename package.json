@@ -1,9 +1,13 @@
 {
     "name": "analog",
     "scripts": {
-        "check": "biome check --write .",
-        "check:ci": "biome check .",
-        "prepare": "husky"
+        "prepare": "husky",
+        "biome:fix": "biome check --write --no-errors-on-unmatched",
+        "prettier:fix": "prettier --write --log-level warn",
+        "check": "pnpm biome:fix . && pnpm prettier:fix \"**/*.vue\"",
+        "check:ci": "biome check . && prettier --check \"**/*.vue\"",
+        "dev": "concurrently -n web -c green \"pnpm --filter @analog/web dev\"",
+        "build": "pnpm -r --stream run build"
     },
     "devEngines": {
         "packageManager": {
@@ -21,12 +25,18 @@
     "type": "module",
     "devDependencies": {
         "@biomejs/biome": "^2.5.12",
+        "concurrently": "^10.0.5",
         "husky": "^9.1.7",
-        "lint-staged": "^17.4.1"
+        "lint-staged": "^17.4.1",
+        "prettier": "^3.9.6"
     },
     "lint-staged": {
         "*.{js,ts,jsx,tsx,json,css}": [
-            "pnpm check:ci"
+            "pnpm biome:fix"
+        ],
+        "*.vue": [
+            "pnpm biome:fix",
+            "pnpm prettier:fix"
         ]
     }
 }

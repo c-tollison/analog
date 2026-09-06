@@ -1,0 +1,15 @@
+{
+    "embeddedLanguageFormatting": "off",
+    "singleQuote": true,
+    "tabWidth": 4,
+    "printWidth": 80,
+    "endOfLine": "lf",
+    "overrides": [
+        {
+            "files": "*.vue",
+            "options": {
+                "vueIndentScriptAndStyle": false
+            }
+        }
+    ]
+}

@@ -14,7 +14,7 @@ Built as a side project to tighten understanding on multiple subjects, including
 
 ## Dev Info
 
-`package.json` scripts:
+### Important root `package.json` scripts
 
 ```bash
 # Format and lint, applying safe fixes in place
@@ -22,4 +22,17 @@ pnpm check
 
 # Format and lint in check-only mode (used in CI)
 pnpm check:ci
+
+# Run all app dev servers
+pnpm dev
+
+# Build every workspace package
+pnpm build
 ```
+
+### Formatting & linting
+
+Using both Biome and Prettier. Biome formats and lints everything except Vue
+single-file components; Prettier runs only over `**/*.vue` to format the HTML in
+Vue templates (which Biome does not handle). Both run in `pnpm check` and in the
+`lint-staged` pre-commit hook.

@@ -80,6 +80,37 @@
                     }
                 }
             }
+        },
+        {
+            "includes": ["**/*.vue"],
+            "linter": {
+                "rules": {
+                    "correctness": {
+                        "noUnusedVariables": "off",
+                        "noUnusedImports": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["**/*.svg"],
+            "linter": {
+                "rules": {
+                    "a11y": {
+                        "noSvgWithoutTitle": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["apps/api/src/**"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noConsole": "error"
+                    }
+                }
+            }
         }
     ]
 }

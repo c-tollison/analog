@@ -1,0 +1,7 @@
+**/*
+!**/
+!**/*.vue
+
+**/node_modules/**
+**/dist/**
+**/build/**

@@ -8,6 +8,11 @@
     "[jsonc]": {
         "editor.defaultFormatter": "biomejs.biome"
     },
+    "[vue]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "prettier.documentSelectors": ["**/*.vue"],
     "[toml]": {
         "editor.defaultFormatter": "tamasfe.even-better-toml"
     },
