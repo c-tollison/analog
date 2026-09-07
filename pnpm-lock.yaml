@@ -188,6 +188,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@analog/api':
+        specifier: workspace:*
+        version: link:../api
       '@lucide/vue':
         specifier: ^1.41.0
         version: 1.41.0(vue@3.5.42(typescript@6.0.3))
