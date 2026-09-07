@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { Stage } from '@analog/types';
 
-import { parse as parseToml } from 'smol-toml';
+import { parse } from 'smol-toml';
 import { z } from 'zod';
 
 const StageConfigSchema = z.object({
@@ -35,10 +35,7 @@ export function loadConfig(configPath = CONFIG_PATH): Config {
 
     EnvSchema.parse(process.env);
 
-    const toml = parseToml(readFileSync(configPath, 'utf-8')) as Record<
-        string,
-        unknown
-    >;
+    const toml = parse(readFileSync(configPath, 'utf-8'));
 
     const stageTable = toml[stage];
     if (!stageTable) {
