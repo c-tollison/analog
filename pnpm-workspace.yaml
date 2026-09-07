@@ -10,4 +10,5 @@ catalog:
   hono: ^4.13.7
   "@types/node": ^26.4.0
   zod: ^4.5.4
-  tsx: "^4.23.13" 
+  tsx: "^4.23.13"
+  concurrently: ^10.0.5 
