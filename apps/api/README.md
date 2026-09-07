@@ -22,9 +22,5 @@ pnpm start
 ```
 ## Config
 
-Config comes in two layers. `.env` holds secrets and per-machine overrides;
-right now the only key is `STAGE` (`local` or `deployed`), which picks a table
-in `config/config.toml`. Copy `.env.example` to `.env` to get started.
-`config/config.toml` holds the per-stage, non-secret settings (`appUrl`,
-`server.port`, `cors.origins`) and is checked into the repo. `loadConfig()`
-parses both layers into a zod-validated `Config`.
+`.env` holds secrets and per-machine overrides. Copy `.env.example` to `.env` to get started.
+`config/config.toml` holds the per-stage, non-secret settings and is checked into the repo. 
