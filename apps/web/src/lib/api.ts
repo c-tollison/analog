@@ -7,7 +7,6 @@ export const NETWORK_ERROR_STATUS = 0;
 export type ApiClient = ReturnType<typeof hcWithType>['api'];
 
 export interface ApiClientOptions {
-    /** Origin of the API, e.g. `http://localhost:3001`. */
     baseUrl: string;
 }
 
