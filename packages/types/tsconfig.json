@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "lib": ["ESNext"],
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "verbatimModuleSyntax": true,
+        "skipLibCheck": true,
+        "declaration": true,
+        "declarationMap": true,
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "composite": true
+    },
+    "include": ["src"]
+}

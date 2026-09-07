@@ -2,7 +2,12 @@ packages:
   - "apps/*"
   - "packages/**/*"
 allowBuilds:
+  esbuild: true
   vue-demi: true
 catalog:
   typescript: 6.0.3
   vite: ^8.1.5
+  hono: ^4.13.7
+  "@types/node": ^26.4.0
+  zod: ^4.5.4
+  tsx: "^4.23.13" 

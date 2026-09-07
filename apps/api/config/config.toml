@@ -1,0 +1,17 @@
+[local]
+appUrl = 'http://localhost:5173'
+
+[local.server]
+port = 3001
+
+[local.cors]
+origins = ['http://localhost:5173']
+
+[deployed]
+appUrl = 'https://analog.carson-dev.com'
+
+[deployed.server]
+port = 3001
+
+[deployed.cors]
+origins = ['https://analog.carson-dev.com']
