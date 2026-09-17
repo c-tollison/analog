@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { loadConfig } from './lib/config.js';
-import { init, logger } from './lib/init.js';
+import { db, init, logger } from './lib/init.js';
+import { registerGracefulShutdown } from './lib/shutdown.js';
 import { serve } from '@hono/node-server';
 
 async function main() {
@@ -9,7 +10,7 @@ async function main() {
 
     const app = createApp(config);
 
-    serve(
+    const server = serve(
         {
             fetch: app.fetch,
             port: config.server.port,
@@ -21,6 +22,8 @@ async function main() {
             );
         }
     );
+
+    registerGracefulShutdown(server, logger(), () => db().$client.end());
 }
 
 main().catch((err) => {
