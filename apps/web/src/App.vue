@@ -8,7 +8,7 @@ const api = useApiClient();
 const message = ref('');
 
 async function fetchMessage() {
-    const res = await api['hello-world'].$get();
+    const res = await api['hello-world'].$get({ query: { name: 'Analog' } });
     message.value = await res.text();
 }
 </script>
