@@ -1,0 +1,67 @@
+# Production stack. Runs on the VPS next to a .env (see .env.example) and
+# joins the shared `vps` network from ../vps-infra, which provides Traefik
+# and Postgres. Nothing here publishes a port; Traefik is the only way in.
+#
+#   docker compose pull && docker compose up -d
+
+name: analog
+
+services:
+    migrate:
+        image: ghcr.io/c-tollison/analog-api:latest
+        command: node node_modules/@analog/db/dist/scripts/migrate.js
+        env_file: .env
+        networks: [vps]
+        security_opt:
+            - no-new-privileges:true
+
+    api:
+        image: ghcr.io/c-tollison/analog-api:latest
+        restart: unless-stopped
+        env_file: .env
+        depends_on:
+            migrate:
+                condition: service_completed_successfully
+        networks: [vps]
+        security_opt:
+            - no-new-privileges:true
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "node",
+                    "-e",
+                    "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.analog-api.rule=Host(`analog.coji-dev.com`) && PathPrefix(`/api`)"
+            - "traefik.http.routers.analog-api.entrypoints=websecure"
+            - "traefik.http.routers.analog-api.tls.certresolver=letsencrypt"
+            - "traefik.http.services.analog-api.loadbalancer.server.port=3001"
+
+    web:
+        image: ghcr.io/c-tollison/analog-web:latest
+        restart: unless-stopped
+        networks: [vps]
+        security_opt:
+            - no-new-privileges:true
+        healthcheck:
+            test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.analog-web.rule=Host(`analog.coji-dev.com`)"
+            - "traefik.http.routers.analog-web.entrypoints=websecure"
+            - "traefik.http.routers.analog-web.tls.certresolver=letsencrypt"
+            - "traefik.http.services.analog-web.loadbalancer.server.port=8080"
+
+networks:
+    vps:
+        external: true
