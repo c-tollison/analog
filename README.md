@@ -23,11 +23,18 @@ pnpm check
 # Format and lint in check-only mode (used in CI)
 pnpm check:ci
 
-# Run all app dev servers
+# Start local Postgres (if not already running), then all app dev servers
 pnpm dev
 
 # Build every workspace package
 pnpm build
+
+# Start / stop the local Postgres container (docker-compose.local.yml)
+pnpm local:up
+pnpm local:down
+
+# Stop, wipe the database volume, and start fresh
+pnpm local:reset
 
 # Add one or more shadcn-vue components to the web app
 pnpm add-component button
