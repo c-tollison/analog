@@ -7,6 +7,10 @@ port = 3001
 [local.cors]
 origins = ['http://localhost:5173']
 
+[local.db]
+maxConnections = 5
+ssl = false
+
 [deployed]
 appUrl = 'https://analog.carson-dev.com'
 
@@ -15,3 +19,7 @@ port = 3001
 
 [deployed.cors]
 origins = ['https://analog.carson-dev.com']
+
+[deployed.db]
+maxConnections = 10
+ssl = false

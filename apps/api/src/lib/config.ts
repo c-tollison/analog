@@ -14,26 +14,35 @@ const StageConfigSchema = z.object({
     cors: z.object({
         origins: z.array(z.url()).min(1, 'cors.origins must not be empty'),
     }),
+    db: z.object({
+        maxConnections: z.number().int().positive(),
+        ssl: z.boolean(),
+    }),
 });
 
 const EnvSchema = z.object({
+    STAGE: z.enum(Stage),
     LOG_LEVEL: z
         .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
         .optional(),
+    DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 });
 
-const StageSchema = z.enum(Stage);
+type StageConfig = z.infer<typeof StageConfigSchema>;
 
-export type Config = z.infer<typeof StageConfigSchema> & {
+export type Config = Omit<StageConfig, 'db'> & {
     stage: Stage;
+    db: StageConfig['db'] & { url: string };
 };
 
 const CONFIG_PATH = resolve(import.meta.dirname, '../../config/config.toml');
 
-export function loadConfig(configPath = CONFIG_PATH): Config {
-    const stage = StageSchema.parse(process.env.STAGE);
-
-    EnvSchema.parse(process.env);
+export function loadConfig(
+    env: NodeJS.ProcessEnv = process.env,
+    configPath = CONFIG_PATH
+): Config {
+    const parsedEnv = EnvSchema.parse(env);
+    const stage = parsedEnv.STAGE;
 
     const toml = parse(readFileSync(configPath, 'utf-8'));
 
@@ -42,8 +51,11 @@ export function loadConfig(configPath = CONFIG_PATH): Config {
         throw new Error(`No config for stage '${stage}' in ${configPath}`);
     }
 
+    const stageConfig = StageConfigSchema.parse(stageTable);
+
     return {
         stage,
-        ...StageConfigSchema.parse(stageTable),
+        ...stageConfig,
+        db: { ...stageConfig.db, url: parsedEnv.DATABASE_URL },
     };
 }
