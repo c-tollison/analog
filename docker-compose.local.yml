@@ -2,7 +2,7 @@ name: analog
 
 services:
     postgres:
-        image: postgres:18
+        image: postgres:18.1
         container_name: analog-db
         restart: unless-stopped
         environment:
