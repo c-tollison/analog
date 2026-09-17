@@ -1,1 +1,1 @@
-export * from './primitiives.js';
+export * from './primitives.js';
