@@ -16,6 +16,7 @@ const StageConfigSchema = z.object({
     }),
     db: z.object({
         maxConnections: z.number().int().positive(),
+        ssl: z.boolean(),
     }),
 });
 

@@ -9,6 +9,7 @@ origins = ['http://localhost:5173']
 
 [local.db]
 maxConnections = 5
+ssl = false
 
 [deployed]
 appUrl = 'https://analog.carson-dev.com'
@@ -21,3 +22,4 @@ origins = ['https://analog.carson-dev.com']
 
 [deployed.db]
 maxConnections = 10
+ssl = false

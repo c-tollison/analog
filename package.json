@@ -11,7 +11,9 @@
         "build": "pnpm -r --stream run build",
         "local:up": "docker compose -f docker-compose.local.yml up -d --wait",
         "local:down": "docker compose -f docker-compose.local.yml down",
-        "local:reset": "docker compose -f docker-compose.local.yml down -v && pnpm local:up"
+        "local:reset": "docker compose -f docker-compose.local.yml down -v && pnpm local:up",
+        "db:generate": "pnpm --filter @analog/db generate",
+        "db:migrate": "pnpm --filter @analog/db migrate"
     },
     "devEngines": {
         "packageManager": {
