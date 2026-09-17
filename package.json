@@ -6,14 +6,17 @@
         "prettier:fix": "prettier --write --log-level warn",
         "check": "pnpm biome:fix . && pnpm prettier:fix \"**/*.vue\"",
         "check:ci": "biome check . && prettier --check \"**/*.vue\"",
-        "dev": "pnpm local:up && concurrently -n api,web -c blue,green \"pnpm --filter @analog/api dev\" \"pnpm --filter @analog/web dev\"",
+        "dev": "pnpm local:start && concurrently -n api,web -c blue,green \"pnpm --filter @analog/api dev\" \"pnpm --filter @analog/web dev\"",
         "add-component": "node scripts/add-component.mjs",
         "build": "pnpm -r --stream run build",
-        "local:up": "docker compose -f docker-compose.local.yml up -d --wait",
+        "local:start": "docker compose -f docker-compose.local.yml up -d --wait",
+        "local:up": "pnpm local:start && pnpm db:migrate && pnpm db:seed",
         "local:down": "docker compose -f docker-compose.local.yml down",
         "local:reset": "docker compose -f docker-compose.local.yml down -v && pnpm local:up",
         "db:generate": "pnpm --filter @analog/db generate",
-        "db:migrate": "pnpm --filter @analog/db migrate"
+        "db:migrate": "pnpm --filter @analog/db migrate",
+        "db:seed": "pnpm --filter @analog/db seed",
+        "deploy": "scripts/deploy.sh"
     },
     "devEngines": {
         "packageManager": {
