@@ -16,10 +16,7 @@ async function main() {
             port: config.server.port,
         },
         (info) => {
-            logger().info(
-                { url: `http://localhost:${info.port}`, stage: config.stage },
-                'Server is running'
-            );
+            logger().info({ port: info.port }, 'Server is running');
         }
     );
 

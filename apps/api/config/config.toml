@@ -12,13 +12,13 @@ maxConnections = 5
 ssl = false
 
 [deployed]
-appUrl = 'https://analog.carson-dev.com'
+appUrl = 'https://analog.coji-dev.com'
 
 [deployed.server]
 port = 3001
 
 [deployed.cors]
-origins = ['https://analog.carson-dev.com']
+origins = ['https://analog.coji-dev.com']
 
 [deployed.db]
 maxConnections = 10
