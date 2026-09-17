@@ -29,6 +29,7 @@
         "@analog/db": "workspace:*",
         "@analog/types": "workspace:*",
         "@hono/node-server": "^2.1.1",
+        "@hono/zod-validator": "^0.9.1",
         "hono": "catalog:",
         "pino": "^10.3.1",
         "smol-toml": "^1.8.0",
