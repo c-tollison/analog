@@ -15,8 +15,7 @@
         "local:reset": "docker compose -f docker-compose.local.yml down -v && pnpm local:up",
         "db:generate": "pnpm --filter @analog/db generate",
         "db:migrate": "pnpm --filter @analog/db migrate",
-        "db:seed": "pnpm --filter @analog/db seed",
-        "deploy": "scripts/deploy.sh"
+        "db:seed": "pnpm --filter @analog/db seed"
     },
     "devEngines": {
         "packageManager": {
