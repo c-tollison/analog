@@ -1,30 +1,38 @@
-# Production stack. Runs on the VPS next to a .env (see .env.example) and
-# joins the shared `vps` network from ../vps-infra, which provides Traefik
-# and Postgres. Nothing here publishes a port; Traefik is the only way in.
+# Production stack. Lives at ~/analog/ on the VPS next to a .env (see
+# .env.example). Joins the shared `vps` (Traefik) and `db` (Postgres)
+# networks from vps-infra. Nothing here publishes a port; Traefik is the only
+# way in, and only api and migrate can reach Postgres.
 #
-#   docker compose pull && docker compose up -d
+# IMAGE_TAG comes from .env; vps-infra's deploy.sh writes it on every deploy.
+# To roll back, set it to an older `sha-<commit>` and `docker compose up -d`.
 
 name: analog
 
 services:
     migrate:
-        image: ghcr.io/c-tollison/analog-api:latest
+        image: ghcr.io/c-tollison/analog-api:${IMAGE_TAG:?set IMAGE_TAG in .env}
         command: node node_modules/@analog/db/dist/scripts/migrate.js
         env_file: .env
-        networks: [vps]
+        networks: [db]
         security_opt:
             - no-new-privileges:true
+        read_only: true
+        tmpfs: [/tmp]
+        mem_limit: 256m
 
     api:
-        image: ghcr.io/c-tollison/analog-api:latest
+        image: ghcr.io/c-tollison/analog-api:${IMAGE_TAG:?set IMAGE_TAG in .env}
         restart: unless-stopped
         env_file: .env
         depends_on:
             migrate:
                 condition: service_completed_successfully
-        networks: [vps]
+        networks: [vps, db]
         security_opt:
             - no-new-privileges:true
+        read_only: true
+        tmpfs: [/tmp]
+        mem_limit: 256m
         healthcheck:
             test:
                 [
@@ -45,11 +53,15 @@ services:
             - "traefik.http.services.analog-api.loadbalancer.server.port=3001"
 
     web:
-        image: ghcr.io/c-tollison/analog-web:latest
+        image: ghcr.io/c-tollison/analog-web:${IMAGE_TAG:?set IMAGE_TAG in .env}
         restart: unless-stopped
         networks: [vps]
         security_opt:
             - no-new-privileges:true
+        # nginx-unprivileged keeps its pid and temp dirs under /tmp.
+        read_only: true
+        tmpfs: [/tmp]
+        mem_limit: 64m
         healthcheck:
             test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/"]
             interval: 30s
@@ -64,4 +76,6 @@ services:
 
 networks:
     vps:
+        external: true
+    db:
         external: true

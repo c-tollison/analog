@@ -5,7 +5,6 @@ on:
         branches: [main]
     workflow_dispatch:
 
-# One deploy at a time; queued runs wait rather than racing on the VPS.
 concurrency:
     group: deploy
     cancel-in-progress: false
@@ -17,6 +16,8 @@ env:
 jobs:
     check:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         steps:
             - uses: actions/checkout@v7
             - uses: pnpm/action-setup@v6
@@ -51,7 +52,6 @@ jobs:
               uses: docker/metadata-action@v6
               with:
                   images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/analog-${{ matrix.app }}
-                  # `latest` is what compose pulls; the sha tag is for rollback.
                   tags: |
                       type=raw,value=latest
                       type=sha
@@ -70,11 +70,8 @@ jobs:
     deploy:
         needs: build
         runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: read
+        permissions: {}
         steps:
-            - uses: actions/checkout@v7
             - name: Set up SSH
               run: |
                   mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -89,22 +86,7 @@ jobs:
                     IdentityFile ~/.ssh/id_ed25519
                     IdentitiesOnly yes
                   EOF
-            - name: Copy compose file
-              run: scp docker-compose.yml vps:~/analog/docker-compose.yml
-            - name: Pull and restart
-              # The job token can read this repo's packages, so the VPS never
-              # stores a long-lived registry credential.
-              run: |
-                  ssh vps bash -s <<REMOTE
-                    set -euo pipefail
-                    cd ~/analog
-                    echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-                    docker compose pull --quiet
-                    docker logout ghcr.io
-                    docker compose up -d --remove-orphans
-                    docker image prune -f >/dev/null
-                    docker compose ps
-                  REMOTE
-              env:
-                  GHCR_USER: ${{ github.actor }}
-                  GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Deploy
+              # The only thing the VPS accepts from this key is an image tag.
+              # Must match the `type=sha` tag above (7-char short sha).
+              run: ssh vps "sha-${GITHUB_SHA::7}"
