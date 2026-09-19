@@ -20,6 +20,9 @@ export function CreateAuthInstance(
         secret: config.auth.secret,
         baseURL: config.appUrl,
         trustedOrigins: config.cors.origins,
+        advanced: {
+            database: { generateId: 'uuid' },
+        },
         logger: {
             level: config.stage === Stage.Local ? 'debug' : 'warn',
             log: (level, message, ...args) => logger[level]({ args }, message),
