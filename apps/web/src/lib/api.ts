@@ -23,7 +23,7 @@ export class ApiError extends Error {
 export function createApiClient({ baseUrl }: ApiClientOptions): ApiClient {
     const wrappedFetch: typeof fetch = async (input, init) => {
         try {
-            return await fetch(input, init);
+            return await fetch(input, { ...init, credentials: 'include' });
         } catch {
             throw new ApiError(
                 'Unable to reach the server. Check your connection and try again.',
