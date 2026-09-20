@@ -27,6 +27,9 @@ export function CreateAuthInstance(
             level: config.stage === Stage.Local ? 'debug' : 'warn',
             log: (level, message, ...args) => logger[level]({ args }, message),
         },
+        emailAndPassword: {
+            enabled: true,
+        },
     });
 
     logger.info(
