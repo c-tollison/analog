@@ -37,3 +37,30 @@ export const SignInSchema = z.object({
 
 export type SignUpInput = z.infer<typeof SignUpSchema>;
 export type SignInInput = z.infer<typeof SignInSchema>;
+
+export const OTP_LENGTH = 6;
+
+export const OtpSchema = z
+    .string()
+    .regex(
+        new RegExp(`^\\d{${OTP_LENGTH}}$`),
+        `Enter the ${OTP_LENGTH}-digit code`
+    );
+
+export const VerifyOtpSchema = z.object({
+    otp: OtpSchema,
+});
+
+export const ForgotPasswordSchema = z.object({
+    email: EmailSchema,
+});
+
+export const ResetPasswordSchema = z.object({
+    email: EmailSchema,
+    otp: OtpSchema,
+    password: PasswordSchema,
+});
+
+export type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
