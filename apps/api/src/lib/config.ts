@@ -18,6 +18,9 @@ const StageConfigSchema = z.object({
         maxConnections: z.number().int().positive(),
         ssl: z.boolean(),
     }),
+    email: z.object({
+        from: z.string().min(1),
+    }),
 });
 
 const EnvSchema = z.object({
@@ -27,6 +30,7 @@ const EnvSchema = z.object({
         .optional(),
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     BETTER_AUTH_SECRET: z.string().min(32),
+    RESEND_API_KEY: z.string().min(1).optional(),
 });
 
 type StageConfig = z.infer<typeof StageConfigSchema>;
@@ -35,6 +39,7 @@ export type Config = Omit<StageConfig, 'db'> & {
     stage: Stage;
     db: StageConfig['db'] & { url: string };
     auth: { secret: string };
+    email: StageConfig['email'] & { resendApiKey: string | undefined };
 };
 
 const CONFIG_PATH = resolve(import.meta.dirname, '../../config/config.toml');
@@ -55,10 +60,15 @@ export function loadConfig(
 
     const stageConfig = StageConfigSchema.parse(stageTable);
 
+    if (stage !== Stage.Local && !parsedEnv.RESEND_API_KEY) {
+        throw new Error(`RESEND_API_KEY is required for stage '${stage}'`);
+    }
+
     return {
         stage,
         ...stageConfig,
         db: { ...stageConfig.db, url: parsedEnv.DATABASE_URL },
         auth: { secret: parsedEnv.BETTER_AUTH_SECRET },
+        email: { ...stageConfig.email, resendApiKey: parsedEnv.RESEND_API_KEY },
     };
 }

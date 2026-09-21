@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import FormError from '@/components/FormError.vue';
+import { Alert, AlertDescription } from '@/components/shadcn-components/alert';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Card,
@@ -20,6 +21,7 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { signIn } from '@/lib/auth';
 import { SignInSchema } from '@/lib/auth-schemas';
+import { getRedirect } from '@/lib/redirect';
 
 import { useRoute, useRouter } from 'vue-router';
 
@@ -30,13 +32,26 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
     schema: SignInSchema,
     initialValues: { email: '', password: '' },
     onSubmit: async (values) => {
-        const { error } = await signIn.email(values);
+        const redirect = getRedirect(route.query);
+        const { data, error } = await signIn.email(values);
+
+        if (error?.code === 'EMAIL_NOT_VERIFIED') {
+            await router.push({
+                name: 'verify-email',
+                query: { email: values.email, redirect },
+            });
+            return;
+        }
         if (error) {
             return error.message ?? 'Unable to sign in.';
         }
 
-        const redirect = route.query.redirect;
-        await router.replace(typeof redirect === 'string' ? redirect : '/');
+        if (data && 'twoFactorRedirect' in data && data.twoFactorRedirect) {
+            await router.push({ name: 'two-factor', query: { redirect } });
+            return;
+        }
+
+        await router.replace(redirect);
     },
 });
 </script>
@@ -52,6 +67,11 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
             </CardHeader>
             <CardContent>
                 <form class="grid gap-4" novalidate @submit="submit">
+                    <Alert v-if="route.query.reset && !formError">
+                        <AlertDescription>
+                            Password updated. Sign in with your new password.
+                        </AlertDescription>
+                    </Alert>
                     <FormError :message="formError" />
 
                     <FormField
@@ -79,7 +99,15 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                         name="password"
                     >
                         <FormItem>
-                            <FormLabel>Password</FormLabel>
+                            <div class="flex items-center justify-between">
+                                <FormLabel>Password</FormLabel>
+                                <RouterLink
+                                    class="text-muted-foreground text-sm underline"
+                                    :to="{ name: 'forgot-password' }"
+                                >
+                                    Forgot password?
+                                </RouterLink>
+                            </div>
                             <FormControl>
                                 <Input
                                     type="password"

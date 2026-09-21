@@ -25,6 +25,20 @@ pnpm start
 `.env` holds secrets and per-machine overrides. Copy `.env.example` to `.env` to get started.
 `config/config.toml` holds the per-stage, non-secret settings and is checked into the repo. 
 
+## Auth emails locally
+
+Verification, sign-in, and password reset codes are sent through Resend only
+when `RESEND_API_KEY` is set (required for `STAGE=deployed`). Locally it's
+left unset, so the email is logged by the API instead. Find the code in the
+`pnpm dev` terminal:
+
+```
+INFO: email to you@example.com (not sent, no RESEND_API_KEY)
+Verify your Analog email
+
+Your code is 458949
+```
+
 ## Docker
 
 Build from the repo root so workspace packages are in context. Local Postgres
@@ -42,7 +56,8 @@ docker run --rm --network analog_default \
 
 # Run the API, then hit it from a sibling container (no ports are published)
 docker run -d --name analog-api-test --network analog_default \
-  -e STAGE=deployed -e DATABASE_URL=postgres://analog:analog@analog-db:5432/analog analog-api
+  -e STAGE=deployed -e RESEND_API_KEY=re_placeholder \
+  -e DATABASE_URL=postgres://analog:analog@analog-db:5432/analog analog-api
 docker run --rm --network analog_default analog-api \
   node -e "fetch('http://analog-api-test:3001/api/hello-world').then(r=>r.text()).then(console.log)"
 

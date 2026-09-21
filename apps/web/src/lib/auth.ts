@@ -1,9 +1,11 @@
 import { API_URL } from './env';
+import { emailOTPClient, twoFactorClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/vue';
 import { type ComputedRef, computed, shallowRef } from 'vue';
 
 export const authClient = createAuthClient({
     baseURL: `${API_URL}/api/auth`,
+    plugins: [emailOTPClient(), twoFactorClient()],
     fetchOptions: {
         credentials: 'include',
         onSuccess: (ctx) => {
@@ -14,7 +16,8 @@ export const authClient = createAuthClient({
     },
 });
 
-export const { signIn, signUp, signOut, useSession } = authClient;
+export const { signIn, signUp, signOut, useSession, emailOtp, twoFactor } =
+    authClient;
 
 type Session = Awaited<ReturnType<typeof authClient.getSession>>['data'];
 
@@ -40,10 +43,18 @@ export async function getCachedSession(): Promise<Session> {
 
     pendingSession ??= authClient
         .getSession()
-        .then(({ data, error }) => {
-            if (!error) {
-                cachedSession.value = data;
+        .then(async ({ data, error }) => {
+            if (error) {
+                return data;
             }
+
+            if (data && !data.user.emailVerified) {
+                await authClient.signOut();
+                cachedSession.value = null;
+                return null;
+            }
+
+            cachedSession.value = data;
             return data;
         })
         .finally(() => {
