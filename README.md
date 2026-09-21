@@ -84,7 +84,8 @@ builds nothing. It has one directory:
    Keep the URL it prints.
 2. **Env file.** On the VPS: `mkdir ~/analog`, then write `~/analog/.env`
    from `.env.example` with `STAGE=deployed`, `DATABASE_URL=` set to that
-   URL, and `IMAGE_TAG=` left empty. `chmod 600 ~/analog/.env`.
+   URL, `BETTER_AUTH_SECRET=` set to `openssl rand -base64 32`, and
+   `IMAGE_TAG=` left empty. `chmod 600 ~/analog/.env`.
 3. **Compose file.** Copy `docker-compose.yml` from this repo to `~/analog/`.
    Do this again whenever it changes; the workflow does not deliver it.
 4. **Deploy key.** On your laptop:

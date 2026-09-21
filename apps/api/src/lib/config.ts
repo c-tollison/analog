@@ -26,6 +26,7 @@ const EnvSchema = z.object({
         .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
         .optional(),
     DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+    BETTER_AUTH_SECRET: z.string().min(32),
 });
 
 type StageConfig = z.infer<typeof StageConfigSchema>;
@@ -33,6 +34,7 @@ type StageConfig = z.infer<typeof StageConfigSchema>;
 export type Config = Omit<StageConfig, 'db'> & {
     stage: Stage;
     db: StageConfig['db'] & { url: string };
+    auth: { secret: string };
 };
 
 const CONFIG_PATH = resolve(import.meta.dirname, '../../config/config.toml');
@@ -57,5 +59,6 @@ export function loadConfig(
         stage,
         ...stageConfig,
         db: { ...stageConfig.db, url: parsedEnv.DATABASE_URL },
+        auth: { secret: parsedEnv.BETTER_AUTH_SECRET },
     };
 }
