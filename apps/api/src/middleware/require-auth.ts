@@ -22,7 +22,7 @@ export const requireAuth = createMiddleware<AuthEnv>(async (c, next) => {
         c.header('Set-Cookie', cookie, { append: true });
     }
 
-    if (!response) {
+    if (!response?.user.emailVerified) {
         throw new HTTPException(401, { message: 'Unauthorized' });
     }
 
