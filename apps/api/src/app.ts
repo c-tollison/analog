@@ -3,6 +3,7 @@ import { getCorsConfig } from './lib/cors.js';
 import { auth, logger } from './lib/init.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { createRequestLoggerMiddleware } from './middleware/request-logger.js';
+import { requireAuth } from './middleware/require-auth.js';
 import helloWorld from './routes/helloworld.js';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -31,7 +32,7 @@ export function createApp(config: Config) {
 
     const api = app.basePath('/api');
     api.on(['POST', 'GET'], '/auth/*', (c) => auth().handler(c.req.raw));
-    return api.route('/hello-world', helloWorld);
+    return api.use(requireAuth).route('/hello-world', helloWorld);
 }
 
 export type ApiRoutes = ReturnType<typeof createApp>;

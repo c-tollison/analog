@@ -1,4 +1,4 @@
-import { authClient } from '@/lib/auth';
+import { getCachedSession } from '@/lib/auth';
 import HomeView from '@/views/HomeView.vue';
 import SignInView from '@/views/SignInView.vue';
 import SignUpView from '@/views/SignUpView.vue';
@@ -41,7 +41,7 @@ router.beforeEach(async (to) => {
         return true;
     }
 
-    const { data: session } = await authClient.getSession();
+    const session = await getCachedSession();
 
     if (to.meta.requiresAuth && !session) {
         return { name: 'sign-in', query: { redirect: to.fullPath } };
