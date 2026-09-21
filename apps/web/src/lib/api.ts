@@ -1,8 +1,10 @@
 import { hcWithType } from '@analog/api/client';
 
+import { reportUnauthorized } from './auth';
 import { type InjectionKey, inject } from 'vue';
 
 export const NETWORK_ERROR_STATUS = 0;
+const UNAUTHORIZED_STATUS = 401;
 
 export type ApiClient = ReturnType<typeof hcWithType>['api'];
 
@@ -23,7 +25,11 @@ export class ApiError extends Error {
 export function createApiClient({ baseUrl }: ApiClientOptions): ApiClient {
     const wrappedFetch: typeof fetch = async (input, init) => {
         try {
-            return await fetch(input, { ...init, credentials: 'include' });
+            const res = await fetch(input, { ...init, credentials: 'include' });
+            if (res.status === UNAUTHORIZED_STATUS) {
+                reportUnauthorized();
+            }
+            return res;
         } catch {
             throw new ApiError(
                 'Unable to reach the server. Check your connection and try again.',
