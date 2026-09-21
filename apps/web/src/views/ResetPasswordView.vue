@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { PASSWORD_MIN_LENGTH } from '@analog/types';
+import CodeInput from '@/components/CodeInput.vue';
 import FormError from '@/components/FormError.vue';
+import ResendCode from '@/components/ResendCode.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Card,
@@ -20,34 +22,46 @@ import {
 import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
-import { signUp } from '@/lib/auth';
-import { SignUpFormSchema } from '@/lib/auth-schemas';
+import { emailOtp } from '@/lib/auth';
+import { ResetPasswordFormSchema } from '@/lib/auth-schemas';
 
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
+const route = useRoute();
 const router = useRouter();
 
+const email = String(route.query.email);
+
 const { submit, formError, isSubmitting, fieldProps } = useAppForm({
-    schema: SignUpFormSchema,
-    initialValues: { name: '', email: '', password: '', confirmPassword: '' },
-    onSubmit: async ({ name, email, password }) => {
-        const { error } = await signUp.email({ name, email, password });
+    schema: ResetPasswordFormSchema,
+    initialValues: { otp: '', password: '', confirmPassword: '' },
+    onSubmit: async ({ otp, password }) => {
+        const { error } = await emailOtp.resetPassword({
+            email,
+            otp,
+            password,
+        });
         if (error) {
-            return error.message ?? 'Unable to create your account.';
+            return error.message ?? 'Unable to reset your password.';
         }
 
-        await router.push({ name: 'verify-email', query: { email } });
+        await router.replace({ name: 'sign-in', query: { reset: '1' } });
     },
 });
+
+async function resend() {
+    const { error } = await emailOtp.requestPasswordReset({ email });
+    return error ? (error.message ?? 'Unable to send a new code.') : undefined;
+}
 </script>
 
 <template>
     <main class="flex min-h-svh items-center justify-center p-4">
         <Card class="w-full max-w-sm">
             <CardHeader>
-                <CardTitle>Create an account</CardTitle>
+                <CardTitle>Choose a new password</CardTitle>
                 <CardDescription>
-                    It only takes a few seconds to get started.
+                    If {{ email }} has an account, we sent it a reset code.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -57,35 +71,12 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                     <FormField
                         v-slot="{ componentField }"
                         v-bind="fieldProps"
-                        name="name"
+                        name="otp"
                     >
                         <FormItem>
-                            <FormLabel>Name</FormLabel>
+                            <FormLabel>Reset code</FormLabel>
                             <FormControl>
-                                <Input
-                                    type="text"
-                                    autocomplete="name"
-                                    v-bind="componentField"
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField
-                        v-slot="{ componentField }"
-                        v-bind="fieldProps"
-                        name="email"
-                    >
-                        <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="email"
-                                    autocomplete="email"
-                                    placeholder="you@example.com"
-                                    v-bind="componentField"
-                                />
+                                <CodeInput v-bind="componentField" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -97,7 +88,7 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                         name="password"
                     >
                         <FormItem>
-                            <FormLabel>Password</FormLabel>
+                            <FormLabel>New password</FormLabel>
                             <FormControl>
                                 <Input
                                     type="password"
@@ -118,7 +109,7 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                         name="confirmPassword"
                     >
                         <FormItem>
-                            <FormLabel>Confirm password</FormLabel>
+                            <FormLabel>Confirm new password</FormLabel>
                             <FormControl>
                                 <Input
                                     type="password"
@@ -132,15 +123,10 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
 
                     <Button type="submit" :disabled="isSubmitting">
                         <Spinner v-if="isSubmitting" />
-                        Create account
+                        Reset password
                     </Button>
 
-                    <p class="text-muted-foreground text-center text-sm">
-                        Already have an account?
-                        <RouterLink class="underline" to="/sign-in">
-                            Sign in
-                        </RouterLink>
-                    </p>
+                    <ResendCode :send="resend" @error="formError = $event" />
                 </form>
             </CardContent>
         </Card>

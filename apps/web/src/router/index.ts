@@ -1,9 +1,17 @@
 import { getCachedSession } from '@/lib/auth';
+import ForgotPasswordView from '@/views/ForgotPasswordView.vue';
 import HomeView from '@/views/HomeView.vue';
+import ResetPasswordView from '@/views/ResetPasswordView.vue';
 import SignInView from '@/views/SignInView.vue';
 import SignUpView from '@/views/SignUpView.vue';
+import TwoFactorView from '@/views/TwoFactorView.vue';
+import VerifyEmailView from '@/views/VerifyEmailView.vue';
 
-import { createRouter, createWebHistory } from 'vue-router';
+import {
+    createRouter,
+    createWebHistory,
+    type NavigationGuard,
+} from 'vue-router';
 
 declare module 'vue-router' {
     interface RouteMeta {
@@ -11,6 +19,11 @@ declare module 'vue-router' {
         guestOnly?: boolean;
     }
 }
+
+const requireEmailQuery: NavigationGuard = (to) =>
+    typeof to.query.email === 'string' && to.query.email !== ''
+        ? true
+        : { name: 'sign-in' };
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -32,6 +45,32 @@ export const router = createRouter({
             name: 'sign-up',
             component: SignUpView,
             meta: { guestOnly: true },
+        },
+        {
+            path: '/verify-email',
+            name: 'verify-email',
+            component: VerifyEmailView,
+            meta: { guestOnly: true },
+            beforeEnter: requireEmailQuery,
+        },
+        {
+            path: '/two-factor',
+            name: 'two-factor',
+            component: TwoFactorView,
+            meta: { guestOnly: true },
+        },
+        {
+            path: '/forgot-password',
+            name: 'forgot-password',
+            component: ForgotPasswordView,
+            meta: { guestOnly: true },
+        },
+        {
+            path: '/reset-password',
+            name: 'reset-password',
+            component: ResetPasswordView,
+            meta: { guestOnly: true },
+            beforeEnter: requireEmailQuery,
         },
     ],
 });
