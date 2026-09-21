@@ -12,6 +12,10 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 
+const SESSION_EXPIRES_IN = 60 * 60 * 24 * 7; // 7 days
+const SESSION_UPDATE_AGE = 60 * 60 * 24; // extend expiry at most once a day
+const SESSION_COOKIE_CACHE_MAX_AGE = 60 * 5; // 5 minutes
+
 export type Auth = ReturnType<typeof CreateAuthInstance>;
 
 export function CreateAuthInstance(
@@ -32,6 +36,14 @@ export function CreateAuthInstance(
         logger: {
             level: config.stage === Stage.Local ? 'debug' : 'warn',
             log: (level, message, ...args) => logger[level]({ args }, message),
+        },
+        session: {
+            expiresIn: SESSION_EXPIRES_IN,
+            updateAge: SESSION_UPDATE_AGE,
+            cookieCache: {
+                enabled: true,
+                maxAge: SESSION_COOKIE_CACHE_MAX_AGE,
+            },
         },
         emailAndPassword: {
             enabled: true,
