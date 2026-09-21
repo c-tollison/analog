@@ -10,16 +10,21 @@
     },
     "dependencies": {
         "@analog/api": "workspace:*",
+        "@analog/types": "workspace:*",
         "@lucide/vue": "^1.41.0",
+        "@vee-validate/zod": "^4.15.1",
         "@vueuse/core": "^14.4.0",
+        "better-auth": "catalog:",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "reka-ui": "^2.10.4",
         "shadcn-vue": "^2.8.2",
         "tailwind-merge": "^3.6.0",
         "tw-animate-css": "^1.4.0",
+        "vee-validate": "^4.15.1",
         "vue": "^3.5.40",
-        "better-auth": "catalog:"
+        "vue-router": "^5.3.1",
+        "zod": "catalog:"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.3.3",
