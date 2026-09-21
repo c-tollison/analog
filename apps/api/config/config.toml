@@ -11,6 +11,9 @@ origins = ['http://localhost:5173']
 maxConnections = 5
 ssl = false
 
+[local.email]
+from = 'Analog <noreply@analog.coji-dev.com>'
+
 [deployed]
 appUrl = 'https://analog.coji-dev.com'
 
@@ -23,3 +26,6 @@ origins = ['https://analog.coji-dev.com']
 [deployed.db]
 maxConnections = 10
 ssl = false
+
+[deployed.email]
+from = 'Analog <noreply@analog.coji-dev.com>'

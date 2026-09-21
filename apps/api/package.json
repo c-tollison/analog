@@ -30,11 +30,12 @@
         "@analog/types": "workspace:*",
         "@hono/node-server": "^2.1.1",
         "@hono/zod-validator": "^0.9.1",
+        "better-auth": "catalog:",
         "hono": "catalog:",
         "pino": "^10.3.1",
+        "resend": "^6.28.1",
         "smol-toml": "^1.8.0",
-        "zod": "catalog:",
-        "better-auth": "catalog:"
+        "zod": "catalog:"
     },
     "devDependencies": {
         "@types/node": "catalog:",
