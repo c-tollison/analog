@@ -2,14 +2,14 @@
 import ModeToggle from '@/components/ModeToggle.vue';
 import { Button } from '@/components/shadcn-components/button';
 import { useApiClient } from '@/lib/api';
-import { signOut, useSession } from '@/lib/auth';
+import { signOut, useAppSession } from '@/lib/auth';
 
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 const api = useApiClient();
 const router = useRouter();
-const session = useSession();
+const session = useAppSession();
 const message = ref('');
 
 async function fetchMessage() {
@@ -25,12 +25,16 @@ async function handleSignOut() {
 
 <template>
     <main class="flex min-h-svh flex-col items-center justify-center gap-4">
-        <p v-if="session.data" class="text-muted-foreground text-sm">
-            Signed in as {{ session.data.user.email }}
+        <p v-if="session" class="text-muted-foreground text-sm">
+            Signed in as {{ session.user.email }}
         </p>
 
         <Button @click="fetchMessage">Say hello</Button>
         <p v-if="message">{{ message }}</p>
+
+        <Button variant="outline" @click="router.push({ name: 'new-view' })">
+            Go to new view
+        </Button>
 
         <div class="flex items-center gap-2">
             <ModeToggle />

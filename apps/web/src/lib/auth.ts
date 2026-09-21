@@ -1,5 +1,6 @@
 import { API_URL } from './env';
 import { createAuthClient } from 'better-auth/vue';
+import { type ComputedRef, computed, shallowRef } from 'vue';
 
 export const authClient = createAuthClient({
     baseURL: `${API_URL}/api/auth`,
@@ -17,7 +18,7 @@ export const { signIn, signUp, signOut, useSession } = authClient;
 
 type Session = Awaited<ReturnType<typeof authClient.getSession>>['data'];
 
-let cachedSession: Session | undefined;
+const cachedSession = shallowRef<Session | undefined>();
 let pendingSession: Promise<Session> | undefined;
 
 function isExpired(session: Session): boolean {
@@ -32,15 +33,16 @@ function isExpired(session: Session): boolean {
  * navigating doesn't hit the API on every route change.
  */
 export async function getCachedSession(): Promise<Session> {
-    if (cachedSession !== undefined && !isExpired(cachedSession)) {
-        return cachedSession;
+    const current = cachedSession.value;
+    if (current !== undefined && !isExpired(current)) {
+        return current;
     }
 
     pendingSession ??= authClient
         .getSession()
         .then(({ data, error }) => {
             if (!error) {
-                cachedSession = data;
+                cachedSession.value = data;
             }
             return data;
         })
@@ -52,8 +54,19 @@ export async function getCachedSession(): Promise<Session> {
 }
 
 export function clearCachedSession(): void {
-    cachedSession = undefined;
+    cachedSession.value = undefined;
     pendingSession = undefined;
+}
+
+/**
+ * Cached Session values. Route guard ensures that cached session is valid prior
+ * loading any page.
+ *
+ * Use `useSession()` instead if you need Better Auth's own polling and
+ * cross-tab refresh.
+ */
+export function useAppSession(): ComputedRef<Session> {
+    return computed(() => cachedSession.value ?? null);
 }
 
 type UnauthorizedHandler = () => void;
