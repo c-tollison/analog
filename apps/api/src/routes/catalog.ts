@@ -14,7 +14,11 @@ const IsbnParamSchema = z.object({ isbn: IsbnSchema });
 
 const { collectionItem, collectionMember } = schema;
 
-async function collectionsContaining(catalogItemId: string, userId: string) {
+async function collectionsContaining(
+    catalogItemId: string | undefined,
+    userId: string
+): Promise<string[]> {
+    if (!catalogItemId) return [];
     const rows = await db()
         .select({ id: collectionItem.collectionId })
         .from(collectionItem)
@@ -50,7 +54,7 @@ const catalog = new Hono<AppEnv>().get(
 
         const [suggested, inCollectionIds] = await Promise.all([
             suggestSeries(existing, book),
-            existing ? collectionsContaining(existing.id, user.id) : [],
+            collectionsContaining(existing?.id, user.id),
         ]);
         return c.json({
             book,
