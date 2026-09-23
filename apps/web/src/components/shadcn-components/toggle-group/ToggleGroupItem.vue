@@ -1,0 +1,55 @@
+<script setup lang="ts">
+import { toggleVariants } from '@/components/shadcn-components/toggle';
+import { cn } from '@/lib/utils';
+
+import { reactiveOmit } from '@vueuse/core';
+import type { VariantProps } from 'class-variance-authority';
+import type { ToggleGroupItemProps } from 'reka-ui';
+import { ToggleGroupItem, useForwardProps } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
+import { computed, inject } from 'vue';
+
+type ToggleGroupVariants = VariantProps<typeof toggleVariants> & {
+    spacing?: number;
+};
+
+const props = defineProps<
+    ToggleGroupItemProps & {
+        class?: HTMLAttributes['class'];
+        variant?: ToggleGroupVariants['variant'];
+        size?: ToggleGroupVariants['size'];
+    }
+>();
+
+const context = inject<ToggleGroupVariants>('toggleGroup');
+
+const delegatedProps = reactiveOmit(props, 'class', 'size', 'variant');
+const forwardedProps = useForwardProps(delegatedProps);
+
+// Built here rather than in the template so the toggleVariants import is
+// seen as a runtime value and kept.
+const classes = computed(() =>
+    cn(
+        'group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-md group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-md group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-md group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-md shrink-0 focus:z-10 focus-visible:z-10 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t',
+        toggleVariants({
+            variant: context?.variant || props.variant,
+            size: context?.size || props.size,
+        }),
+        props.class
+    )
+);
+</script>
+
+<template>
+    <ToggleGroupItem
+        v-slot="slotProps"
+        data-slot="toggle-group-item"
+        :data-variant="context?.variant || variant"
+        :data-size="context?.size || size"
+        :data-spacing="context?.spacing"
+        v-bind="forwardedProps"
+        :class="classes"
+    >
+        <slot v-bind="slotProps" />
+    </ToggleGroupItem>
+</template>

@@ -129,6 +129,26 @@ export function useCollectionSeriesItems(
     );
 }
 
+/** One item in a collection, with everyone's status and reviews. */
+export function useCollectionItem(
+    id: MaybeRefOrGetter<string>,
+    itemId: MaybeRefOrGetter<string>
+) {
+    return useQuery({
+        queryKey: () => [
+            ...collectionKey(toValue(id)),
+            'item',
+            toValue(itemId),
+        ],
+        queryFn: async () =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].$get({
+                    param: { id: toValue(id), itemId: toValue(itemId) },
+                })
+            ),
+    });
+}
+
 /**
  * Catalog items whose title matches `q`, or every item in `seriesId`,
  * flagged with whether the collection has them. Nothing loads until one of

@@ -4,6 +4,7 @@ import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import ProgressMark from '@/components/progress/ProgressMark.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
@@ -14,7 +15,14 @@ import {
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
-import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
+import {
+    completedWord,
+    FORMAT_LABELS,
+    formatStatusLabels,
+    formatsStatusLabels,
+    kindStatusLabels,
+    SERIES_KIND_LABELS,
+} from '@/lib/media-types';
 
 import {
     ArrowLeftIcon,
@@ -59,6 +67,12 @@ function onRemove() {
     );
 }
 
+const progress = computed(() => {
+    const c = collection.value;
+    if (!c || c.itemCount === 0) return null;
+    return `${c.completedCount} of ${c.itemCount} ${completedWord(formatsStatusLabels(c.formats))}`;
+});
+
 const headerError = computed(
     () => (loadError.value ?? removeError.value)?.message ?? null
 );
@@ -102,9 +116,12 @@ const headerError = computed(
         />
 
         <div class="flex min-h-7 items-center justify-between gap-2">
-            <h1 v-if="collection" class="text-lg font-semibold">
-                {{ collection.name }}
-            </h1>
+            <div v-if="collection" class="grid">
+                <h1 class="text-lg font-semibold">{{ collection.name }}</h1>
+                <p v-if="progress" class="text-muted-foreground text-xs">
+                    {{ progress }}
+                </p>
+            </div>
             <Spinner v-else-if="!headerError" />
             <Button v-if="collection" variant="ghost" size="sm" as-child>
                 <RouterLink
@@ -165,24 +182,37 @@ const headerError = computed(
                                     {{ SERIES_KIND_LABELS[entry.series.kind] }}
                                 </Badge>
                                 <span class="text-muted-foreground text-xs">
-                                    {{ entry.ownedCount }} owned
+                                    {{ entry.ownedCount }} owned ·
+                                    {{ entry.completedCount }}
+                                    {{
+                                        completedWord(
+                                            kindStatusLabels(entry.series.kind)
+                                        )
+                                    }}
                                 </span>
                             </div>
                         </RouterLink>
 
-                        <div v-else class="grid gap-1.5">
+                        <RouterLink
+                            v-else
+                            :to="{
+                                name: 'collection-item',
+                                params: { id, itemId: entry.id },
+                            }"
+                            class="grid gap-1.5"
+                        >
                             <CoverImage
                                 size="md"
                                 :src="entry.coverUrl"
                                 :alt="entry.title"
-                                class="aspect-2/3 w-full"
+                                class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
                             <p
                                 class="line-clamp-2 min-h-10 text-sm font-medium"
                             >
                                 {{ entry.title }}
                             </p>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex flex-wrap items-center gap-1.5">
                                 <Badge variant="secondary">
                                     {{
                                         entry.kind
@@ -197,16 +227,22 @@ const headerError = computed(
                                     Vol. {{ entry.position }}
                                 </span>
                             </div>
-                            <Button
-                                variant="secondary"
-                                size="icon"
-                                class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                                :aria-label="`Remove ${entry.title}`"
-                                @click="removing = { id: entry.id, title: entry.title }"
-                            >
-                                <XIcon />
-                            </Button>
-                        </div>
+                            <ProgressMark
+                                :status="entry.status"
+                                :rating="entry.rating"
+                                :labels="formatStatusLabels(entry.format)"
+                            />
+                        </RouterLink>
+                        <Button
+                            v-if="!entry.series"
+                            variant="secondary"
+                            size="icon"
+                            class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                            :aria-label="`Remove ${entry.title}`"
+                            @click="removing = { id: entry.id, title: entry.title }"
+                        >
+                            <XIcon />
+                        </Button>
                     </li>
                 </ul>
             </template>

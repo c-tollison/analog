@@ -1,8 +1,16 @@
-import { IsbnSchema, SERIES_TITLE_MAX_LENGTH } from '@analog/types';
+import {
+    IsbnSchema,
+    LinkDetailsSourceSchema,
+    SERIES_TITLE_MAX_LENGTH,
+} from '@analog/types';
 
 import { z } from 'zod';
 
-export { AddCatalogItemsSchema, CreateCollectionSchema } from '@analog/types';
+export {
+    AddCatalogItemsSchema,
+    CreateCollectionSchema,
+    ReviewSchema,
+} from '@analog/types';
 
 export const IsbnLookupFormSchema = z.object({
     isbn: z.string().trim().min(1, 'Enter an ISBN').pipe(IsbnSchema),
@@ -39,4 +47,19 @@ export const AddBookFormSchema = z
     .refine((values) => !values.isSeries || values.series !== null, {
         message: 'Pick a series or type a new name',
         path: ['series'],
+    });
+
+export const LinkDetailsSourceFormSchema = z
+    .object({
+        sourceId: z.string().nullable(),
+        volumeCount: z
+            .unknown()
+            .transform((value) =>
+                value === '' || value == null ? null : Number(value)
+            )
+            .pipe(LinkDetailsSourceSchema.shape.volumeCount),
+    })
+    .refine((values) => values.sourceId !== null, {
+        message: 'Pick a match',
+        path: ['sourceId'],
     });

@@ -67,6 +67,12 @@ export const router = createRouter({
                     props: true,
                 },
                 {
+                    path: 'collections/:id/items/:itemId',
+                    name: 'collection-item',
+                    component: () => import('@/views/CollectionItemView.vue'),
+                    props: true,
+                },
+                {
                     path: 'friends',
                     name: 'friends',
                     component: () => import('@/views/FriendsView.vue'),
