@@ -61,6 +61,19 @@ function myProgress(userId: string) {
 
 const myRating = whenCompleted<number>(progress.rating);
 
+/**
+ * Everyone else on the app who finished a catalog item and left a rating or
+ * review. Items are shared, so reviews are too.
+ */
+function othersReviewed(catalogItemId: string, me: string) {
+    return and(
+        eq(progress.catalogItemId, catalogItemId),
+        ne(progress.userId, me),
+        isCompleted,
+        or(isNotNull(progress.rating), isNotNull(progress.review))
+    );
+}
+
 const completedCount = sql<number>`(
     count(*) filter (where ${isCompleted})
 )::int`;
@@ -591,7 +604,7 @@ const collections = new Hono<AppEnv>()
             const item = found.catalogItem;
 
             const details = itemDetails(item);
-            const [[mine], reviews] = await Promise.all([
+            const [[mine], [counted]] = await Promise.all([
                 db()
                     .select({
                         status: progress.status,
@@ -605,35 +618,10 @@ const collections = new Hono<AppEnv>()
                             eq(progress.catalogItemId, item.id)
                         )
                     ),
-                // Everyone else in the collection who finished it and left a
-                // rating or review.
                 db()
-                    .select({
-                        ...userColumns,
-                        rating: progress.rating,
-                        review: progress.review,
-                    })
-                    .from(collectionMember)
-                    .innerJoin(user, eq(user.id, collectionMember.userId))
-                    .innerJoin(
-                        progress,
-                        and(
-                            eq(progress.userId, collectionMember.userId),
-                            eq(progress.catalogItemId, item.id)
-                        )
-                    )
-                    .where(
-                        and(
-                            eq(collectionMember.collectionId, id),
-                            ne(collectionMember.userId, me),
-                            isCompleted,
-                            or(
-                                isNotNull(progress.rating),
-                                isNotNull(progress.review)
-                            )
-                        )
-                    )
-                    .orderBy(desc(progress.updatedAt), asc(user.id)),
+                    .select({ reviewCount: sql<number>`count(*)::int` })
+                    .from(progress)
+                    .where(othersReviewed(item.id, me)),
             ]);
 
             return c.json({
@@ -650,8 +638,45 @@ const collections = new Hono<AppEnv>()
                 status: mine?.status ?? null,
                 rating: mine?.rating ?? null,
                 review: mine?.review ?? null,
-                reviews,
+                reviewCount: counted?.reviewCount ?? 0,
             });
+        }
+    )
+    .get(
+        '/:id/items/:itemId/reviews',
+        schemaValidator('param', ItemParamSchema),
+        schemaValidator('query', PageQuerySchema),
+        async (c) => {
+            const { id, itemId } = c.req.valid('param');
+            const me = c.get('user').id;
+            await requireMember(id, me);
+
+            const found = await db().query.collectionItem.findFirst({
+                columns: { catalogItemId: true },
+                where: and(
+                    eq(collectionItem.id, itemId),
+                    eq(collectionItem.collectionId, id)
+                ),
+            });
+            if (!found) {
+                throw new HTTPException(404, { message: 'Item not found' });
+            }
+
+            const page = await paginate(c.req.valid('query'), (limit, offset) =>
+                db()
+                    .select({
+                        ...userColumns,
+                        rating: progress.rating,
+                        review: progress.review,
+                    })
+                    .from(progress)
+                    .innerJoin(user, eq(user.id, progress.userId))
+                    .where(othersReviewed(found.catalogItemId, me))
+                    .orderBy(desc(progress.updatedAt), asc(user.id))
+                    .limit(limit)
+                    .offset(offset)
+            );
+            return c.json(page);
         }
     )
     .delete(

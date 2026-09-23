@@ -155,6 +155,30 @@ export function useCollectionItem(
     });
 }
 
+/** Everyone else's reviews of an item, a page at a time. */
+export function useCollectionItemReviews(
+    id: MaybeRefOrGetter<string>,
+    itemId: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [
+            ...collectionKey(toValue(id)),
+            'item',
+            toValue(itemId),
+            'reviews',
+        ],
+        async (offset) =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].reviews.$get({
+                    param: { id: toValue(id), itemId: toValue(itemId) },
+                    query: { offset },
+                })
+            ),
+        options
+    );
+}
+
 /**
  * Catalog items whose title matches `q`, or every item in `seriesId`,
  * flagged with whether the collection has them. Nothing loads until one of

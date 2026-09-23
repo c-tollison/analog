@@ -2,6 +2,7 @@
 import { ProgressStatus } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
+import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import ReviewForm from '@/components/progress/ReviewForm.vue';
 import StarRating from '@/components/progress/StarRating.vue';
@@ -24,7 +25,10 @@ import {
     TabsTrigger,
 } from '@/components/shadcn-components/tabs';
 import UserAvatar from '@/components/users/UserAvatar.vue';
-import { useCollectionItem } from '@/composables/useCollections';
+import {
+    useCollectionItem,
+    useCollectionItemReviews,
+} from '@/composables/useCollections';
 import { useSetProgressStatus } from '@/composables/useProgress';
 import {
     FORMAT_LABELS,
@@ -33,7 +37,7 @@ import {
 } from '@/lib/media-types';
 
 import { ArrowLeftIcon, PencilIcon } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
 const props = defineProps<{ id: string; itemId: string }>();
@@ -41,6 +45,21 @@ const props = defineProps<{ id: string; itemId: string }>();
 const { data: item, error: loadError } = useCollectionItem(
     () => props.id,
     () => props.itemId
+);
+
+const tab = ref('details');
+watch(
+    () => props.itemId,
+    () => {
+        tab.value = 'details';
+    }
+);
+
+// Loads when the Reviews tab is first opened.
+const reviews = useCollectionItemReviews(
+    () => props.id,
+    () => props.itemId,
+    { enabled: () => tab.value === 'reviews' }
 );
 
 const labels = computed(() =>
@@ -111,11 +130,11 @@ const error = computed(
             <Spinner class="size-6" />
         </div>
 
-        <Tabs v-if="item && labels" default-value="details" class="gap-4">
-            <TabsList v-if="item.reviews.length">
+        <Tabs v-if="item && labels" v-model="tab" class="gap-4">
+            <TabsList v-if="item.reviewCount">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="reviews">
-                    Reviews ({{ item.reviews.length }})
+                    Reviews ({{ item.reviewCount }})
                 </TabsTrigger>
             </TabsList>
 
@@ -228,47 +247,51 @@ const error = computed(
             </TabsContent>
 
             <TabsContent value="reviews">
-                <ItemGroup class="grid gap-2 sm:grid-cols-2">
-                    <Item
-                        v-for="review in item.reviews"
-                        :key="review.id"
-                        variant="outline"
-                        class="items-start"
-                    >
-                        <ItemMedia>
-                            <UserAvatar
-                                :name="review.name"
-                                :image="review.image"
-                            />
-                        </ItemMedia>
-                        <ItemContent class="min-w-0 gap-1">
-                            <ItemTitle>
-                                <RouterLink
-                                    :to="{
-                                            name: 'user',
-                                            params: {
-                                                username: review.username,
-                                            },
-                                        }"
-                                    class="hover:underline"
-                                >
-                                    {{ review.name }}
-                                </RouterLink>
-                            </ItemTitle>
-                            <StarRating
-                                v-if="review.rating !== null"
-                                readonly
-                                :model-value="review.rating"
-                            />
-                            <p
-                                v-if="review.review"
-                                class="text-sm whitespace-pre-line"
+                <PagedList :list="reviews" empty-text="No reviews yet.">
+                    <template #default="{ items: page }">
+                        <ItemGroup class="grid gap-2 sm:grid-cols-2">
+                            <Item
+                                v-for="review in page"
+                                :key="review.id"
+                                variant="outline"
+                                class="items-start"
                             >
-                                {{ review.review }}
-                            </p>
-                        </ItemContent>
-                    </Item>
-                </ItemGroup>
+                                <ItemMedia>
+                                    <UserAvatar
+                                        :name="review.name"
+                                        :image="review.image"
+                                    />
+                                </ItemMedia>
+                                <ItemContent class="min-w-0 gap-1">
+                                    <ItemTitle>
+                                        <RouterLink
+                                            :to="{
+                                                name: 'user',
+                                                params: {
+                                                    username: review.username,
+                                                },
+                                            }"
+                                            class="hover:underline"
+                                        >
+                                            {{ review.name }}
+                                        </RouterLink>
+                                    </ItemTitle>
+                                    <StarRating
+                                        v-if="review.rating !== null"
+                                        readonly
+                                        :model-value="review.rating"
+                                    />
+                                    <p
+                                        v-if="review.review"
+                                        class="text-sm whitespace-pre-line"
+                                    >
+                                        {{ review.review }}
+                                    </p>
+                                </ItemContent>
+                            </Item>
+                        </ItemGroup>
+                    </template>
+                </PagedList>
             </TabsContent>
         </Tabs>
     </main>
