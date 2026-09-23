@@ -6,7 +6,6 @@ import { createRequestLoggerMiddleware } from './middleware/request-logger.js';
 import { requireAuth } from './middleware/require-auth.js';
 import catalog from './routes/catalog.js';
 import collections from './routes/collections.js';
-import helloWorld from './routes/helloworld.js';
 import series from './routes/series.js';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -37,7 +36,6 @@ export function createApp(config: Config) {
     api.on(['POST', 'GET'], '/auth/*', (c) => auth().handler(c.req.raw));
     return api
         .use(requireAuth)
-        .route('/hello-world', helloWorld)
         .route('/catalog', catalog)
         .route('/collections', collections)
         .route('/series', series);
