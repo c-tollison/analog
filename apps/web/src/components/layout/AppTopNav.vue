@@ -6,6 +6,7 @@ import {
     NavigationMenuList,
 } from '@/components/shadcn-components/navigation-menu';
 
+import NotificationsBell from './NotificationsBell.vue';
 import UserMenu from './UserMenu.vue';
 import { DiscAlbumIcon, LibraryBigIcon, UsersIcon } from '@lucide/vue';
 import { useRoute } from 'vue-router';
@@ -52,6 +53,7 @@ function isActive(name: string) {
             </NavigationMenuList>
         </NavigationMenu>
         <div class="flex-1" />
+        <NotificationsBell />
         <UserMenu />
     </header>
 </template>

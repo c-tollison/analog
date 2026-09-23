@@ -59,6 +59,11 @@ export const router = createRouter({
                     component: () => import('@/views/FriendsView.vue'),
                 },
                 {
+                    path: 'notifications',
+                    name: 'notifications',
+                    component: () => import('@/views/NotificationsView.vue'),
+                },
+                {
                     path: 'profile',
                     name: 'profile',
                     component: () => import('@/views/ProfileView.vue'),
