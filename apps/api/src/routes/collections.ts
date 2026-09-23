@@ -5,6 +5,8 @@ import {
     eq,
     ilike,
     inArray,
+    isNotNull,
+    ne,
     notExists,
     or,
     schema,
@@ -17,17 +19,19 @@ import {
     CreateCollectionSchema,
     type MediaFormat,
     PageQuerySchema,
+    ProgressStatus,
     type SeriesKind,
     UserIdSchema,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { seriesColumns, upsertBook } from '../lib/books.js';
+import { itemDetails, seriesColumns, upsertBook } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
 import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
+import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -40,9 +44,27 @@ const {
     collectionInvite,
     catalogItem,
     friendship,
+    progress,
     series,
     user,
 } = schema;
+
+/** Join condition: `progress` is this user's row for the catalog item. */
+function myProgress(userId: string) {
+    return and(
+        eq(progress.catalogItemId, catalogItem.id),
+        eq(progress.userId, userId)
+    );
+}
+
+// A rating only counts once the item is finished.
+const myRating = sql<number | null>`case
+    when ${progress.status} = ${ProgressStatus.Completed} then ${progress.rating}
+end`;
+
+const completedCount = sql<number>`(
+    count(*) filter (where ${progress.status} = ${ProgressStatus.Completed})
+)::int`;
 
 const CollectionParamSchema = z.object({ id: z.uuid('Invalid id') });
 const ItemParamSchema = CollectionParamSchema.extend({
@@ -94,6 +116,20 @@ function collectionSummaries(userId: string, collectionId?: string) {
             itemCount: sql<number>`(
                 select count(*)::int from ${collectionItem}
                 where ${collectionItem.collectionId} = ${collection.id}
+            )`,
+            // How much of the collection this user has finished.
+            completedCount: sql<number>`(
+                select count(*)::int from ${collectionItem} ci
+                join ${progress} p on p.catalog_item_id = ci.catalog_item_id
+                    and p.user_id = ${userId}
+                where ci.collection_id = ${collection.id}
+                    and p.status = ${ProgressStatus.Completed}
+            )`,
+            formats: sql<MediaFormat[]>`(
+                select coalesce(json_agg(distinct c.format), '[]'::json)
+                from ${collectionItem} ci
+                join ${catalogItem} c on c.id = ci.catalog_item_id
+                where ci.collection_id = ${collection.id}
             )`,
             memberCount: sql<number>`(
                 select count(*)::int from ${collectionMember} m
@@ -230,20 +266,28 @@ const collections = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { q, ...pageQuery } = c.req.valid('query');
-            await requireMember(id, c.get('user').id);
+            const me = c.get('user').id;
+            await requireMember(id, me);
 
             const terms = searchTerms(q ?? '');
             if (terms.length) {
                 const titles = [catalogItem.title, series.title];
                 const page = await paginate(pageQuery, (limit, offset) =>
                     db()
-                        .select({ ...itemColumns, series: sql<null>`null` })
+                        .select({
+                            ...itemColumns,
+                            series: sql<null>`null`,
+                            completedCount: sql<number>`0`,
+                            status: progress.status,
+                            rating: myRating,
+                        })
                         .from(collectionItem)
                         .innerJoin(
                             catalogItem,
                             eq(collectionItem.catalogItemId, catalogItem.id)
                         )
                         .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                        .leftJoin(progress, myProgress(me))
                         .where(
                             and(
                                 eq(collectionItem.collectionId, id),
@@ -273,6 +317,10 @@ const collections = new Hono<AppEnv>()
                     .select({
                         series: seriesColumns,
                         ownedCount: sql<number>`count(*)::int`,
+                        completedCount,
+                        // Only meaningful for items not in a series.
+                        status: sql<ProgressStatus | null>`min(${progress.status}::text)`,
+                        rating: sql<number | null>`min(${myRating})`,
                         id: sql<string>`min(${collectionItem.id}::text)`,
                         format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         kind: sql<SeriesKind | null>`min(${catalogItem.kind}::text)`,
@@ -290,6 +338,7 @@ const collections = new Hono<AppEnv>()
                         eq(collectionItem.catalogItemId, catalogItem.id)
                     )
                     .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                    .leftJoin(progress, myProgress(me))
                     .where(eq(collectionItem.collectionId, id))
                     .groupBy(groupKey, series.id)
                     .orderBy(
@@ -308,20 +357,29 @@ const collections = new Hono<AppEnv>()
         schemaValidator('param', SeriesParamSchema),
         async (c) => {
             const { id, seriesId } = c.req.valid('param');
-            await requireMember(id, c.get('user').id);
+            const me = c.get('user').id;
+            await requireMember(id, me);
 
-            const [[found], [counted]] = await Promise.all([
+            const [found, [counted]] = await Promise.all([
+                db().query.series.findFirst({
+                    where: eq(series.id, seriesId),
+                }),
                 db()
-                    .select(seriesColumns)
-                    .from(series)
-                    .where(eq(series.id, seriesId)),
-                db()
-                    .select({ ownedCount: sql<number>`count(*)::int` })
+                    .select({
+                        ownedCount: sql<number>`count(*)::int`,
+                        completedCount,
+                        ownedPositions: sql<number[]>`coalesce(
+                            array_agg(distinct ${catalogItem.position}::float)
+                                filter (where ${catalogItem.position} is not null),
+                            '{}'
+                        )`,
+                    })
                     .from(collectionItem)
                     .innerJoin(
                         catalogItem,
                         eq(collectionItem.catalogItemId, catalogItem.id)
                     )
+                    .leftJoin(progress, myProgress(me))
                     .where(
                         and(
                             eq(collectionItem.collectionId, id),
@@ -334,8 +392,16 @@ const collections = new Hono<AppEnv>()
             }
 
             return c.json({
-                series: found,
+                series: {
+                    id: found.id,
+                    title: found.title,
+                    kind: found.kind,
+                    coverUrl: found.coverUrl,
+                },
                 ownedCount: counted?.ownedCount ?? 0,
+                completedCount: counted?.completedCount ?? 0,
+                ownedPositions: counted?.ownedPositions ?? [],
+                ...(await seriesDetails(found)),
             });
         }
     )
@@ -345,16 +411,22 @@ const collections = new Hono<AppEnv>()
         schemaValidator('query', PageQuerySchema),
         async (c) => {
             const { id, seriesId } = c.req.valid('param');
-            await requireMember(id, c.get('user').id);
+            const me = c.get('user').id;
+            await requireMember(id, me);
 
             const page = await paginate(c.req.valid('query'), (limit, offset) =>
                 db()
-                    .select(itemColumns)
+                    .select({
+                        ...itemColumns,
+                        status: progress.status,
+                        rating: myRating,
+                    })
                     .from(collectionItem)
                     .innerJoin(
                         catalogItem,
                         eq(collectionItem.catalogItemId, catalogItem.id)
                     )
+                    .leftJoin(progress, myProgress(me))
                     .where(
                         and(
                             eq(collectionItem.collectionId, id),
@@ -496,6 +568,93 @@ const collections = new Hono<AppEnv>()
             }
 
             return c.json({ id: added.id }, 201);
+        }
+    )
+    .get(
+        '/:id/items/:itemId',
+        schemaValidator('param', ItemParamSchema),
+        async (c) => {
+            const { id, itemId } = c.req.valid('param');
+            const me = c.get('user').id;
+            await requireMember(id, me);
+
+            const found = await db().query.collectionItem.findFirst({
+                columns: { id: true },
+                where: and(
+                    eq(collectionItem.id, itemId),
+                    eq(collectionItem.collectionId, id)
+                ),
+                with: { catalogItem: { with: { series: true } } },
+            });
+            if (!found) {
+                throw new HTTPException(404, { message: 'Item not found' });
+            }
+            const item = found.catalogItem;
+            const isCompleted = sql`${progress.status} = ${ProgressStatus.Completed}`;
+
+            const details = itemDetails(item);
+            const [[mine], members] = await Promise.all([
+                db()
+                    .select({
+                        status: progress.status,
+                        rating: progress.rating,
+                        review: progress.review,
+                    })
+                    .from(progress)
+                    .where(
+                        and(
+                            eq(progress.userId, me),
+                            eq(progress.catalogItemId, item.id)
+                        )
+                    ),
+                // Everyone else in the collection who has marked it. Ratings
+                // and reviews only count once they've finished it.
+                db()
+                    .select({
+                        ...userColumns,
+                        status: sql<ProgressStatus>`${progress.status}`,
+                        rating: sql<
+                            number | null
+                        >`case when ${isCompleted} then ${progress.rating} end`,
+                        review: sql<
+                            string | null
+                        >`case when ${isCompleted} then ${progress.review} end`,
+                    })
+                    .from(collectionMember)
+                    .innerJoin(user, eq(user.id, collectionMember.userId))
+                    .innerJoin(
+                        progress,
+                        and(
+                            eq(progress.userId, collectionMember.userId),
+                            eq(progress.catalogItemId, item.id)
+                        )
+                    )
+                    .where(
+                        and(
+                            eq(collectionMember.collectionId, id),
+                            ne(collectionMember.userId, me),
+                            isNotNull(progress.status)
+                        )
+                    )
+                    .orderBy(desc(progress.updatedAt), asc(user.id)),
+            ]);
+
+            return c.json({
+                id: found.id,
+                catalogItemId: item.id,
+                format: item.format,
+                kind: item.kind,
+                title: item.title,
+                coverUrl: item.coverUrl,
+                position: item.position,
+                seriesId: item.series?.id ?? null,
+                seriesTitle: item.series?.title ?? null,
+                ...details,
+                status: mine?.status ?? null,
+                rating: mine?.rating ?? null,
+                review: mine?.review ?? null,
+                members,
+            });
         }
     )
     .delete(

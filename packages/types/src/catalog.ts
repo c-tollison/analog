@@ -1,3 +1,4 @@
+import { ExternalSource } from './catalog-enums.js';
 import { IsbnSchema } from './isbn.js';
 import { z } from 'zod';
 
@@ -43,8 +44,16 @@ export const AddCatalogItemsSchema = z.object({
 
 export const MAX_VOLUME_COUNT = 1000;
 
-export const LinkAniListSchema = z.object({
-    aniListId: z.number().int().positive(),
+/** Sources a series can pull its synopsis, genres and run from. */
+export const DETAILS_SOURCES = [ExternalSource.AniList] as const;
+
+export type DetailsSource = (typeof DETAILS_SOURCES)[number];
+
+export const DetailsSourceSchema = z.enum(DETAILS_SOURCES);
+
+export const LinkDetailsSourceSchema = z.object({
+    source: DetailsSourceSchema,
+    sourceId: z.string().trim().min(1).max(100),
     volumeCount: z
         .number()
         .int('Enter a whole number')
