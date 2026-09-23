@@ -28,6 +28,7 @@ import { useCollections } from '@/composables/useCollections';
 import { IsbnLookupFormSchema } from '@/lib/catalog-schemas';
 import { isbnFromBarcode } from '@/lib/isbn';
 import { MEDIA_TYPES, type MediaTypeValue } from '@/lib/media-types';
+import { vNoAutofill } from '@/lib/no-autofill';
 
 import {
     ArrowLeftIcon,
@@ -393,7 +394,7 @@ function scanAnother() {
                         <FormControl>
                             <Input
                                 inputmode="numeric"
-                                autocomplete="off"
+                                v-no-autofill
                                 placeholder="978…"
                                 v-bind="componentField"
                             />

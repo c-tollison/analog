@@ -4,6 +4,7 @@ import {
     InputGroupAddon,
     InputGroupInput,
 } from '@/components/shadcn-components/input-group';
+import { vNoAutofill } from '@/lib/no-autofill';
 
 import { SearchIcon } from '@lucide/vue';
 
@@ -20,6 +21,7 @@ const model = defineModel<string>({ required: true });
         <InputGroupInput
             v-model="model"
             type="search"
+            v-no-autofill
             :placeholder="placeholder"
             :aria-label="placeholder ?? 'Search'"
         />

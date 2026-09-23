@@ -23,6 +23,7 @@ import type { IsbnLookup } from '@/composables/useCatalog';
 import { useAddBook } from '@/composables/useCollections';
 import { AddBookFormSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { vNoAutofill } from '@/lib/no-autofill';
 
 import { CheckCircleIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -176,6 +177,7 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                             <Input
                                 type="number"
                                 inputmode="decimal"
+                                v-no-autofill
                                 min="0"
                                 step="any"
                                 v-bind="componentField"
