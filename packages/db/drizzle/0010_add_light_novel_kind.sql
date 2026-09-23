@@ -1,0 +1,1 @@
+ALTER TYPE "app"."series_kind" ADD VALUE 'light_novel' BEFORE 'book';

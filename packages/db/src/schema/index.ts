@@ -8,4 +8,5 @@ export * from './enums.js';
 export * from './friend-request.js';
 export * from './friendship.js';
 export * from './primitives.js';
+export * from './progress.js';
 export * from './series.js';

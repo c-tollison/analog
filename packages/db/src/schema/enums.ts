@@ -2,6 +2,7 @@ import {
     CollectionRole,
     ExternalSource,
     MediaFormat,
+    ProgressStatus,
     SeriesKind,
 } from '@analog/types';
 
@@ -27,4 +28,8 @@ export const collectionRole = appSchema.enum(
 export const externalSource = appSchema.enum(
     'external_source',
     values(ExternalSource)
+);
+export const progressStatus = appSchema.enum(
+    'progress_status',
+    values(ProgressStatus)
 );

@@ -40,3 +40,15 @@ export const AddCatalogItemsSchema = z.object({
         .min(1, 'Pick at least one item')
         .max(MAX_BULK_ADD, `Add at most ${MAX_BULK_ADD} items at a time`),
 });
+
+export const MAX_VOLUME_COUNT = 1000;
+
+export const LinkAniListSchema = z.object({
+    aniListId: z.number().int().positive(),
+    volumeCount: z
+        .number()
+        .int('Enter a whole number')
+        .positive('Enter a number above 0')
+        .max(MAX_VOLUME_COUNT)
+        .nullable(),
+});
