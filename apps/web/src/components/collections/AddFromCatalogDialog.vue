@@ -32,15 +32,12 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import {
     useAddCollectionItems,
-    useCatalogSeriesItems,
+    useCatalogItems,
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
-import { useSeriesSearch } from '@/composables/useSeries';
 import type { ApiClient } from '@/lib/api';
 import { AddCatalogItemsSchema } from '@/lib/catalog-schemas';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
 
-import { ArrowLeftIcon, ChevronRightIcon } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 
 type Series = InferResponseType<
@@ -56,15 +53,14 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { required: true });
 
-const selectedSeries = ref<Series | null>(props.series ?? null);
 const search = ref('');
 const { term, isTyping } = useSearchTerm(search);
 
-const seriesList = useSeriesSearch(term, { pending: isTyping });
-
-const options = useCatalogSeriesItems(
+const options = useCatalogItems(
     () => props.collectionId,
-    () => selectedSeries.value?.id
+    term,
+    () => props.series?.id,
+    { pending: isTyping }
 );
 
 const addItems = useAddCollectionItems();
@@ -102,23 +98,32 @@ function toggle(id: string, checked: boolean | 'indeterminate') {
 }
 
 function toggleAll() {
-    setFieldValue(
-        'catalogItemIds',
-        allSelected.value ? [] : addable.value.map((i) => i.id)
-    );
+    const next = new Set(selected.value);
+    for (const item of addable.value) {
+        if (allSelected.value) {
+            next.delete(item.id);
+        } else {
+            next.add(item.id);
+        }
+    }
+    setFieldValue('catalogItemIds', [...next]);
 }
 
-function pickSeries(series: Series | null) {
-    selectedSeries.value = series;
-    resetForm();
-}
+const emptyText = computed(() => {
+    if (term.value) {
+        return 'No titles match.';
+    }
+    return props.series
+        ? 'Nothing catalogued in this series yet.'
+        : 'Search by title to see what`s in the catalog.';
+});
 
 watch(open, (isOpen) => {
     if (!isOpen) {
         return;
     }
     search.value = '';
-    pickSeries(props.series ?? null);
+    resetForm();
 });
 </script>
 
@@ -133,76 +138,16 @@ watch(open, (isOpen) => {
                 </DialogDescription>
             </DialogHeader>
 
-            <template v-if="!selectedSeries">
-                <SearchInput v-model="search" placeholder="Search series…" />
-                <div class="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
-                    <PagedList
-                        :list="seriesList"
-                        :empty-text="
-                            term
-                                ? 'No series match.'
-                                : 'Search for a series to see what’s in the catalog.'
-                        "
-                    >
-                        <template #default="{ items }">
-                            <ItemGroup>
-                                <Item
-                                    v-for="s in items"
-                                    :key="s.id"
-                                    size="sm"
-                                    class="hover:bg-muted text-left"
-                                    as-child
-                                >
-                                    <button
-                                        type="button"
-                                        @click="pickSeries(s)"
-                                    >
-                                        <ItemMedia>
-                                            <CoverImage
-                                                :src="s.coverUrl"
-                                                alt=""
-                                                size="sm"
-                                                class="h-12 w-8"
-                                            />
-                                        </ItemMedia>
-                                        <ItemContent>
-                                            <ItemTitle>{{ s.title }}</ItemTitle>
-                                        </ItemContent>
-                                        <ItemActions>
-                                            <Badge variant="secondary">
-                                                {{ SERIES_KIND_LABELS[s.kind] }}
-                                            </Badge>
-                                            <ChevronRightIcon
-                                                class="text-muted-foreground size-4"
-                                            />
-                                        </ItemActions>
-                                    </button>
-                                </Item>
-                            </ItemGroup>
-                        </template>
-                    </PagedList>
-                </div>
-            </template>
-
             <form
-                v-else
                 class="flex min-h-0 flex-1 flex-col gap-3"
                 novalidate
                 @submit="submit"
             >
-                <div class="flex items-center gap-2">
-                    <Button
-                        v-if="!series"
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Back to series"
-                        @click="pickSeries(null)"
-                    >
-                        <ArrowLeftIcon />
-                    </Button>
+                <SearchInput v-model="search" placeholder="Search titles…" />
+
+                <div class="flex min-h-8 items-center gap-2">
                     <p class="flex-1 text-sm font-medium">
-                        {{ selectedSeries.title }}
+                        {{ series?.title }}
                     </p>
                     <Button
                         v-if="addable.length"
@@ -220,10 +165,7 @@ watch(open, (isOpen) => {
                 <FormField name="catalogItemIds">
                     <FormItem class="min-h-0 flex-1">
                         <div class="-mx-1 max-h-[50svh] overflow-y-auto px-1">
-                            <PagedList
-                                :list="options"
-                                empty-text="Nothing catalogued in this series yet."
-                            >
+                            <PagedList :list="options" :empty-text="emptyText">
                                 <template #default="{ items }">
                                     <ItemGroup>
                                         <Item

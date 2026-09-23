@@ -129,26 +129,42 @@ export function useCollectionSeriesItems(
 }
 
 /**
- * Every catalog item in a series, flagged with whether the collection has it.
- * Series rarely have more than 100 items, so this is usually one page.
+ * Catalog items whose title matches `q`, or every item in `seriesId`,
+ * flagged with whether the collection has them. Nothing loads until one of
+ * the two is set.
  */
-export function useCatalogSeriesItems(
+export function useCatalogItems(
     id: MaybeRefOrGetter<string>,
-    seriesId: MaybeRefOrGetter<string | undefined>
+    q: MaybeRefOrGetter<string>,
+    seriesId: MaybeRefOrGetter<string | undefined>,
+    options: PaginatedListOptions = {}
 ) {
     return usePaginatedList(
-        () => [...collectionKey(toValue(id)), 'catalog', toValue(seriesId)],
-        async (offset) =>
-            unwrap(
-                await api.collections[':id'].catalog.series[':seriesId'].$get({
-                    param: {
-                        id: toValue(id),
-                        seriesId: toValue(seriesId) ?? '',
+        () => [
+            ...collectionKey(toValue(id)),
+            'catalog',
+            toValue(q),
+            toValue(seriesId),
+        ],
+        async (offset) => {
+            const search = toValue(q);
+            const series = toValue(seriesId);
+            return unwrap(
+                await api.collections[':id'].catalog.$get({
+                    param: { id: toValue(id) },
+                    query: {
+                        limit: String(MAX_PAGE_SIZE),
+                        offset,
+                        ...(search ? { q: search } : {}),
+                        ...(series ? { seriesId: series } : {}),
                     },
-                    query: { limit: String(MAX_PAGE_SIZE), offset },
                 })
-            ),
-        { enabled: () => toValue(seriesId) !== undefined }
+            );
+        },
+        {
+            enabled: () => toValue(q) !== '' || toValue(seriesId) !== undefined,
+            ...options,
+        }
     );
 }
 

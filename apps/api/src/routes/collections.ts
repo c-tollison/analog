@@ -36,6 +36,9 @@ const EntriesQuerySchema = PageQuerySchema.extend({
 const SearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().min(1).max(200),
 });
+const CatalogQuerySchema = EntriesQuerySchema.extend({
+    seriesId: z.uuid('Invalid id').optional(),
+});
 
 const itemColumns = {
     id: collectionItem.id,
@@ -323,14 +326,16 @@ const collections = new Hono<AppEnv>()
         }
     )
     .get(
-        '/:id/catalog/series/:seriesId',
-        schemaValidator('param', SeriesParamSchema),
-        schemaValidator('query', PageQuerySchema),
+        '/:id/catalog',
+        schemaValidator('param', CollectionParamSchema),
+        schemaValidator('query', CatalogQuerySchema),
         async (c) => {
-            const { id, seriesId } = c.req.valid('param');
+            const { id } = c.req.valid('param');
+            const { q, seriesId, ...pageQuery } = c.req.valid('query');
             await requireMember(id, c.get('user').id);
 
-            const page = await paginate(c.req.valid('query'), (limit, offset) =>
+            const terms = searchTerms(q ?? '');
+            const page = await paginate(pageQuery, (limit, offset) =>
                 db()
                     .select({
                         id: catalogItem.id,
@@ -348,8 +353,27 @@ const collections = new Hono<AppEnv>()
                             eq(collectionItem.collectionId, id)
                         )
                     )
-                    .where(eq(catalogItem.seriesId, seriesId))
+                    .where(
+                        and(
+                            seriesId
+                                ? eq(catalogItem.seriesId, seriesId)
+                                : undefined,
+                            matchesAllTerms(terms, {
+                                columns: [catalogItem.title],
+                                position: catalogItem.position,
+                            })
+                        )
+                    )
                     .orderBy(
+                        ...(terms.length
+                            ? [
+                                  desc(
+                                      relevance(terms.join(' '), [
+                                          catalogItem.title,
+                                      ])
+                                  ),
+                              ]
+                            : []),
                         sql`${catalogItem.position} asc nulls last`,
                         asc(catalogItem.title),
                         asc(catalogItem.id)
