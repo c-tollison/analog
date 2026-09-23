@@ -7,7 +7,6 @@ import SeriesPicker, {
 import { Alert, AlertDescription } from '@/components/shadcn-components/alert';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import { Card, CardContent } from '@/components/shadcn-components/card';
 import { Checkbox } from '@/components/shadcn-components/checkbox';
 import {
     FormControl,
@@ -94,116 +93,111 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
 </script>
 
 <template>
-    <Card>
-        <CardContent class="grid gap-4">
-            <div class="flex gap-4">
-                <CoverImage
-                    size="md"
-                    :src="book.coverUrl"
-                    :alt="`Cover of ${book.title}`"
-                    class="h-36 w-24 shrink-0"
-                />
-                <div class="grid content-start gap-1 text-sm">
-                    <p class="font-medium">{{ book.title }}</p>
-                    <p v-if="book.authors.length" class="text-muted-foreground">
-                        {{ book.authors.join(', ') }}
-                    </p>
-                    <p class="text-muted-foreground text-xs">
-                        {{
+    <section class="grid gap-4">
+        <div class="flex gap-4">
+            <CoverImage
+                size="md"
+                :src="book.coverUrl"
+                :alt="`Cover of ${book.title}`"
+                class="h-36 w-24 shrink-0"
+            />
+            <div class="grid content-start gap-1 text-sm">
+                <p class="font-medium">{{ book.title }}</p>
+                <p v-if="book.authors.length" class="text-muted-foreground">
+                    {{ book.authors.join(', ') }}
+                </p>
+                <p class="text-muted-foreground text-xs">
+                    {{
                             [book.publishers[0], book.publishDate]
                                 .filter(Boolean)
                                 .join(' · ')
-                        }}
-                    </p>
-                    <p class="text-muted-foreground text-xs">
-                        ISBN {{ book.isbn }}
-                    </p>
-                    <div class="flex gap-1">
-                        <Badge variant="secondary">
-                            {{ SERIES_KIND_LABELS[book.kind] }}
-                        </Badge>
-                        <Badge v-if="alreadyInCollection">
-                            In {{ collectionName }}
-                        </Badge>
-                    </div>
+                    }}
+                </p>
+                <p class="text-muted-foreground text-xs">
+                    ISBN {{ book.isbn }}
+                </p>
+                <div class="flex gap-1">
+                    <Badge variant="secondary">
+                        {{ SERIES_KIND_LABELS[book.kind] }}
+                    </Badge>
+                    <Badge v-if="alreadyInCollection">
+                        In {{ collectionName }}
+                    </Badge>
                 </div>
             </div>
+        </div>
 
-            <form
-                v-if="!alreadyInCollection"
-                class="grid gap-4"
-                novalidate
-                @submit="submit"
-            >
-                <FormError :message="formError" />
-                <FormField v-slot="{ value }" name="isSeries" type="checkbox">
-                    <FormItem class="flex items-center gap-2">
+        <form
+            v-if="!alreadyInCollection"
+            class="grid gap-4"
+            novalidate
+            @submit="submit"
+        >
+            <FormError :message="formError" />
+            <FormField v-slot="{ value }" name="isSeries" type="checkbox">
+                <FormItem class="flex items-center gap-2">
+                    <FormControl>
+                        <Checkbox
+                            :model-value="value"
+                            @update:model-value="onSeriesToggle"
+                        />
+                    </FormControl>
+                    <FormLabel>Part of a series</FormLabel>
+                </FormItem>
+            </FormField>
+            <template v-if="values.isSeries">
+                <FormField
+                    v-slot="{ componentField }"
+                    v-bind="fieldProps"
+                    name="series"
+                >
+                    <FormItem>
+                        <FormLabel>Series</FormLabel>
                         <FormControl>
-                            <Checkbox
-                                :model-value="value"
-                                @update:model-value="onSeriesToggle"
-                            />
+                            <SeriesPicker v-bind="componentField" />
                         </FormControl>
-                        <FormLabel>Part of a series</FormLabel>
+                        <FormDescription>
+                            Be as specific as possible and include the edition
+                            and language. For example, “Fullmetal Alchemist
+                            (3-in-1 Edition, English)” and “Fullmetal Alchemist
+                            (English)” are separate series.
+                        </FormDescription>
+                        <FormMessage />
                     </FormItem>
                 </FormField>
-                <template v-if="values.isSeries">
-                    <FormField
-                        v-slot="{ componentField }"
-                        v-bind="fieldProps"
-                        name="series"
-                    >
-                        <FormItem>
-                            <FormLabel>Series</FormLabel>
-                            <FormControl>
-                                <SeriesPicker v-bind="componentField" />
-                            </FormControl>
-                            <FormDescription>
-                                Be as specific as possible and include the
-                                edition and language. For example, “Fullmetal
-                                Alchemist (3-in-1 Edition, English)” and
-                                “Fullmetal Alchemist (English)” are separate
-                                series.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                    <FormField
-                        v-slot="{ componentField }"
-                        v-bind="fieldProps"
-                        name="volume"
-                    >
-                        <FormItem class="w-24">
-                            <FormLabel>Volume</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="number"
-                                    inputmode="decimal"
-                                    min="0"
-                                    step="any"
-                                    v-bind="componentField"
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </template>
-                <Button type="submit" :disabled="isSubmitting">
-                    <Spinner v-if="isSubmitting" />
-                    Add to {{ collectionName }}
-                </Button>
-            </form>
+                <FormField
+                    v-slot="{ componentField }"
+                    v-bind="fieldProps"
+                    name="volume"
+                >
+                    <FormItem class="w-24">
+                        <FormLabel>Volume</FormLabel>
+                        <FormControl>
+                            <Input
+                                type="number"
+                                inputmode="decimal"
+                                min="0"
+                                step="any"
+                                v-bind="componentField"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+            </template>
+            <Button type="submit" :disabled="isSubmitting">
+                <Spinner v-if="isSubmitting" />
+                Add to {{ collectionName }}
+            </Button>
+        </form>
 
-            <Alert v-if="added">
-                <CheckCircleIcon />
-                <AlertDescription>
-                    Added to {{ collectionName }}.
-                </AlertDescription>
-            </Alert>
+        <Alert v-if="added">
+            <CheckCircleIcon />
+            <AlertDescription>
+                Added to {{ collectionName }}.
+            </AlertDescription>
+        </Alert>
 
-            <Button variant="outline" @click="emit('done')"
-                >Scan another</Button
-            >
-        </CardContent>
-    </Card>
+        <Button variant="outline" @click="emit('done')">Scan another</Button>
+    </section>
 </template>
