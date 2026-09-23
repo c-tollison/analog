@@ -66,5 +66,5 @@ export function usePaginatedList<P extends Page>(
                 void query.fetchNextPage();
             }
         },
-    }) as PaginatedList<P['items'][number]>;
+    });
 }
