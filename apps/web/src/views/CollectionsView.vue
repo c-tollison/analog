@@ -4,6 +4,10 @@ import CoverImage from '@/components/CoverImage.vue';
 import CreateCollectionDialog from '@/components/collections/CreateCollectionDialog.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
+import {
+    AvatarGroup,
+    AvatarGroupCount,
+} from '@/components/shadcn-components/avatar';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
@@ -14,6 +18,7 @@ import {
     ItemGroup,
     ItemTitle,
 } from '@/components/shadcn-components/item';
+import UserAvatar from '@/components/users/UserAvatar.vue';
 import {
     useCollectionSearch,
     useCollections,
@@ -21,7 +26,7 @@ import {
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
 
-import { PlusIcon, ScanBarcodeIcon, UsersIcon } from '@lucide/vue';
+import { PlusIcon, ScanBarcodeIcon, SettingsIcon } from '@lucide/vue';
 import { ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
@@ -51,7 +56,7 @@ function resultLink(result: SearchResult): RouteLocationRaw {
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <h1 class="text-lg font-semibold">Collections</h1>
             <div class="flex gap-2">
@@ -125,25 +130,56 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                         v-for="c in items"
                         :key="c.id"
                         variant="outline"
-                        as-child
+                        class="has-[a:hover]:bg-muted relative"
                     >
-                        <RouterLink
-                            :to="{ name: 'collection', params: { id: c.id } }"
-                        >
-                            <ItemContent>
-                                <ItemTitle>{{ c.name }}</ItemTitle>
-                                <ItemDescription>
-                                    {{ c.itemCount }}
-                                    {{ c.itemCount === 1 ? 'item' : 'items' }}
-                                </ItemDescription>
-                            </ItemContent>
-                            <ItemActions v-if="c.memberCount > 1">
-                                <Badge variant="secondary">
-                                    <UsersIcon />
-                                    Shared
-                                </Badge>
-                            </ItemActions>
-                        </RouterLink>
+                        <ItemContent class="min-w-0">
+                            <ItemTitle class="w-full">
+                                <RouterLink
+                                    :to="{
+                                        name: 'collection',
+                                        params: { id: c.id },
+                                    }"
+                                    class="truncate after:absolute after:inset-0"
+                                >
+                                    {{ c.name }}
+                                </RouterLink>
+                            </ItemTitle>
+                            <ItemDescription>
+                                {{ c.itemCount }}
+                                {{ c.itemCount === 1 ? 'item' : 'items' }}
+                            </ItemDescription>
+                        </ItemContent>
+                        <ItemActions class="relative">
+                            <AvatarGroup v-if="c.memberCount > 1">
+                                <UserAvatar
+                                    v-for="member in c.members"
+                                    :key="member.id"
+                                    :name="member.name"
+                                    :image="member.image"
+                                    size="sm"
+                                />
+                                <AvatarGroupCount
+                                    v-if="c.memberCount > c.members.length"
+                                >
+                                    +{{ c.memberCount - c.members.length }}
+                                </AvatarGroupCount>
+                            </AvatarGroup>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                :aria-label="`${c.name} settings`"
+                                as-child
+                            >
+                                <RouterLink
+                                    :to="{
+                                        name: 'collection-settings',
+                                        params: { id: c.id },
+                                    }"
+                                >
+                                    <SettingsIcon />
+                                </RouterLink>
+                            </Button>
+                        </ItemActions>
                     </Item>
                 </ItemGroup>
             </template>

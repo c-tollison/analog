@@ -1,19 +1,138 @@
 <script setup lang="ts">
+import FormError from '@/components/FormError.vue';
+import { Button } from '@/components/shadcn-components/button';
 import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@/components/shadcn-components/empty';
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from '@/components/shadcn-components/form';
+import { Input } from '@/components/shadcn-components/input';
+import { Label } from '@/components/shadcn-components/label';
+import { Spinner } from '@/components/shadcn-components/spinner';
+import UserAvatar from '@/components/users/UserAvatar.vue';
+import { useAppForm } from '@/composables/useAppForm';
+import { useUpdateProfile } from '@/composables/useUsers';
+import { UpdateProfileSchema } from '@/lib/auth-schemas';
+import { vNoAutofill } from '@/lib/no-autofill';
+import { useSessionStore } from '@/stores/session';
+
+import { CheckIcon, ExternalLinkIcon } from '@lucide/vue';
+import { storeToRefs } from 'pinia';
+import { computed, ref } from 'vue';
+
+const { session } = storeToRefs(useSessionStore());
+const user = computed(() => session.value?.user);
+
+const update = useUpdateProfile();
+const saved = ref(false);
+
+const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
+    schema: UpdateProfileSchema,
+    initialValues: {
+        name: user.value?.name ?? '',
+        username: user.value?.username ?? '',
+    },
+    onSubmit: async (values) => {
+        saved.value = false;
+        await update.mutateAsync(values);
+        resetForm({ values });
+        saved.value = true;
+        return undefined;
+    },
+});
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
-        <Empty>
-            <EmptyHeader>
-                <EmptyTitle>Profile</EmptyTitle>
-                <EmptyDescription>Coming soon.</EmptyDescription>
-            </EmptyHeader>
-        </Empty>
+    <main class="mx-auto flex w-full max-w-lg flex-col gap-6 p-4">
+        <div class="flex items-center gap-3">
+            <UserAvatar
+                v-if="user"
+                :name="user.name"
+                :image="user.image"
+                size="lg"
+            />
+            <div class="grid min-w-0 flex-1 gap-0.5">
+                <h1 class="truncate text-lg font-semibold">Profile</h1>
+                <p class="text-muted-foreground text-sm">
+                    How you show up to friends.
+                </p>
+            </div>
+            <Button v-if="user?.username" variant="outline" size="sm" as-child>
+                <RouterLink
+                    :to="{ name: 'user', params: { username: user.username } }"
+                >
+                    <ExternalLinkIcon />
+                    View public page
+                </RouterLink>
+            </Button>
+        </div>
+
+        <form class="grid gap-4" novalidate @submit="submit">
+            <FormError :message="formError" />
+
+            <FormField
+                v-slot="{ componentField }"
+                v-bind="fieldProps"
+                name="name"
+            >
+                <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                        <Input
+                            type="text"
+                            autocomplete="name"
+                            v-bind="componentField"
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            </FormField>
+
+            <FormField
+                v-slot="{ componentField }"
+                v-bind="fieldProps"
+                name="username"
+            >
+                <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                        <Input
+                            type="text"
+                            autocapitalize="none"
+                            spellcheck="false"
+                            v-no-autofill
+                            v-bind="componentField"
+                        />
+                    </FormControl>
+                    <FormDescription>
+                        Friends find you by this. Letters, numbers, underscores
+                        and periods.
+                    </FormDescription>
+                    <FormMessage />
+                </FormItem>
+            </FormField>
+
+            <div class="grid gap-2">
+                <Label for="email">Email</Label>
+                <Input id="email" :model-value="user?.email" disabled />
+            </div>
+
+            <div class="flex items-center gap-3">
+                <Button type="submit" :disabled="isSubmitting">
+                    <Spinner v-if="isSubmitting" />
+                    Save
+                </Button>
+                <span
+                    v-if="saved && !isSubmitting"
+                    class="text-muted-foreground flex items-center gap-1 text-sm"
+                >
+                    <CheckIcon class="size-4" />
+                    Saved
+                </span>
+            </div>
+        </form>
     </main>
 </template>

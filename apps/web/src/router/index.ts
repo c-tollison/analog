@@ -48,6 +48,19 @@ export const router = createRouter({
                     props: true,
                 },
                 {
+                    path: 'collections/:id/settings',
+                    name: 'collection-settings',
+                    component: () =>
+                        import('@/views/CollectionSettingsView.vue'),
+                    props: true,
+                },
+                {
+                    path: 'collections/:id/settings/invite',
+                    name: 'collection-invite',
+                    component: () => import('@/views/CollectionInviteView.vue'),
+                    props: true,
+                },
+                {
                     path: 'collections/:id/series/:seriesId',
                     name: 'collection-series',
                     component: () => import('@/views/CollectionSeriesView.vue'),
@@ -57,6 +70,12 @@ export const router = createRouter({
                     path: 'friends',
                     name: 'friends',
                     component: () => import('@/views/FriendsView.vue'),
+                },
+                {
+                    path: 'users/:username',
+                    name: 'user',
+                    component: () => import('@/views/UserView.vue'),
+                    props: true,
                 },
                 {
                     path: 'notifications',

@@ -3,6 +3,7 @@ import {
     type AddCatalogItemsSchema,
     type CreateCollectionSchema,
     MAX_PAGE_SIZE,
+    type UserIdSchema,
 } from '@analog/types';
 import { api, unwrap } from '@/lib/api';
 
@@ -166,6 +167,144 @@ export function useCatalogItems(
             ...options,
         }
     );
+}
+
+/** Everyone in a collection, owner first. */
+export function useCollectionMembers(id: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: () => [...collectionKey(toValue(id)), 'members'],
+        queryFn: async () =>
+            unwrap(
+                await api.collections[':id'].members.$get({
+                    param: { id: toValue(id) },
+                })
+            ),
+    });
+}
+
+/** People invited to a collection who haven't answered. Owner only. */
+export function useCollectionInvites(
+    id: MaybeRefOrGetter<string>,
+    enabled: MaybeRefOrGetter<boolean>
+) {
+    return useQuery({
+        queryKey: () => [...collectionKey(toValue(id)), 'invites'],
+        queryFn: async () =>
+            unwrap(
+                await api.collections[':id'].invites.$get({
+                    param: { id: toValue(id) },
+                })
+            ),
+        enabled: () => toValue(enabled),
+    });
+}
+
+/** Friends who aren't in the collection or invited yet. Owner only. */
+export function useInvitableFriends(
+    id: MaybeRefOrGetter<string>,
+    q: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [...collectionKey(toValue(id)), 'invitable', toValue(q)],
+        async (offset) =>
+            unwrap(
+                await api.collections[':id']['invitable-friends'].$get({
+                    param: { id: toValue(id) },
+                    query: { offset, ...(toValue(q) ? { q: toValue(q) } : {}) },
+                })
+            ),
+        options
+    );
+}
+
+/** The collections the signed-in user owns, and whether a friend is in each. */
+export function useFriendCollections(
+    userId: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [...COLLECTIONS_KEY, 'for-friend', toValue(userId)],
+        async (offset) =>
+            unwrap(
+                await api.friends[':userId'].collections.$get({
+                    param: { userId: toValue(userId) },
+                    query: { offset },
+                })
+            ),
+        options
+    );
+}
+
+type MemberInput = z.output<typeof UserIdSchema> & { collectionId: string };
+
+export function useInviteToCollection() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ collectionId, ...json }: MemberInput) =>
+            unwrap(
+                await api.collections[':id'].invites.$post({
+                    param: { id: collectionId },
+                    json,
+                })
+            ),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
+    });
+}
+
+export function useCancelInvite() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ collectionId, userId }: MemberInput) =>
+            unwrap(
+                await api.collections[':id'].invites[':userId'].$delete({
+                    param: { id: collectionId, userId },
+                })
+            ),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
+    });
+}
+
+/** The owner removes an editor. */
+export function useRemoveMember() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ collectionId, userId }: MemberInput) =>
+            unwrap(
+                await api.collections[':id'].members[':userId'].$delete({
+                    param: { id: collectionId, userId },
+                })
+            ),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
+    });
+}
+
+/** An editor leaves. Like deleting, the collection's queries are dropped. */
+export function useLeaveCollection() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ collectionId, userId }: MemberInput) =>
+            unwrap(
+                await api.collections[':id'].members[':userId'].$delete({
+                    param: { id: collectionId, userId },
+                })
+            ),
+        onSuccess: (_data, { collectionId }) => {
+            queryClient.removeQueries({
+                queryKey: collectionKey(collectionId),
+            });
+            return queryClient.invalidateQueries({
+                queryKey: COLLECTIONS_KEY,
+            });
+        },
+    });
 }
 
 export function useCreateCollection() {

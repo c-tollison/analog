@@ -1,9 +1,4 @@
 <script setup lang="ts">
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from '@/components/shadcn-components/avatar';
 import { Button } from '@/components/shadcn-components/button';
 import {
     DropdownMenu,
@@ -13,6 +8,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/shadcn-components/dropdown-menu';
+import UserAvatar from '@/components/users/UserAvatar.vue';
 import { signOut } from '@/lib/auth';
 import { useSessionStore } from '@/stores/session';
 
@@ -36,14 +32,6 @@ const user = computed(() => session.value?.user);
 const displayName = computed<string>(
     () => user.value?.name || user.value?.email || ''
 );
-const initials = computed(() =>
-    displayName.value
-        .split(/[\s@.]+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('')
-);
 
 // 'auto' follows the system, so resolve it before flipping.
 const isDark = computed(
@@ -64,16 +52,11 @@ async function onSignOut() {
     <DropdownMenu>
         <DropdownMenuTrigger as-child>
             <Button variant="ghost" class="h-9 gap-2 px-2">
-                <Avatar class="size-7">
-                    <AvatarImage
-                        v-if="user?.image"
-                        :src="user.image"
-                        :alt="displayName"
-                    />
-                    <AvatarFallback class="text-xs">
-                        {{ initials }}
-                    </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                    :name="displayName"
+                    :image="user?.image"
+                    class="size-7 text-xs"
+                />
                 <span class="hidden text-sm font-medium md:block">
                     {{ displayName }}
                 </span>

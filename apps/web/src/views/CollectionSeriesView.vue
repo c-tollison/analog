@@ -67,7 +67,7 @@ const headerError = computed(
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <Button variant="ghost" size="sm" as-child>
                 <RouterLink :to="{ name: 'collection', params: { id } }">

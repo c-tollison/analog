@@ -22,6 +22,7 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { signUp } from '@/lib/auth';
 import { SignUpFormSchema } from '@/lib/auth-schemas';
+import { vNoAutofill } from '@/lib/no-autofill';
 
 import { useRouter } from 'vue-router';
 
@@ -29,9 +30,20 @@ const router = useRouter();
 
 const { submit, formError, isSubmitting, fieldProps } = useAppForm({
     schema: SignUpFormSchema,
-    initialValues: { name: '', email: '', password: '', confirmPassword: '' },
-    onSubmit: async ({ name, email, password }) => {
-        const { error } = await signUp.email({ name, email, password });
+    initialValues: {
+        name: '',
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+    },
+    onSubmit: async ({ name, username, email, password }) => {
+        const { error } = await signUp.email({
+            name,
+            username,
+            email,
+            password,
+        });
         if (error) {
             return error.message ?? 'Unable to create your account.';
         }
@@ -68,6 +80,30 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                                     v-bind="componentField"
                                 />
                             </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField
+                        v-slot="{ componentField }"
+                        v-bind="fieldProps"
+                        name="username"
+                    >
+                        <FormItem>
+                            <FormLabel>Username</FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="text"
+                                    autocapitalize="none"
+                                    spellcheck="false"
+                                    v-no-autofill
+                                    v-bind="componentField"
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Friends find you by this. Letters, numbers,
+                                underscores and periods.
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     </FormField>

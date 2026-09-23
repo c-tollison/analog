@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { CollectionRole } from '@analog/types';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
@@ -12,7 +11,6 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import {
     useCollection,
     useCollectionEntries,
-    useDeleteCollection,
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
@@ -22,19 +20,15 @@ import {
     ArrowLeftIcon,
     LibraryIcon,
     ScanBarcodeIcon,
-    Trash2Icon,
+    SettingsIcon,
     XIcon,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
 
-const router = useRouter();
-
 const query = ref('');
 const { term, isTyping } = useSearchTerm(query);
-const confirmingDelete = ref(false);
 const isAddOpen = ref(false);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
@@ -65,30 +59,13 @@ function onRemove() {
     );
 }
 
-const {
-    mutate: deleteCollection,
-    isPending: isDeleting,
-    error: deleteError,
-} = useDeleteCollection();
-
-function onDelete() {
-    deleteCollection(props.id, {
-        onSuccess: () => router.replace({ name: 'collections' }),
-        onError: () => {
-            confirmingDelete.value = false;
-        },
-    });
-}
-
 const headerError = computed(
-    () =>
-        (loadError.value ?? removeError.value ?? deleteError.value)?.message ??
-        null
+    () => (loadError.value ?? removeError.value)?.message ?? null
 );
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <Button variant="ghost" size="sm" as-child>
                 <RouterLink :to="{ name: 'collections' }">
@@ -129,25 +106,14 @@ const headerError = computed(
                 {{ collection.name }}
             </h1>
             <Spinner v-else-if="!headerError" />
-            <ConfirmDialog
-                v-if="collection?.role === CollectionRole.Owner"
-                v-model:open="confirmingDelete"
-                :title="`Delete ${collection.name}?`"
-                description="This removes the collection and everything in it for all members."
-                confirm-text="Delete"
-                :pending="isDeleting"
-                @confirm="onDelete"
-            >
-                <template #trigger>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Delete collection"
-                    >
-                        <Trash2Icon />
-                    </Button>
-                </template>
-            </ConfirmDialog>
+            <Button v-if="collection" variant="ghost" size="sm" as-child>
+                <RouterLink
+                    :to="{ name: 'collection-settings', params: { id } }"
+                >
+                    <SettingsIcon />
+                    Settings
+                </RouterLink>
+            </Button>
         </div>
         <FormError :message="headerError" />
 
