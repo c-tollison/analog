@@ -1,3 +1,4 @@
+import type { InferResponseType } from '@analog/api/client';
 import {
     type AddBookSchema,
     type AddCatalogItemsSchema,
@@ -5,7 +6,7 @@ import {
     MAX_PAGE_SIZE,
     type UserIdSchema,
 } from '@analog/types';
-import { api, unwrap } from '@/lib/api';
+import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { CATALOG_KEY } from './useCatalog';
 import {
@@ -128,6 +129,11 @@ export function useCollectionSeriesItems(
             )
     );
 }
+
+export type CollectionItemDetail = InferResponseType<
+    ApiClient['collections'][':id']['items'][':itemId']['$get'],
+    200
+>;
 
 /** One item in a collection, with everyone's status and reviews. */
 export function useCollectionItem(

@@ -30,6 +30,8 @@ import { requireMember } from '../lib/collections.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
+import { IdParamSchema } from '../lib/params.js';
+import { isCompleted, whenCompleted } from '../lib/progress.js';
 import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
 import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
@@ -57,16 +59,13 @@ function myProgress(userId: string) {
     );
 }
 
-// A rating only counts once the item is finished.
-const myRating = sql<number | null>`case
-    when ${progress.status} = ${ProgressStatus.Completed} then ${progress.rating}
-end`;
+const myRating = whenCompleted<number>(progress.rating);
 
 const completedCount = sql<number>`(
-    count(*) filter (where ${progress.status} = ${ProgressStatus.Completed})
+    count(*) filter (where ${isCompleted})
 )::int`;
 
-const CollectionParamSchema = z.object({ id: z.uuid('Invalid id') });
+const CollectionParamSchema = IdParamSchema;
 const ItemParamSchema = CollectionParamSchema.extend({
     itemId: z.uuid('Invalid id'),
 });
@@ -401,7 +400,7 @@ const collections = new Hono<AppEnv>()
                 ownedCount: counted?.ownedCount ?? 0,
                 completedCount: counted?.completedCount ?? 0,
                 ownedPositions: counted?.ownedPositions ?? [],
-                ...(await seriesDetails(found)),
+                ...seriesDetails(found),
             });
         }
     )
@@ -590,7 +589,6 @@ const collections = new Hono<AppEnv>()
                 throw new HTTPException(404, { message: 'Item not found' });
             }
             const item = found.catalogItem;
-            const isCompleted = sql`${progress.status} = ${ProgressStatus.Completed}`;
 
             const details = itemDetails(item);
             const [[mine], members] = await Promise.all([
@@ -613,12 +611,8 @@ const collections = new Hono<AppEnv>()
                     .select({
                         ...userColumns,
                         status: sql<ProgressStatus>`${progress.status}`,
-                        rating: sql<
-                            number | null
-                        >`case when ${isCompleted} then ${progress.rating} end`,
-                        review: sql<
-                            string | null
-                        >`case when ${isCompleted} then ${progress.review} end`,
+                        rating: whenCompleted<number>(progress.rating),
+                        review: whenCompleted<string>(progress.review),
                     })
                     .from(collectionMember)
                     .innerJoin(user, eq(user.id, collectionMember.userId))

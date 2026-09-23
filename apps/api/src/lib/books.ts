@@ -6,6 +6,7 @@ import {
     SeriesKind,
 } from '@analog/types';
 
+import { filledFacts, filledLinks } from './details.js';
 import { db, logger } from './init.js';
 import {
     type BookDetails,
@@ -20,35 +21,20 @@ type CatalogItem = typeof schema.catalogItem.$inferSelect;
 type Series = typeof schema.series.$inferSelect;
 
 // What's stored in a book's `metadata`. Older rows may be missing fields.
-const BookMetadataSchema = z
-    .object({
-        subtitle: z.string().nullable().catch(null),
-        authors: z.array(z.string()).catch([]),
-        publishers: z.array(z.string()).catch([]),
-        publishDate: z.string().nullable().catch(null),
-        firstPublishYear: z.number().nullable().catch(null),
-        pageCount: z.number().nullable().catch(null),
-        description: z.string().nullable().catch(null),
-        characters: z.array(z.string()).catch([]),
-        editionName: z.string().nullable().catch(null),
-        physicalFormat: z.string().nullable().catch(null),
-        languages: z.array(z.string()).catch([]),
-        goodreadsId: z.string().nullable().catch(null),
-    })
-    .catch({
-        subtitle: null,
-        authors: [],
-        publishers: [],
-        publishDate: null,
-        firstPublishYear: null,
-        pageCount: null,
-        description: null,
-        characters: [],
-        editionName: null,
-        physicalFormat: null,
-        languages: [],
-        goodreadsId: null,
-    }) satisfies z.ZodType<BookDetails>;
+const BookMetadataSchema = z.object({
+    subtitle: z.string().nullable().catch(null),
+    authors: z.array(z.string()).catch([]),
+    publishers: z.array(z.string()).catch([]),
+    publishDate: z.string().nullable().catch(null),
+    firstPublishYear: z.number().nullable().catch(null),
+    pageCount: z.number().nullable().catch(null),
+    description: z.string().nullable().catch(null),
+    characters: z.array(z.string()).catch([]),
+    editionName: z.string().nullable().catch(null),
+    physicalFormat: z.string().nullable().catch(null),
+    languages: z.array(z.string()).catch([]),
+    goodreadsId: z.string().nullable().catch(null),
+}) satisfies z.ZodType<BookDetails>;
 
 function readMetadata(item: CatalogItem): BookDetails {
     return BookMetadataSchema.parse(item.metadata);
@@ -349,12 +335,8 @@ export function bookDetails(item: CatalogItem) {
         subtitle: meta.subtitle,
         creators: meta.authors,
         description: meta.description,
-        facts: facts.filter(
-            (fact): fact is { label: string; value: string } => !!fact.value
-        ),
-        links: links.filter(
-            (link): link is { label: string; url: string } => !!link.url
-        ),
+        facts: filledFacts(facts),
+        links: filledLinks(links),
     };
 }
 

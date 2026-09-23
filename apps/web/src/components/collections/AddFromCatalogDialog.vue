@@ -113,7 +113,7 @@ const emptyText = computed(() => {
     if (term.value) {
         return 'No titles match.';
     }
-    return props.series ? 'Nothing in this series yet.' : 'Search by title.';
+    return 'Nothing in this series yet.';
 });
 
 watch(open, (isOpen) => {
@@ -136,8 +136,8 @@ watch(open, (isOpen) => {
                     Quickly add other parts of this series to
                     {{ collectionName }}.
                 </DialogDescription>
-                <DialogDescription v-else>
-                    Pick what to add to {{ collectionName }}.
+                <DialogDescription v-else class="sr-only">
+                    Add media to {{ collectionName }}
                 </DialogDescription>
             </DialogHeader>
 
@@ -168,14 +168,18 @@ watch(open, (isOpen) => {
                 <FormField name="catalogItemIds">
                     <FormItem class="min-h-0 flex-1">
                         <div class="-mx-1 max-h-[50svh] overflow-y-auto px-1">
-                            <PagedList :list="options" :empty-text="emptyText">
+                            <PagedList
+                                v-if="term || series"
+                                :list="options"
+                                :empty-text="emptyText"
+                            >
                                 <template #default="{ items }">
                                     <ItemGroup>
                                         <Item
                                             v-for="item in items"
                                             :key="item.id"
                                             size="sm"
-                                            class="hover:bg-muted has-disabled:opacity-60"
+                                            class="has-disabled:opacity-60"
                                             as-child
                                         >
                                             <label>

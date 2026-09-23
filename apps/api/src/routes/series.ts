@@ -3,12 +3,14 @@ import {
     DetailsSourceSchema,
     LinkDetailsSourceSchema,
     PageQuerySchema,
+    SetVolumeCountSchema,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { seriesColumns } from '../lib/books.js';
 import { db } from '../lib/init.js';
 import { paginate } from '../lib/pagination.js';
+import { IdParamSchema } from '../lib/params.js';
 import {
     matchesAllTerms,
     relevance,
@@ -18,6 +20,7 @@ import {
 import {
     linkDetailsSource,
     searchDetailsSource,
+    setVolumeCount,
     unlinkDetailsSource,
 } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
@@ -31,7 +34,6 @@ const DetailsSearchQuerySchema = z.object({
     source: DetailsSourceSchema,
     q: z.string().trim().min(1).max(200),
 });
-const SeriesParamSchema = z.object({ id: z.uuid('Invalid id') });
 
 // Series are shared like the rest of the catalog, so anyone can link one.
 const series = new Hono<AppEnv>()
@@ -45,20 +47,33 @@ const series = new Hono<AppEnv>()
     )
     .put(
         '/:id/details-source',
-        schemaValidator('param', SeriesParamSchema),
+        schemaValidator('param', IdParamSchema),
         schemaValidator('json', LinkDetailsSourceSchema),
         async (c) => {
-            const { id } = c.req.valid('param');
-            const { source, sourceId, volumeCount } = c.req.valid('json');
-            await linkDetailsSource(id, source, sourceId, volumeCount);
+            await linkDetailsSource(
+                c.req.valid('param').id,
+                c.req.valid('json')
+            );
             return c.body(null, 204);
         }
     )
     .delete(
         '/:id/details-source',
-        schemaValidator('param', SeriesParamSchema),
+        schemaValidator('param', IdParamSchema),
         async (c) => {
             await unlinkDetailsSource(c.req.valid('param').id);
+            return c.body(null, 204);
+        }
+    )
+    .put(
+        '/:id/volume-count',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('json', SetVolumeCountSchema),
+        async (c) => {
+            await setVolumeCount(
+                c.req.valid('param').id,
+                c.req.valid('json').volumeCount
+            );
             return c.body(null, 204);
         }
     )

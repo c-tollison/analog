@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import ExternalLinks from '@/components/media/ExternalLinks.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
 import LinkDetailsSourceDialog from '@/components/series/LinkDetailsSourceDialog.vue';
+import VolumeCountDialog from '@/components/series/VolumeCountDialog.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Progress } from '@/components/shadcn-components/progress';
@@ -19,15 +22,12 @@ import {
 } from '@/composables/useCollections';
 import {
     completedWord,
-    DETAILS_SOURCE_LABELS,
-    detailsSourceFor,
     kindStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
 import {
     ArrowLeftIcon,
-    ExternalLinkIcon,
     LinkIcon,
     PencilIcon,
     PlusIcon,
@@ -39,6 +39,7 @@ const props = defineProps<{ id: string; seriesId: string }>();
 
 const isAddOpen = ref(false);
 const isLinkOpen = ref(false);
+const isVolumeCountOpen = ref(false);
 
 const { data: detail, error: detailError } = useCollectionSeries(
     () => props.id,
@@ -149,6 +150,13 @@ const headerError = computed(
             </Button>
         </div>
 
+        <VolumeCountDialog
+            v-if="detail"
+            v-model:open="isVolumeCountOpen"
+            :series-id="seriesId"
+            :volume-count="detail.volumeCount"
+        />
+
         <LinkDetailsSourceDialog
             v-if="detail && linkSource"
             v-model:open="isLinkOpen"
@@ -192,28 +200,21 @@ const headerError = computed(
                             {{ detail.ownedCount }} owned
                         </template>
                     </span>
+                    <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Edit total volumes"
+                        @click="isVolumeCountOpen = true"
+                    >
+                        <PencilIcon />
+                    </Button>
                 </div>
                 <p v-if="missing" class="text-muted-foreground text-xs">
                     Missing {{ missing }}
                 </p>
                 <div v-if="linkSource" class="flex flex-wrap gap-2 pt-1">
                     <template v-if="detail.detailsSource">
-                        <Button
-                            v-for="link in detail.links"
-                            :key="link.url"
-                            variant="outline"
-                            size="sm"
-                            as-child
-                        >
-                            <a
-                                :href="link.url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                {{ link.label }}
-                                <ExternalLinkIcon data-icon="inline-end" />
-                            </a>
-                        </Button>
+                        <ExternalLinks :links="detail.links" />
                         <Button
                             variant="ghost"
                             size="sm"
@@ -230,7 +231,7 @@ const headerError = computed(
                         @click="isLinkOpen = true"
                     >
                         <LinkIcon />
-                        Link {{ DETAILS_SOURCE_LABELS[linkSource] }}
+                        Link {{ DETAILS_SOURCE_INFO[linkSource].label }}
                     </Button>
                 </div>
                 <div

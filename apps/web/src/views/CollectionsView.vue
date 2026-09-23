@@ -25,7 +25,7 @@ import {
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
-import { completedWord, formatsStatusLabels } from '@/lib/media-types';
+import { formatsCompletedWord } from '@/lib/media-types';
 
 import { PlusIcon, ScanBarcodeIcon, SettingsIcon } from '@lucide/vue';
 import { ref } from 'vue';
@@ -152,11 +152,7 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 {{ c.itemCount === 1 ? 'item' : 'items' }}
                                 <template v-if="c.itemCount">
                                     · {{ c.completedCount }}
-                                    {{
-                                        completedWord(
-                                            formatsStatusLabels(c.formats)
-                                        )
-                                    }}
+                                    {{ formatsCompletedWord(c.formats) }}
                                 </template>
                             </ItemDescription>
                         </ItemContent>

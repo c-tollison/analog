@@ -19,7 +19,7 @@ import {
     completedWord,
     FORMAT_LABELS,
     formatStatusLabels,
-    formatsStatusLabels,
+    formatsCompletedWord,
     kindStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
@@ -68,9 +68,9 @@ function onRemove() {
 }
 
 const progress = computed(() => {
-    const c = collection.value;
-    if (!c || c.itemCount === 0) return null;
-    return `${c.completedCount} of ${c.itemCount} ${completedWord(formatsStatusLabels(c.formats))}`;
+    const summary = collection.value;
+    if (!summary || summary.itemCount === 0) return null;
+    return `${summary.completedCount} of ${summary.itemCount} ${formatsCompletedWord(summary.formats)}`;
 });
 
 const headerError = computed(

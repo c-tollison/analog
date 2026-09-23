@@ -1,17 +1,18 @@
 <script setup lang="ts">
+import ExternalLinks from '@/components/media/ExternalLinks.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
+import type { CollectionItemDetail } from '@/composables/useCollections';
 
-import { ExternalLinkIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const LONG_DESCRIPTION = 400;
 
 const props = defineProps<{
-    description: string | null;
+    description: CollectionItemDetail['description'];
     genres?: string[];
-    facts: { label: string; value: string }[];
-    links?: { label: string; url: string }[];
+    facts: CollectionItemDetail['facts'];
+    links?: CollectionItemDetail['links'];
 }>();
 
 const showFullDescription = ref(false);
@@ -59,18 +60,7 @@ const isLongDescription = computed(
         </dl>
 
         <div v-if="links?.length" class="flex flex-wrap gap-2">
-            <Button
-                v-for="link in links"
-                :key="link.url"
-                variant="outline"
-                size="sm"
-                as-child
-            >
-                <a :href="link.url" target="_blank" rel="noopener noreferrer">
-                    {{ link.label }}
-                    <ExternalLinkIcon data-icon="inline-end" />
-                </a>
-            </Button>
+            <ExternalLinks :links="links" />
         </div>
     </div>
 </template>

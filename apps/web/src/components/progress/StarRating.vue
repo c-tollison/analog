@@ -16,6 +16,14 @@ const rating = defineModel<number | null>({ default: null });
 
 const stars = Array.from({ length: RATING_MAX }, (_, i) => i + 1);
 
+function starClass(star: number, size: string) {
+    const filled = rating.value !== null && star <= rating.value;
+    return cn(
+        size,
+        filled ? 'fill-primary text-primary' : 'text-muted-foreground'
+    );
+}
+
 // Picking the current rating again clears it.
 function pick(star: number) {
     rating.value = rating.value === star ? null : star;
@@ -32,14 +40,7 @@ function pick(star: number) {
         <StarIcon
             v-for="star in stars"
             :key="star"
-            :class="
-                cn(
-                    small ? 'size-3' : 'size-4',
-                    rating !== null && star <= rating
-                        ? 'fill-primary text-primary'
-                        : 'text-muted-foreground'
-                )
-            "
+            :class="starClass(star, small ? 'size-3' : 'size-4')"
         />
     </div>
     <div
@@ -58,16 +59,7 @@ function pick(star: number) {
             :aria-pressed="rating === star"
             @click="pick(star)"
         >
-            <StarIcon
-                :class="
-                    cn(
-                        'size-6',
-                        rating !== null && star <= rating
-                            ? 'fill-primary text-primary'
-                            : 'text-muted-foreground'
-                    )
-                "
-            />
+            <StarIcon :class="starClass(star, 'size-6')" />
         </Button>
     </div>
 </template>

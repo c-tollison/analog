@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DetailsSource } from '@analog/types';
+import { DETAILS_SOURCE_INFO, type DetailsSource } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SearchInput from '@/components/SearchInput.vue';
@@ -7,6 +7,7 @@ import { Button } from '@/components/shadcn-components/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -33,12 +34,12 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import {
+    type DetailsSearchResult,
     useDetailsSearch,
     useLinkDetailsSource,
     useUnlinkDetailsSource,
 } from '@/composables/useSeries';
 import { LinkDetailsSourceFormSchema } from '@/lib/catalog-schemas';
-import { DETAILS_SOURCE_LABELS } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import { computed, ref, watch } from 'vue';
@@ -55,7 +56,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { required: true });
 
-const sourceLabel = computed(() => DETAILS_SOURCE_LABELS[props.source]);
+const sourceLabel = computed(() => DETAILS_SOURCE_INFO[props.source].label);
 
 // "Haikyu!! (English)" searches better as "Haikyu!!".
 function searchText(title: string): string {
@@ -102,7 +103,7 @@ const {
     },
 });
 
-function pick(result: { id: string; title: string; volumes: number | null }) {
+function pick(result: DetailsSearchResult) {
     setFieldValue('sourceId', result.id);
     setFieldValue('volumeCount', result.volumes ?? '');
     pickedTitle.value = result.title;
@@ -129,11 +130,7 @@ watch(open, (isOpen) => {
     });
 });
 
-function describe(result: {
-    format: string | null;
-    volumes: number | null;
-    startYear: number | null;
-}): string {
+function describe(result: DetailsSearchResult): string {
     return [
         result.format,
         result.volumes
@@ -151,6 +148,9 @@ function describe(result: {
         <DialogContent class="flex max-h-[85svh] flex-col sm:max-w-md">
             <DialogHeader>
                 <DialogTitle>Link to {{ sourceLabel }}</DialogTitle>
+                <DialogDescription class="sr-only">
+                    Pick the matching entry and set the total volumes
+                </DialogDescription>
             </DialogHeader>
 
             <form class="grid min-h-0 flex-1 gap-4" novalidate @submit="submit">
@@ -186,7 +186,6 @@ function describe(result: {
                                     : 'default'
                             "
                             :aria-pressed="values.sourceId === result.id"
-                            class="hover:bg-muted text-left"
                             @click="pick(result)"
                         >
                             <ItemMedia>

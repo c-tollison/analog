@@ -14,13 +14,14 @@ import {
     toBookLookup,
 } from '../lib/books.js';
 import { db } from '../lib/init.js';
+import { IdParamSchema } from '../lib/params.js';
+import { isCompleted } from '../lib/progress.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
 const IsbnParamSchema = z.object({ isbn: IsbnSchema });
-const ItemParamSchema = z.object({ id: z.uuid('Invalid id') });
 
 const { catalogItem, collectionItem, collectionMember, progress } = schema;
 
@@ -58,7 +59,7 @@ async function collectionsContaining(
 const catalog = new Hono<AppEnv>()
     .put(
         '/items/:id/status',
-        schemaValidator('param', ItemParamSchema),
+        schemaValidator('param', IdParamSchema),
         schemaValidator('json', SetProgressStatusSchema),
         async (c) => {
             const { id } = c.req.valid('param');
@@ -91,7 +92,7 @@ const catalog = new Hono<AppEnv>()
     )
     .put(
         '/items/:id/review',
-        schemaValidator('param', ItemParamSchema),
+        schemaValidator('param', IdParamSchema),
         schemaValidator('json', ReviewSchema),
         async (c) => {
             const { id } = c.req.valid('param');
@@ -105,7 +106,7 @@ const catalog = new Hono<AppEnv>()
                     and(
                         eq(progress.userId, user.id),
                         eq(progress.catalogItemId, id),
-                        eq(progress.status, ProgressStatus.Completed)
+                        isCompleted
                     )
                 )
                 .returning({

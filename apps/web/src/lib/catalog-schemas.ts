@@ -1,7 +1,7 @@
 import {
     IsbnSchema,
-    LinkDetailsSourceSchema,
     SERIES_TITLE_MAX_LENGTH,
+    SetVolumeCountSchema,
 } from '@analog/types';
 
 import { z } from 'zod';
@@ -49,15 +49,22 @@ export const AddBookFormSchema = z
         path: ['series'],
     });
 
+// Number inputs give strings; empty means no total.
+const VolumeCountField = z
+    .unknown()
+    .transform((value) =>
+        value === '' || value == null ? null : Number(value)
+    )
+    .pipe(SetVolumeCountSchema.shape.volumeCount);
+
+export const VolumeCountFormSchema = z.object({
+    volumeCount: VolumeCountField,
+});
+
 export const LinkDetailsSourceFormSchema = z
     .object({
         sourceId: z.string().nullable(),
-        volumeCount: z
-            .unknown()
-            .transform((value) =>
-                value === '' || value == null ? null : Number(value)
-            )
-            .pipe(LinkDetailsSourceSchema.shape.volumeCount),
+        volumeCount: VolumeCountField,
     })
     .refine((values) => values.sourceId !== null, {
         message: 'Pick a match',

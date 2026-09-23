@@ -1,5 +1,10 @@
-import type { DetailsSource, LinkDetailsSourceSchema } from '@analog/types';
-import { api, unwrap } from '@/lib/api';
+import type { InferResponseType } from '@analog/api/client';
+import type {
+    DetailsSource,
+    LinkDetailsSourceSchema,
+    SetVolumeCountSchema,
+} from '@analog/types';
+import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { COLLECTIONS_KEY } from './useCollections';
 import {
@@ -11,6 +16,11 @@ import { type MaybeRefOrGetter, toValue } from 'vue';
 import type { z } from 'zod';
 
 export const SERIES_KEY = ['series'] as const;
+
+export type DetailsSearchResult = InferResponseType<
+    ApiClient['series']['details-source']['search']['$get'],
+    200
+>[number];
 
 /** Series in the shared catalog matching `q`; nothing loads while it's empty. */
 export function useSeriesSearch(
@@ -92,6 +102,25 @@ export function useUnlinkDetailsSource() {
             unwrap(
                 await api.series[':id']['details-source'].$delete({
                     param: { id: seriesId },
+                })
+            ),
+        onSuccess: invalidate,
+    });
+}
+
+/** Sets how many volumes a series has in total, linked or not. */
+export function useSetVolumeCount() {
+    const invalidate = useInvalidateSeries();
+
+    return useMutation({
+        mutationFn: async ({
+            seriesId,
+            ...json
+        }: z.output<typeof SetVolumeCountSchema> & { seriesId: string }) =>
+            unwrap(
+                await api.series[':id']['volume-count'].$put({
+                    param: { id: seriesId },
+                    json,
                 })
             ),
         onSuccess: invalidate,

@@ -1,4 +1,4 @@
-import { ExternalSource } from './catalog-enums.js';
+import { ExternalSource, SeriesKind } from './catalog-enums.js';
 import { IsbnSchema } from './isbn.js';
 import { z } from 'zod';
 
@@ -44,6 +44,17 @@ export const AddCatalogItemsSchema = z.object({
 
 export const MAX_VOLUME_COUNT = 1000;
 
+const VolumeCountSchema = z
+    .number()
+    .int('Enter a whole number')
+    .positive('Enter a number above 0')
+    .max(MAX_VOLUME_COUNT)
+    .nullable();
+
+export const SetVolumeCountSchema = z.object({
+    volumeCount: VolumeCountSchema,
+});
+
 /** Sources a series can pull its synopsis, genres and run from. */
 export const DETAILS_SOURCES = [ExternalSource.AniList] as const;
 
@@ -51,13 +62,27 @@ export type DetailsSource = (typeof DETAILS_SOURCES)[number];
 
 export const DetailsSourceSchema = z.enum(DETAILS_SOURCES);
 
-export const LinkDetailsSourceSchema = z.object({
+/** Each source's display name and the kinds of series it covers. */
+export const DETAILS_SOURCE_INFO: Record<
+    DetailsSource,
+    { label: string; kinds: readonly SeriesKind[] }
+> = {
+    [ExternalSource.AniList]: {
+        label: 'AniList',
+        kinds: [SeriesKind.Manga, SeriesKind.LightNovel],
+    },
+};
+
+/** Where a series of this kind can get more details, if anywhere. */
+export function detailsSourceFor(kind: SeriesKind): DetailsSource | null {
+    return (
+        DETAILS_SOURCES.find((source) =>
+            DETAILS_SOURCE_INFO[source].kinds.includes(kind)
+        ) ?? null
+    );
+}
+
+export const LinkDetailsSourceSchema = SetVolumeCountSchema.extend({
     source: DetailsSourceSchema,
     sourceId: z.string().trim().min(1).max(100),
-    volumeCount: z
-        .number()
-        .int('Enter a whole number')
-        .positive('Enter a number above 0')
-        .max(MAX_VOLUME_COUNT)
-        .nullable(),
 });

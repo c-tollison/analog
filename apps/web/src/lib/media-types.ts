@@ -1,10 +1,4 @@
-import {
-    type DetailsSource,
-    ExternalSource,
-    MediaFormat,
-    ProgressStatus,
-    SeriesKind,
-} from '@analog/types';
+import { MediaFormat, ProgressStatus, SeriesKind } from '@analog/types';
 
 import type { BarcodeFormat } from 'vue-qrcode-reader';
 
@@ -110,19 +104,7 @@ export function completedWord(labels: StatusLabels): string {
     return labels[ProgressStatus.Completed].toLowerCase();
 }
 
-export const DETAILS_SOURCE_LABELS: Record<DetailsSource, string> = {
-    [ExternalSource.AniList]: 'AniList',
-};
-
-/** Where a series of this kind can get its synopsis and run, if anywhere. */
-const KIND_DETAILS_SOURCES: Record<SeriesKind, DetailsSource | null> = {
-    [SeriesKind.Manga]: ExternalSource.AniList,
-    [SeriesKind.LightNovel]: ExternalSource.AniList,
-    [SeriesKind.Book]: null,
-    [SeriesKind.Tv]: null,
-    [SeriesKind.Film]: null,
-};
-
-export function detailsSourceFor(kind: SeriesKind): DetailsSource | null {
-    return KIND_DETAILS_SOURCES[kind];
+/** The completed word for a collection's mix of formats: "read", "complete". */
+export function formatsCompletedWord(formats: MediaFormat[]): string {
+    return completedWord(formatsStatusLabels(formats));
 }
