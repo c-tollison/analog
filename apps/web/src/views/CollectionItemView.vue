@@ -112,10 +112,10 @@ const error = computed(
         </div>
 
         <Tabs v-if="item && labels" default-value="details" class="gap-4">
-            <TabsList v-if="item.members.length">
+            <TabsList v-if="item.reviews.length">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="reviews">
-                    Reviews ({{ item.members.length }})
+                    Reviews ({{ item.reviews.length }})
                 </TabsTrigger>
             </TabsList>
 
@@ -230,15 +230,15 @@ const error = computed(
             <TabsContent value="reviews">
                 <ItemGroup class="grid gap-2 sm:grid-cols-2">
                     <Item
-                        v-for="member in item.members"
-                        :key="member.id"
+                        v-for="review in item.reviews"
+                        :key="review.id"
                         variant="outline"
                         class="items-start"
                     >
                         <ItemMedia>
                             <UserAvatar
-                                :name="member.name"
-                                :image="member.image"
+                                :name="review.name"
+                                :image="review.image"
                             />
                         </ItemMedia>
                         <ItemContent class="min-w-0 gap-1">
@@ -247,29 +247,24 @@ const error = computed(
                                     :to="{
                                             name: 'user',
                                             params: {
-                                                username: member.username,
+                                                username: review.username,
                                             },
                                         }"
                                     class="hover:underline"
                                 >
-                                    {{ member.name }}
+                                    {{ review.name }}
                                 </RouterLink>
                             </ItemTitle>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant="secondary">
-                                    {{ labels[member.status] }}
-                                </Badge>
-                                <StarRating
-                                    v-if="member.rating !== null"
-                                    readonly
-                                    :model-value="member.rating"
-                                />
-                            </div>
+                            <StarRating
+                                v-if="review.rating !== null"
+                                readonly
+                                :model-value="review.rating"
+                            />
                             <p
-                                v-if="member.review"
+                                v-if="review.review"
                                 class="text-sm whitespace-pre-line"
                             >
-                                {{ member.review }}
+                                {{ review.review }}
                             </p>
                         </ItemContent>
                     </Item>

@@ -591,7 +591,7 @@ const collections = new Hono<AppEnv>()
             const item = found.catalogItem;
 
             const details = itemDetails(item);
-            const [[mine], members] = await Promise.all([
+            const [[mine], reviews] = await Promise.all([
                 db()
                     .select({
                         status: progress.status,
@@ -605,14 +605,13 @@ const collections = new Hono<AppEnv>()
                             eq(progress.catalogItemId, item.id)
                         )
                     ),
-                // Everyone else in the collection who has marked it. Ratings
-                // and reviews only count once they've finished it.
+                // Everyone else in the collection who finished it and left a
+                // rating or review.
                 db()
                     .select({
                         ...userColumns,
-                        status: sql<ProgressStatus>`${progress.status}`,
-                        rating: whenCompleted<number>(progress.rating),
-                        review: whenCompleted<string>(progress.review),
+                        rating: progress.rating,
+                        review: progress.review,
                     })
                     .from(collectionMember)
                     .innerJoin(user, eq(user.id, collectionMember.userId))
@@ -627,7 +626,11 @@ const collections = new Hono<AppEnv>()
                         and(
                             eq(collectionMember.collectionId, id),
                             ne(collectionMember.userId, me),
-                            isNotNull(progress.status)
+                            isCompleted,
+                            or(
+                                isNotNull(progress.rating),
+                                isNotNull(progress.review)
+                            )
                         )
                     )
                     .orderBy(desc(progress.updatedAt), asc(user.id)),
@@ -647,7 +650,7 @@ const collections = new Hono<AppEnv>()
                 status: mine?.status ?? null,
                 rating: mine?.rating ?? null,
                 review: mine?.review ?? null,
-                members,
+                reviews,
             });
         }
     )
