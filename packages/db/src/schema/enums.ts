@@ -11,7 +11,11 @@ import { appSchema } from './primitives.js';
 // arrays: drizzle-kit drops the "app." schema prefix from column types when
 // given an enum object.
 function values<T extends string>(enumObject: Record<string, T>): [T, ...T[]] {
-    return Object.values(enumObject) as [T, ...T[]];
+    const [first, ...rest] = Object.values(enumObject);
+    if (first === undefined) {
+        throw new Error('Enum has no values');
+    }
+    return [first, ...rest];
 }
 
 export const seriesKind = appSchema.enum('series_kind', values(SeriesKind));

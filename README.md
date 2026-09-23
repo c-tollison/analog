@@ -48,7 +48,9 @@ pnpm add-component button card dialog
 1. Runs `shadcn-vue add` from inside `apps/web` so it picks up
    `apps/web/components.json`. Components go in
    `apps/web/src/components/shadcn-components/`.
-2. Formats the generated files
+2. Never overwrites a component that's already there. It answers no to
+   every overwrite prompt and refuses `--overwrite`.
+3. Formats the generated files
 
 Passing no component name starts the shadcn interactive picker.
 

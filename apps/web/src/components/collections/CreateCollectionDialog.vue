@@ -21,6 +21,7 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { useCreateCollection } from '@/composables/useCollections';
 import { CreateCollectionSchema } from '@/lib/catalog-schemas';
+import { vNoAutofill } from '@/lib/no-autofill';
 
 import { watch } from 'vue';
 
@@ -65,7 +66,7 @@ watch(open, (isOpen) => {
                         <FormLabel>Name</FormLabel>
                         <FormControl>
                             <Input
-                                autocomplete="off"
+                                v-no-autofill
                                 placeholder="Manga"
                                 v-bind="componentField"
                             />

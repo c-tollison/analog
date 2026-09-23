@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CollectionRole } from '@analog/types';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
@@ -42,7 +43,27 @@ const entries = useCollectionEntries(() => props.id, term, {
     pending: isTyping,
 });
 
-const { mutate: removeItem, error: removeError } = useRemoveCollectionItem();
+const {
+    mutate: removeItem,
+    isPending: isRemoving,
+    error: removeError,
+} = useRemoveCollectionItem();
+
+const removing = ref<{ id: string; title: string } | null>(null);
+const confirmingRemove = computed({
+    get: () => removing.value !== null,
+    set: (open) => {
+        if (!open) removing.value = null;
+    },
+});
+
+function onRemove() {
+    if (!removing.value) return;
+    removeItem(
+        { collectionId: props.id, itemId: removing.value.id },
+        { onSettled: () => (removing.value = null) }
+    );
+}
 
 const {
     mutate: deleteCollection,
@@ -53,6 +74,9 @@ const {
 function onDelete() {
     deleteCollection(props.id, {
         onSuccess: () => router.replace({ name: 'collections' }),
+        onError: () => {
+            confirmingDelete.value = false;
+        },
     });
 }
 
@@ -64,7 +88,7 @@ const headerError = computed(
 </script>
 
 <template>
-    <main class="mx-auto flex min-h-svh w-full max-w-3xl flex-col gap-4 p-4">
+    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <Button variant="ghost" size="sm" as-child>
                 <RouterLink :to="{ name: 'collections' }">
@@ -105,40 +129,36 @@ const headerError = computed(
                 {{ collection.name }}
             </h1>
             <Spinner v-else-if="!headerError" />
-            <template v-if="collection?.role === CollectionRole.Owner">
-                <div v-if="confirmingDelete" class="flex items-center gap-1">
-                    <span class="text-muted-foreground text-xs">
-                        Delete collection?
-                    </span>
-                    <Button
-                        variant="destructive"
-                        size="sm"
-                        :disabled="isDeleting"
-                        @click="onDelete"
-                    >
-                        <Spinner v-if="isDeleting" />
-                        Delete
-                    </Button>
+            <ConfirmDialog
+                v-if="collection?.role === CollectionRole.Owner"
+                v-model:open="confirmingDelete"
+                :title="`Delete ${collection.name}?`"
+                description="This removes the collection and everything in it for all members."
+                confirm-text="Delete"
+                :pending="isDeleting"
+                @confirm="onDelete"
+            >
+                <template #trigger>
                     <Button
                         variant="ghost"
-                        size="sm"
-                        @click="confirmingDelete = false"
+                        size="icon"
+                        aria-label="Delete collection"
                     >
-                        Cancel
+                        <Trash2Icon />
                     </Button>
-                </div>
-                <Button
-                    v-else
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Delete collection"
-                    @click="confirmingDelete = true"
-                >
-                    <Trash2Icon />
-                </Button>
-            </template>
+                </template>
+            </ConfirmDialog>
         </div>
         <FormError :message="headerError" />
+
+        <ConfirmDialog
+            v-model:open="confirmingRemove"
+            :title="`Remove ${removing?.title ?? 'item'}?`"
+            description="This takes it out of the collection."
+            confirm-text="Remove"
+            :pending="isRemoving"
+            @confirm="onRemove"
+        />
 
         <SearchInput v-model="query" placeholder="Search" />
 
@@ -212,7 +232,7 @@ const headerError = computed(
                                 size="icon"
                                 class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                                 :aria-label="`Remove ${entry.title}`"
-                                @click="removeItem({ collectionId: id, itemId: entry.id })"
+                                @click="removing = { id: entry.id, title: entry.title }"
                             >
                                 <XIcon />
                             </Button>

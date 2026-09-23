@@ -6,7 +6,14 @@ import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import { Card, CardContent } from '@/components/shadcn-components/card';
+import {
+    Item,
+    ItemActions,
+    ItemContent,
+    ItemDescription,
+    ItemGroup,
+    ItemTitle,
+} from '@/components/shadcn-components/item';
 import {
     useCollectionSearch,
     useCollections,
@@ -14,12 +21,7 @@ import {
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
 
-import {
-    ArrowLeftIcon,
-    PlusIcon,
-    ScanBarcodeIcon,
-    UsersIcon,
-} from '@lucide/vue';
+import { PlusIcon, ScanBarcodeIcon, UsersIcon } from '@lucide/vue';
 import { ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
@@ -49,14 +51,9 @@ function resultLink(result: SearchResult): RouteLocationRaw {
 </script>
 
 <template>
-    <main class="mx-auto flex min-h-svh w-full max-w-3xl flex-col gap-4 p-4">
+    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
-            <Button variant="ghost" size="sm" as-child>
-                <RouterLink :to="{ name: 'home' }">
-                    <ArrowLeftIcon />
-                    Home
-                </RouterLink>
-            </Button>
+            <h1 class="text-lg font-semibold">Collections</h1>
             <div class="flex gap-2">
                 <Button
                     variant="outline"
@@ -76,8 +73,6 @@ function resultLink(result: SearchResult): RouteLocationRaw {
         </div>
 
         <CreateCollectionDialog v-model:open="isCreateOpen" />
-
-        <h1 class="text-lg font-semibold">Collections</h1>
 
         <SearchInput v-model="query" placeholder="Search all collections" />
 
@@ -125,41 +120,32 @@ function resultLink(result: SearchResult): RouteLocationRaw {
             empty-text="No collections yet. Click New collection to make one."
         >
             <template #default="{ items }">
-                <ul class="grid gap-2 sm:grid-cols-2">
-                    <li v-for="c in items" :key="c.id">
+                <ItemGroup class="grid sm:grid-cols-2">
+                    <Item
+                        v-for="c in items"
+                        :key="c.id"
+                        variant="outline"
+                        as-child
+                    >
                         <RouterLink
                             :to="{ name: 'collection', params: { id: c.id } }"
-                            class="block"
                         >
-                            <Card class="hover:bg-muted/50 transition-colors">
-                                <CardContent
-                                    class="flex items-center justify-between"
-                                >
-                                    <div>
-                                        <p class="font-medium">{{ c.name }}</p>
-                                        <p
-                                            class="text-muted-foreground text-xs"
-                                        >
-                                            {{ c.itemCount }}
-                                            {{
-                                                c.itemCount === 1
-                                                    ? 'item'
-                                                    : 'items'
-                                            }}
-                                        </p>
-                                    </div>
-                                    <Badge
-                                        v-if="c.memberCount > 1"
-                                        variant="secondary"
-                                    >
-                                        <UsersIcon />
-                                        Shared
-                                    </Badge>
-                                </CardContent>
-                            </Card>
+                            <ItemContent>
+                                <ItemTitle>{{ c.name }}</ItemTitle>
+                                <ItemDescription>
+                                    {{ c.itemCount }}
+                                    {{ c.itemCount === 1 ? 'item' : 'items' }}
+                                </ItemDescription>
+                            </ItemContent>
+                            <ItemActions v-if="c.memberCount > 1">
+                                <Badge variant="secondary">
+                                    <UsersIcon />
+                                    Shared
+                                </Badge>
+                            </ItemActions>
                         </RouterLink>
-                    </li>
-                </ul>
+                    </Item>
+                </ItemGroup>
             </template>
         </PagedList>
     </main>

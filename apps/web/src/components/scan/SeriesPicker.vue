@@ -5,6 +5,7 @@ import { Button } from '@/components/shadcn-components/button';
 import {
     Combobox,
     ComboboxAnchor,
+    ComboboxEmpty,
     ComboboxInput,
     ComboboxItem,
     ComboboxList,
@@ -13,14 +14,16 @@ import {
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useSeriesSearch } from '@/composables/useSeries';
+import type { AddBookFormSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 
 import { PlusIcon, XIcon } from '@lucide/vue';
 import { computed, ref, useAttrs, watch } from 'vue';
+import type { z } from 'zod';
 
-export type SeriesPick =
-    | { id: string; title: string }
-    | { id: null; title: string };
+export type SeriesPick = NonNullable<
+    z.input<typeof AddBookFormSchema>['series']
+>;
 
 const PAGE_SIZE = 20;
 
@@ -55,10 +58,15 @@ watch(search, (text) => {
     model.value = title ? { id: null, title } : null;
 });
 
+function isSeriesPick(value: unknown): value is SeriesPick {
+    return typeof value === 'object' && value !== null && 'title' in value;
+}
+
 function sameSeries(a: unknown, b: unknown) {
-    const x = a as SeriesPick | null;
-    const y = b as SeriesPick | null;
-    return x?.id === y?.id && x?.title === y?.title;
+    if (!isSeriesPick(a) || !isSeriesPick(b)) {
+        return a === b;
+    }
+    return a.id === b.id && a.title === b.title;
 }
 </script>
 
@@ -88,12 +96,9 @@ function sameSeries(a: unknown, b: unknown) {
                     >
                         <Spinner />
                     </div>
-                    <p
-                        v-else-if="!list.items.length && !canCreate"
-                        class="text-muted-foreground py-2 text-center text-xs"
-                    >
+                    <ComboboxEmpty v-else-if="!list.items.length && !canCreate">
                         Type a name to search or create a series.
-                    </p>
+                    </ComboboxEmpty>
                     <ComboboxItem
                         v-if="canCreate"
                         :value="{ id: null, title: trimmed }"
