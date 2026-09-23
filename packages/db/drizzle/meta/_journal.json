@@ -29,6 +29,13 @@
       "when": 1789989147721,
       "tag": "0003_require_verified_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790027275756,
+      "tag": "0004_add_catalog_and_collections",
+      "breakpoints": true
     }
   ]
 }

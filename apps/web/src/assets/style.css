@@ -186,6 +186,17 @@
     --shadow-xl: var(--shadow-xl);
     --shadow-2xl: var(--shadow-2xl);
     --font-heading: var(--font-sans);
+
+    --animate-scan-sweep: scan-sweep 1.8s ease-in-out infinite alternate;
+
+    @keyframes scan-sweep {
+        from {
+            top: 0%;
+        }
+        to {
+            top: 100%;
+        }
+    }
 }
 
 @layer base {

@@ -1,21 +1,14 @@
 <script setup lang="ts">
 import ModeToggle from '@/components/ModeToggle.vue';
 import { Button } from '@/components/shadcn-components/button';
-import { useApiClient } from '@/lib/api';
-import { signOut, useAppSession } from '@/lib/auth';
+import { signOut } from '@/lib/auth';
+import { useSessionStore } from '@/stores/session';
 
-import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 
-const api = useApiClient();
 const router = useRouter();
-const session = useAppSession();
-const message = ref('');
-
-async function fetchMessage() {
-    const res = await api['hello-world'].$get({ query: { name: 'Analog' } });
-    message.value = await res.text();
-}
+const { session } = storeToRefs(useSessionStore());
 
 async function handleSignOut() {
     await signOut();
@@ -29,12 +22,16 @@ async function handleSignOut() {
             Signed in as {{ session.user.email }}
         </p>
 
-        <Button @click="fetchMessage">Say hello</Button>
-        <p v-if="message">{{ message }}</p>
-
-        <Button variant="outline" @click="router.push({ name: 'new-view' })">
-            Go to new view
-        </Button>
+        <div class="flex items-center gap-2">
+            <Button as-child>
+                <RouterLink :to="{ name: 'scan' }">Scan</RouterLink>
+            </Button>
+            <Button variant="outline" as-child>
+                <RouterLink :to="{ name: 'collections' }">
+                    Collections
+                </RouterLink>
+            </Button>
+        </div>
 
         <div class="flex items-center gap-2">
             <ModeToggle />

@@ -1,11 +1,4 @@
-import { getCachedSession } from '@/lib/auth';
-import ForgotPasswordView from '@/views/ForgotPasswordView.vue';
-import HomeView from '@/views/HomeView.vue';
-import ResetPasswordView from '@/views/ResetPasswordView.vue';
-import SignInView from '@/views/SignInView.vue';
-import SignUpView from '@/views/SignUpView.vue';
-import TwoFactorView from '@/views/TwoFactorView.vue';
-import VerifyEmailView from '@/views/VerifyEmailView.vue';
+import { useSessionStore } from '@/stores/session';
 
 import {
     createRouter,
@@ -31,44 +24,70 @@ export const router = createRouter({
         {
             path: '/',
             name: 'home',
-            component: HomeView,
+            component: () => import('@/views/HomeView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/scan',
+            name: 'scan',
+            component: () => import('@/views/ScanView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/collections',
+            name: 'collections',
+            component: () => import('@/views/CollectionsView.vue'),
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/collections/:id',
+            name: 'collection',
+            component: () => import('@/views/CollectionView.vue'),
+            props: true,
+            meta: { requiresAuth: true },
+        },
+        {
+            path: '/collections/:id/series/:seriesId',
+            name: 'collection-series',
+            component: () => import('@/views/CollectionSeriesView.vue'),
+            props: true,
             meta: { requiresAuth: true },
         },
         {
             path: '/sign-in',
             name: 'sign-in',
-            component: SignInView,
+            component: () => import('@/views/SignInView.vue'),
             meta: { guestOnly: true },
         },
         {
             path: '/sign-up',
             name: 'sign-up',
-            component: SignUpView,
+            component: () => import('@/views/SignUpView.vue'),
             meta: { guestOnly: true },
         },
         {
             path: '/verify-email',
             name: 'verify-email',
-            component: VerifyEmailView,
+            component: () => import('@/views/VerifyEmailView.vue'),
             meta: { guestOnly: true },
             beforeEnter: requireEmailQuery,
         },
         {
             path: '/two-factor',
             name: 'two-factor',
-            component: TwoFactorView,
+            component: () => import('@/views/TwoFactorView.vue'),
             meta: { guestOnly: true },
         },
         {
             path: '/forgot-password',
             name: 'forgot-password',
-            component: ForgotPasswordView,
+            component: () => import('@/views/ForgotPasswordView.vue'),
             meta: { guestOnly: true },
         },
         {
             path: '/reset-password',
             name: 'reset-password',
-            component: ResetPasswordView,
+            component: () => import('@/views/ResetPasswordView.vue'),
             meta: { guestOnly: true },
             beforeEnter: requireEmailQuery,
         },
@@ -80,7 +99,7 @@ router.beforeEach(async (to) => {
         return true;
     }
 
-    const session = await getCachedSession();
+    const session = await useSessionStore().load();
 
     if (to.meta.requiresAuth && !session) {
         return { name: 'sign-in', query: { redirect: to.fullPath } };
