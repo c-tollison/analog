@@ -1,4 +1,15 @@
-import { and, asc, desc, eq, inArray, schema, sql } from '@analog/db';
+import {
+    and,
+    asc,
+    desc,
+    eq,
+    ilike,
+    inArray,
+    notExists,
+    or,
+    schema,
+    sql,
+} from '@analog/db';
 import {
     AddBookSchema,
     AddCatalogItemsSchema,
@@ -7,25 +18,38 @@ import {
     type MediaFormat,
     PageQuerySchema,
     type SeriesKind,
+    UserIdSchema,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { seriesColumns, upsertBook } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
+import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
-import { paginate } from '../lib/pagination.js';
+import { likePattern, paginate } from '../lib/pagination.js';
 import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
-const { collection, collectionMember, collectionItem, catalogItem, series } =
-    schema;
+const {
+    collection,
+    collectionMember,
+    collectionItem,
+    collectionInvite,
+    catalogItem,
+    friendship,
+    series,
+    user,
+} = schema;
 
 const CollectionParamSchema = z.object({ id: z.uuid('Invalid id') });
 const ItemParamSchema = CollectionParamSchema.extend({
     itemId: z.uuid('Invalid id'),
+});
+const MemberParamSchema = CollectionParamSchema.extend({
+    userId: z.uuid('Invalid id'),
 });
 const SeriesParamSchema = CollectionParamSchema.extend({
     seriesId: z.uuid('Invalid id'),
@@ -35,6 +59,9 @@ const EntriesQuerySchema = PageQuerySchema.extend({
 });
 const SearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().min(1).max(200),
+});
+const FriendsQuerySchema = PageQuerySchema.extend({
+    q: z.string().trim().max(100).optional(),
 });
 const CatalogQuerySchema = EntriesQuerySchema.extend({
     seriesId: z.uuid('Invalid id').optional(),
@@ -49,6 +76,15 @@ const itemColumns = {
     position: catalogItem.position,
 };
 
+const MEMBER_PREVIEW_COUNT = 3;
+
+type MemberPreview = Pick<typeof user.$inferSelect, 'id' | 'name' | 'image'>;
+
+const ownerFirst = [
+    sql`${collectionMember.role} = ${CollectionRole.Owner} desc`,
+    asc(collectionMember.createdAt),
+];
+
 function collectionSummaries(userId: string, collectionId?: string) {
     return db()
         .select({
@@ -62,6 +98,18 @@ function collectionSummaries(userId: string, collectionId?: string) {
             memberCount: sql<number>`(
                 select count(*)::int from ${collectionMember} m
                 where m.collection_id = ${collection.id}
+            )`,
+            // The first few members for avatars, owner first.
+            members: sql<MemberPreview[]>`(
+                select coalesce(json_agg(p), '[]'::json) from (
+                    select u.id, u.name, u.image
+                    from ${collectionMember} m
+                    join ${user} u on u.id = m.user_id
+                    where m.collection_id = ${collection.id}
+                    order by m.role = ${CollectionRole.Owner} desc,
+                        m.created_at, u.id
+                    limit ${MEMBER_PREVIEW_COUNT}
+                ) p
             )`,
         })
         .from(collectionMember)
@@ -470,6 +518,203 @@ const collections = new Hono<AppEnv>()
                 throw new HTTPException(404, { message: 'Item not found' });
             }
             return c.body(null, 204);
+        }
+    )
+    .get(
+        '/:id/members',
+        schemaValidator('param', CollectionParamSchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            await requireMember(id, c.get('user').id);
+
+            const members = await db()
+                .select({ ...userColumns, role: collectionMember.role })
+                .from(collectionMember)
+                .innerJoin(user, eq(user.id, collectionMember.userId))
+                .where(eq(collectionMember.collectionId, id))
+                .orderBy(...ownerFirst, asc(user.id));
+            return c.json(members);
+        }
+    )
+    .delete(
+        '/:id/members/:userId',
+        schemaValidator('param', MemberParamSchema),
+        async (c) => {
+            const { id, userId } = c.req.valid('param');
+            const me = c.get('user').id;
+            const leaving = userId.toLowerCase() === me;
+
+            // Editors can leave; only the owner removes other people.
+            const role = await requireMember(
+                id,
+                me,
+                leaving ? undefined : CollectionRole.Owner
+            );
+            if (leaving && role === CollectionRole.Owner) {
+                throw new HTTPException(400, {
+                    message:
+                        "Owners can't leave. Delete the collection instead.",
+                });
+            }
+
+            const [removed] = await db()
+                .delete(collectionMember)
+                .where(
+                    and(
+                        eq(collectionMember.collectionId, id),
+                        eq(collectionMember.userId, userId),
+                        eq(collectionMember.role, CollectionRole.Editor)
+                    )
+                )
+                .returning({ userId: collectionMember.userId });
+            if (!removed) {
+                throw new HTTPException(404, { message: 'Member not found' });
+            }
+            return c.body(null, 204);
+        }
+    )
+    .get(
+        '/:id/invites',
+        schemaValidator('param', CollectionParamSchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            await requireMember(id, c.get('user').id, CollectionRole.Owner);
+
+            const invited = await db()
+                .select(userColumns)
+                .from(collectionInvite)
+                .innerJoin(user, eq(user.id, collectionInvite.inviteeId))
+                .where(eq(collectionInvite.collectionId, id))
+                .orderBy(asc(collectionInvite.createdAt), asc(user.id));
+            return c.json(invited);
+        }
+    )
+    .post(
+        '/:id/invites',
+        schemaValidator('param', CollectionParamSchema),
+        schemaValidator('json', UserIdSchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            const { userId } = c.req.valid('json');
+            const me = c.get('user').id;
+            await requireMember(id, me, CollectionRole.Owner);
+
+            if (!(await areFriends(me, userId))) {
+                throw new HTTPException(400, {
+                    message: 'You can only invite friends',
+                });
+            }
+            const member = await db().query.collectionMember.findFirst({
+                columns: { role: true },
+                where: and(
+                    eq(collectionMember.collectionId, id),
+                    eq(collectionMember.userId, userId)
+                ),
+            });
+            if (member) {
+                throw new HTTPException(409, {
+                    message: 'Already a member',
+                });
+            }
+
+            const [invited] = await db()
+                .insert(collectionInvite)
+                .values({ collectionId: id, inviteeId: userId, inviterId: me })
+                .onConflictDoNothing()
+                .returning({ inviteeId: collectionInvite.inviteeId });
+            if (!invited) {
+                throw new HTTPException(409, { message: 'Already invited' });
+            }
+            return c.json(invited, 201);
+        }
+    )
+    .delete(
+        '/:id/invites/:userId',
+        schemaValidator('param', MemberParamSchema),
+        async (c) => {
+            const { id, userId } = c.req.valid('param');
+            await requireMember(id, c.get('user').id, CollectionRole.Owner);
+
+            const [removed] = await db()
+                .delete(collectionInvite)
+                .where(
+                    and(
+                        eq(collectionInvite.collectionId, id),
+                        eq(collectionInvite.inviteeId, userId)
+                    )
+                )
+                .returning({ inviteeId: collectionInvite.inviteeId });
+            if (!removed) {
+                throw new HTTPException(404, { message: 'Invite not found' });
+            }
+            return c.body(null, 204);
+        }
+    )
+    .get(
+        '/:id/invitable-friends',
+        schemaValidator('param', CollectionParamSchema),
+        schemaValidator('query', FriendsQuerySchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            const { q, ...pageQuery } = c.req.valid('query');
+            const me = c.get('user').id;
+            await requireMember(id, me, CollectionRole.Owner);
+            const pattern = q ? likePattern(q) : undefined;
+
+            // My friends who aren't in the collection or invited to it yet.
+            const page = await paginate(pageQuery, (limit, offset) =>
+                db()
+                    .select(userColumns)
+                    .from(user)
+                    .innerJoin(friendship, friendshipWith(me, user.id))
+                    .where(
+                        and(
+                            notExists(
+                                db()
+                                    .select({ userId: collectionMember.userId })
+                                    .from(collectionMember)
+                                    .where(
+                                        and(
+                                            eq(
+                                                collectionMember.collectionId,
+                                                id
+                                            ),
+                                            eq(collectionMember.userId, user.id)
+                                        )
+                                    )
+                            ),
+                            notExists(
+                                db()
+                                    .select({
+                                        inviteeId: collectionInvite.inviteeId,
+                                    })
+                                    .from(collectionInvite)
+                                    .where(
+                                        and(
+                                            eq(
+                                                collectionInvite.collectionId,
+                                                id
+                                            ),
+                                            eq(
+                                                collectionInvite.inviteeId,
+                                                user.id
+                                            )
+                                        )
+                                    )
+                            ),
+                            pattern
+                                ? or(
+                                      ilike(user.name, pattern),
+                                      ilike(user.username, pattern)
+                                  )
+                                : undefined
+                        )
+                    )
+                    .orderBy(sql`lower(${user.name})`, asc(user.id))
+                    .limit(limit)
+                    .offset(offset)
+            );
+            return c.json(page);
         }
     );
 

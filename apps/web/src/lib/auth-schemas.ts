@@ -6,6 +6,7 @@ export {
     ForgotPasswordSchema,
     SignInSchema,
     SignUpSchema,
+    UpdateProfileSchema,
     VerifyOtpSchema,
 } from '@analog/types';
 

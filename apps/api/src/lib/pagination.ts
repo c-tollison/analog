@@ -15,7 +15,14 @@ export async function paginate<T>(
     };
 }
 
-/** Builds an ILIKE pattern that matches `term` anywhere, literally. */
-export function containsPattern(term: string): string {
-    return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+/**
+ * Builds an ILIKE pattern that matches `term` literally: anywhere in the
+ * value, or only at the start when `anywhere` is false.
+ */
+export function likePattern(
+    term: string,
+    { anywhere = true }: { anywhere?: boolean } = {}
+): string {
+    const escaped = term.replace(/[\\%_]/g, '\\$&');
+    return anywhere ? `%${escaped}%` : `${escaped}%`;
 }

@@ -8,22 +8,22 @@ export const IsbnLookupFormSchema = z.object({
     isbn: z.string().trim().min(1, 'Enter an ISBN').pipe(IsbnSchema),
 });
 
+export const SeriesPickSchema = z.object({
+    id: z.string().nullable(),
+    title: z
+        .string()
+        .trim()
+        .min(1, 'Series name is required')
+        .max(
+            SERIES_TITLE_MAX_LENGTH,
+            `Series name must be at most ${SERIES_TITLE_MAX_LENGTH} characters`
+        ),
+});
+
 export const AddBookFormSchema = z
     .object({
         isSeries: z.boolean(),
-        series: z
-            .object({
-                id: z.string().nullable(),
-                title: z
-                    .string()
-                    .trim()
-                    .min(1, 'Series name is required')
-                    .max(
-                        SERIES_TITLE_MAX_LENGTH,
-                        `Series name must be at most ${SERIES_TITLE_MAX_LENGTH} characters`
-                    ),
-            })
-            .nullable(),
+        series: SeriesPickSchema.nullable(),
         volume: z
             .unknown()
             .transform((value) =>

@@ -13,6 +13,7 @@ export const user = appSchema.table('user', {
     id: uuid('id').default(sql`pg_catalog.gen_random_uuid()`).primaryKey(),
     name: text('name').notNull(),
     email: text('email').notNull().unique(),
+    username: text('username').notNull().unique(),
     emailVerified: boolean('email_verified').default(false).notNull(),
     image: text('image'),
     twoFactorEnabled: boolean('two_factor_enabled').default(true).notNull(),

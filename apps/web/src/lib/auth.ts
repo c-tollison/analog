@@ -1,12 +1,16 @@
 import { useSessionStore } from '@/stores/session';
 
 import { API_URL } from './env';
-import { emailOTPClient, twoFactorClient } from 'better-auth/client/plugins';
+import {
+    emailOTPClient,
+    twoFactorClient,
+    usernameClient,
+} from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/vue';
 
 export const authClient = createAuthClient({
     baseURL: `${API_URL}/api/auth`,
-    plugins: [emailOTPClient(), twoFactorClient()],
+    plugins: [emailOTPClient(), twoFactorClient(), usernameClient()],
     fetchOptions: {
         credentials: 'include',
         onSuccess: (ctx) => {

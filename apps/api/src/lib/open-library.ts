@@ -6,8 +6,8 @@ import { z } from 'zod';
 const BASE_URL = 'https://openlibrary.org';
 const COVERS_URL = 'https://covers.openlibrary.org';
 const TIMEOUT_MS = 8_000;
-// Open Library asks clients to identify themselves.
-const HEADERS = { 'User-Agent': 'Analog (physical media tracker)' };
+// Naming the app and a contact email gets 3 requests/second instead of 1.
+const HEADERS = { 'User-Agent': 'Analog/1.0 (tollison.carson@gmail.com)' };
 
 const EditionSchema = z.object({
     key: z.string(),
@@ -55,6 +55,11 @@ async function getJson(path: string): Promise<unknown | null> {
     }
     if (res.status === 404) {
         return null;
+    }
+    if (res.status === 429) {
+        throw new HTTPException(503, {
+            message: 'Open Library is busy. Try again in a few seconds.',
+        });
     }
     if (!res.ok) {
         throw new HTTPException(502, {

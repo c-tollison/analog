@@ -17,9 +17,9 @@
     --primary-foreground: oklch(1 0 0);
     --secondary: oklch(0.7473 0.0387 80.5476);
     --secondary-foreground: oklch(1 0 0);
-    --muted: oklch(0.8502 0.0389 49.0874);
+    --muted: oklch(0.8784 0.0294 76.2);
     --muted-foreground: oklch(0.5416 0.0512 37.2132);
-    --accent: oklch(0.8502 0.0389 49.0874);
+    --accent: oklch(0.8784 0.0294 76.2);
     --accent-foreground: oklch(0.4063 0.0255 40.3627);
     --destructive: oklch(0.55 0.17 21.4566);
     --destructive-foreground: oklch(1 0 0);
@@ -206,5 +206,9 @@
     body {
         @apply bg-background text-foreground;
         @apply font-sans;
+    }
+    button:not(:disabled),
+    [role="button"]:not(:disabled) {
+        @apply cursor-pointer;
     }
 }

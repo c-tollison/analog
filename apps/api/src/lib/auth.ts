@@ -6,6 +6,9 @@ import {
     ResetPasswordSchema,
     SignUpSchema,
     Stage,
+    UpdateProfileSchema,
+    USERNAME_MAX_LENGTH,
+    USERNAME_MIN_LENGTH,
 } from '@analog/types';
 
 import type { Config } from './config.js';
@@ -14,7 +17,12 @@ import type { Logger } from './logger.js';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { type EmailOTPOptions, emailOTP, twoFactor } from 'better-auth/plugins';
+import {
+    type EmailOTPOptions,
+    emailOTP,
+    twoFactor,
+    username,
+} from 'better-auth/plugins';
 import type { ZodType } from 'zod';
 
 const SESSION_EXPIRES_IN = 60 * 60 * 24 * 7; // 7 days
@@ -36,8 +44,10 @@ const OTP_EMAIL_SUBJECTS: Record<OtpEmailType, string> = {
 
 // Only the password + code flows are exposed. Passwordless email-OTP sign-in,
 // email change, and self-service TOTP/backup codes would each skip or weaken
-// the emailed second factor.
+// the emailed second factor. Usernames are for finding people, not signing in.
 const DISABLED_PATHS = [
+    '/sign-in/username',
+    '/is-username-available',
     '/sign-in/email-otp',
     '/email-otp/request-email-change',
     '/email-otp/change-email',
@@ -52,6 +62,7 @@ const DISABLED_PATHS = [
 const BODY_SCHEMAS: Record<string, ZodType> = {
     '/sign-up/email': SignUpSchema,
     '/email-otp/reset-password': ResetPasswordSchema,
+    '/update-user': UpdateProfileSchema,
 };
 
 export type Auth = ReturnType<typeof CreateAuthInstance>;
@@ -121,6 +132,11 @@ export function CreateAuthInstance(
             },
         },
         plugins: [
+            username({
+                displayUsername: false,
+                minUsernameLength: USERNAME_MIN_LENGTH,
+                maxUsernameLength: USERNAME_MAX_LENGTH,
+            }),
             emailOTP({
                 otpLength: OTP_LENGTH,
                 expiresIn: OTP_EXPIRES_IN_MINUTES * 60,

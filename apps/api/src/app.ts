@@ -6,7 +6,11 @@ import { createRequestLoggerMiddleware } from './middleware/request-logger.js';
 import { requireAuth } from './middleware/require-auth.js';
 import catalog from './routes/catalog.js';
 import collections from './routes/collections.js';
+import friends from './routes/friends.js';
+import invites from './routes/invites.js';
+import notifications from './routes/notifications.js';
 import series from './routes/series.js';
+import users from './routes/users.js';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -38,7 +42,11 @@ export function createApp(config: Config) {
         .use(requireAuth)
         .route('/catalog', catalog)
         .route('/collections', collections)
-        .route('/series', series);
+        .route('/series', series)
+        .route('/friends', friends)
+        .route('/users', users)
+        .route('/invites', invites)
+        .route('/notifications', notifications);
 }
 
 export type ApiRoutes = ReturnType<typeof createApp>;
