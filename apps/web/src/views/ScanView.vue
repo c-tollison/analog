@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { InferResponseType } from '@analog/api/client';
 import { MAX_PAGE_SIZE, MediaFormat } from '@analog/types';
 import FormError from '@/components/FormError.vue';
 import BookResult from '@/components/scan/BookResult.vue';
@@ -30,9 +29,8 @@ import {
 } from '@/components/shadcn-components/select';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
-import { useIsbnLookup } from '@/composables/useCatalog';
+import { type IsbnLookup, useIsbnLookup } from '@/composables/useCatalog';
 import { useCollections } from '@/composables/useCollections';
-import type { ApiClient } from '@/lib/api';
 import { IsbnLookupFormSchema } from '@/lib/catalog-schemas';
 import { isbnFromBarcode } from '@/lib/isbn';
 import { MEDIA_TYPES, type MediaTypeValue } from '@/lib/media-types';
@@ -47,11 +45,6 @@ import { useLocalStorage } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { type DetectedBarcode, QrcodeStream } from 'vue-qrcode-reader';
 import { useRoute } from 'vue-router';
-
-type IsbnLookup = InferResponseType<
-    ApiClient['catalog']['isbn'][':isbn']['$get'],
-    200
->;
 
 const route = useRoute();
 const lookupIsbn = useIsbnLookup();
@@ -211,16 +204,11 @@ function scanAnother() {
 </script>
 
 <template>
-    <main class="mx-auto flex min-h-svh w-full max-w-md flex-col gap-4 p-4">
-        <div class="flex items-center justify-between">
+    <main class="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
+        <div>
             <Button variant="ghost" size="sm" as-child>
-                <RouterLink :to="{ name: 'home' }">
-                    <ArrowLeftIcon />
-                    Home
-                </RouterLink>
-            </Button>
-            <Button variant="outline" size="sm" as-child>
                 <RouterLink :to="{ name: 'collections' }">
+                    <ArrowLeftIcon />
                     Collections
                 </RouterLink>
             </Button>
@@ -323,7 +311,7 @@ function scanAnother() {
                     />
                     <div
                         v-if="cameraReady && !paused"
-                        class="pointer-events-none absolute inset-x-8 inset-y-[30%] rounded-sm border-2 border-white/60"
+                        class="pointer-events-none absolute inset-x-8 inset-y-3/10 rounded-sm border-2 border-white/60"
                     >
                         <div
                             class="animate-scan-sweep absolute inset-x-0 h-0.5 bg-red-500/80 shadow-[0_0_8px_2px] shadow-red-500/60 motion-reduce:top-1/2 motion-reduce:animate-none"

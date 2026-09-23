@@ -5,6 +5,16 @@ import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/shadcn-components/alert-dialog';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Spinner } from '@/components/shadcn-components/spinner';
@@ -53,6 +63,9 @@ const {
 function onDelete() {
     deleteCollection(props.id, {
         onSuccess: () => router.replace({ name: 'collections' }),
+        onError: () => {
+            confirmingDelete.value = false;
+        },
     });
 }
 
@@ -64,7 +77,7 @@ const headerError = computed(
 </script>
 
 <template>
-    <main class="mx-auto flex min-h-svh w-full max-w-3xl flex-col gap-4 p-4">
+    <main class="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <Button variant="ghost" size="sm" as-child>
                 <RouterLink :to="{ name: 'collections' }">
@@ -105,38 +118,44 @@ const headerError = computed(
                 {{ collection.name }}
             </h1>
             <Spinner v-else-if="!headerError" />
-            <template v-if="collection?.role === CollectionRole.Owner">
-                <div v-if="confirmingDelete" class="flex items-center gap-1">
-                    <span class="text-muted-foreground text-xs">
-                        Delete collection?
-                    </span>
-                    <Button
-                        variant="destructive"
-                        size="sm"
-                        :disabled="isDeleting"
-                        @click="onDelete"
-                    >
-                        <Spinner v-if="isDeleting" />
-                        Delete
-                    </Button>
+            <AlertDialog
+                v-if="collection?.role === CollectionRole.Owner"
+                v-model:open="confirmingDelete"
+            >
+                <AlertDialogTrigger as-child>
                     <Button
                         variant="ghost"
-                        size="sm"
-                        @click="confirmingDelete = false"
+                        size="icon"
+                        aria-label="Delete collection"
                     >
-                        Cancel
+                        <Trash2Icon />
                     </Button>
-                </div>
-                <Button
-                    v-else
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Delete collection"
-                    @click="confirmingDelete = true"
-                >
-                    <Trash2Icon />
-                </Button>
-            </template>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Delete {{ collection.name }}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This removes the collection and everything in it for
+                            all members.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel :disabled="isDeleting">
+                            Cancel
+                        </AlertDialogCancel>
+                        <Button
+                            variant="destructive"
+                            :disabled="isDeleting"
+                            @click="onDelete"
+                        >
+                            <Spinner v-if="isDeleting" />
+                            Delete
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
         <FormError :message="headerError" />
 

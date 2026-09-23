@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T">
 import FormError from '@/components/FormError.vue';
 import LoadMore from '@/components/lists/LoadMore.vue';
+import { Empty, EmptyDescription } from '@/components/shadcn-components/empty';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import type { PaginatedList } from '@/composables/usePaginatedList';
 
@@ -22,12 +23,9 @@ defineSlots<{ default(props: { items: T[] }): unknown }>();
         >
             <Spinner class="size-6" />
         </div>
-        <p
-            v-else-if="!list.isLoading && !list.error && !list.items.length"
-            class="text-muted-foreground p-8 text-center text-sm"
-        >
-            {{ emptyText }}
-        </p>
+        <Empty v-else-if="!list.isLoading && !list.error && !list.items.length">
+            <EmptyDescription>{{ emptyText }}</EmptyDescription>
+        </Empty>
 
         <div
             v-if="list.items.length"

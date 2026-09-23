@@ -23,35 +23,47 @@ export const router = createRouter({
     routes: [
         {
             path: '/',
-            name: 'home',
-            component: () => import('@/views/HomeView.vue'),
+            component: () => import('@/components/layout/AppLayout.vue'),
             meta: { requiresAuth: true },
-        },
-        {
-            path: '/scan',
-            name: 'scan',
-            component: () => import('@/views/ScanView.vue'),
-            meta: { requiresAuth: true },
-        },
-        {
-            path: '/collections',
-            name: 'collections',
-            component: () => import('@/views/CollectionsView.vue'),
-            meta: { requiresAuth: true },
-        },
-        {
-            path: '/collections/:id',
-            name: 'collection',
-            component: () => import('@/views/CollectionView.vue'),
-            props: true,
-            meta: { requiresAuth: true },
-        },
-        {
-            path: '/collections/:id/series/:seriesId',
-            name: 'collection-series',
-            component: () => import('@/views/CollectionSeriesView.vue'),
-            props: true,
-            meta: { requiresAuth: true },
+            children: [
+                {
+                    path: '',
+                    name: 'home',
+                    redirect: { name: 'collections' },
+                },
+                {
+                    path: 'scan',
+                    name: 'scan',
+                    component: () => import('@/views/ScanView.vue'),
+                },
+                {
+                    path: 'collections',
+                    name: 'collections',
+                    component: () => import('@/views/CollectionsView.vue'),
+                },
+                {
+                    path: 'collections/:id',
+                    name: 'collection',
+                    component: () => import('@/views/CollectionView.vue'),
+                    props: true,
+                },
+                {
+                    path: 'collections/:id/series/:seriesId',
+                    name: 'collection-series',
+                    component: () => import('@/views/CollectionSeriesView.vue'),
+                    props: true,
+                },
+                {
+                    path: 'friends',
+                    name: 'friends',
+                    component: () => import('@/views/FriendsView.vue'),
+                },
+                {
+                    path: 'profile',
+                    name: 'profile',
+                    component: () => import('@/views/ProfileView.vue'),
+                },
+            ],
         },
         {
             path: '/sign-in',

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { InferResponseType } from '@analog/api/client';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SeriesPicker, {
@@ -21,18 +20,13 @@ import {
 import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
+import type { IsbnLookup } from '@/composables/useCatalog';
 import { useAddBook } from '@/composables/useCollections';
-import type { ApiClient } from '@/lib/api';
 import { AddBookFormSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 
 import { CheckCircleIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
-
-type IsbnLookup = InferResponseType<
-    ApiClient['catalog']['isbn'][':isbn']['$get'],
-    200
->;
 
 const props = defineProps<{
     lookup: IsbnLookup;

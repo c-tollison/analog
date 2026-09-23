@@ -1,6 +1,12 @@
-import { api, unwrap } from '@/lib/api';
+import type { InferResponseType } from '@analog/api/client';
+import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { useQueryClient } from '@tanstack/vue-query';
+
+export type IsbnLookup = InferResponseType<
+    ApiClient['catalog']['isbn'][':isbn']['$get'],
+    200
+>;
 
 export const CATALOG_KEY = ['catalog'] as const;
 

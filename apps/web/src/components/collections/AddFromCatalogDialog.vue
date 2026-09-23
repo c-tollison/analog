@@ -20,6 +20,14 @@ import {
     FormItem,
     FormMessage,
 } from '@/components/shadcn-components/form';
+import {
+    Item,
+    ItemActions,
+    ItemContent,
+    ItemGroup,
+    ItemMedia,
+    ItemTitle,
+} from '@/components/shadcn-components/item';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import {
@@ -137,31 +145,40 @@ watch(open, (isOpen) => {
                         "
                     >
                         <template #default="{ items }">
-                            <ul class="grid gap-1">
-                                <li v-for="s in items" :key="s.id">
+                            <ItemGroup>
+                                <Item
+                                    v-for="s in items"
+                                    :key="s.id"
+                                    size="sm"
+                                    class="hover:bg-muted text-left"
+                                    as-child
+                                >
                                     <button
                                         type="button"
-                                        class="hover:bg-muted flex w-full items-center gap-3 rounded-md p-1.5 text-left"
                                         @click="pickSeries(s)"
                                     >
-                                        <CoverImage
-                                            :src="s.coverUrl"
-                                            alt=""
-                                            size="sm"
-                                            class="h-12 w-8 shrink-0"
-                                        />
-                                        <span class="flex-1 text-sm">
-                                            {{ s.title }}
-                                        </span>
-                                        <Badge variant="secondary">
-                                            {{ SERIES_KIND_LABELS[s.kind] }}
-                                        </Badge>
-                                        <ChevronRightIcon
-                                            class="text-muted-foreground size-4"
-                                        />
+                                        <ItemMedia>
+                                            <CoverImage
+                                                :src="s.coverUrl"
+                                                alt=""
+                                                size="sm"
+                                                class="h-12 w-8"
+                                            />
+                                        </ItemMedia>
+                                        <ItemContent>
+                                            <ItemTitle>{{ s.title }}</ItemTitle>
+                                        </ItemContent>
+                                        <ItemActions>
+                                            <Badge variant="secondary">
+                                                {{ SERIES_KIND_LABELS[s.kind] }}
+                                            </Badge>
+                                            <ChevronRightIcon
+                                                class="text-muted-foreground size-4"
+                                            />
+                                        </ItemActions>
                                     </button>
-                                </li>
-                            </ul>
+                                </Item>
+                            </ItemGroup>
                         </template>
                     </PagedList>
                 </div>
@@ -208,55 +225,63 @@ watch(open, (isOpen) => {
                                 empty-text="Nothing catalogued in this series yet."
                             >
                                 <template #default="{ items }">
-                                    <ul class="grid gap-1">
-                                        <li
+                                    <ItemGroup>
+                                        <Item
                                             v-for="item in items"
                                             :key="item.id"
+                                            size="sm"
+                                            class="hover:bg-muted has-disabled:opacity-60"
+                                            as-child
                                         >
-                                            <label
-                                                class="has-disabled:opacity-60 hover:bg-muted flex items-center gap-3 rounded-md p-1.5"
-                                            >
+                                            <label>
                                                 <Checkbox
                                                     :model-value="
-                                                            item.inCollection ||
-                                                            selected.has(item.id)
-                                                        "
-                                                    :disabled="
-                                                            item.inCollection
-                                                        "
+                                                        item.inCollection ||
+                                                        selected.has(item.id)
+                                                    "
+                                                    :disabled="item.inCollection"
                                                     @update:model-value="
-                                                            (checked) =>
-                                                                toggle(
-                                                                    item.id,
-                                                                    checked
-                                                                )
-                                                        "
+                                                        (checked) =>
+                                                            toggle(
+                                                                item.id,
+                                                                checked
+                                                            )
+                                                    "
                                                 />
-                                                <CoverImage
-                                                    :src="item.coverUrl"
-                                                    alt=""
-                                                    size="sm"
-                                                    class="h-12 w-8 shrink-0"
-                                                />
-                                                <span class="flex-1 text-sm">
-                                                    <span
-                                                        v-if="item.position !== null"
-                                                        class="font-medium"
+                                                <ItemMedia>
+                                                    <CoverImage
+                                                        :src="item.coverUrl"
+                                                        alt=""
+                                                        size="sm"
+                                                        class="h-12 w-8"
+                                                    />
+                                                </ItemMedia>
+                                                <ItemContent>
+                                                    <ItemTitle>
+                                                        <span
+                                                            v-if="
+                                                                item.position !==
+                                                                null
+                                                            "
+                                                        >
+                                                            Vol.
+                                                            {{ item.position }}
+                                                            ·
+                                                        </span>
+                                                        {{ item.title }}
+                                                    </ItemTitle>
+                                                </ItemContent>
+                                                <ItemActions>
+                                                    <Badge
+                                                        v-if="item.inCollection"
+                                                        variant="secondary"
                                                     >
-                                                        Vol.
-                                                        {{ item.position }} ·
-                                                    </span>
-                                                    {{ item.title }}
-                                                </span>
-                                                <Badge
-                                                    v-if="item.inCollection"
-                                                    variant="secondary"
-                                                >
-                                                    Owned
-                                                </Badge>
+                                                        Owned
+                                                    </Badge>
+                                                </ItemActions>
                                             </label>
-                                        </li>
-                                    </ul>
+                                        </Item>
+                                    </ItemGroup>
                                 </template>
                             </PagedList>
                         </div>
