@@ -1,0 +1,9 @@
+{
+    "name": "Analog",
+    "short_name": "Analog",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#f1f0e5",
+    "theme_color": "#f1f0e5"
+}
