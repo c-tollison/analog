@@ -14,7 +14,7 @@ import type { Logger } from './logger.js';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { emailOTP, twoFactor } from 'better-auth/plugins';
+import { type EmailOTPOptions, emailOTP, twoFactor } from 'better-auth/plugins';
 import type { ZodType } from 'zod';
 
 const SESSION_EXPIRES_IN = 60 * 60 * 24 * 7; // 7 days
@@ -23,7 +23,10 @@ const SESSION_COOKIE_CACHE_MAX_AGE = 60 * 5; // 5 minutes
 const OTP_EXPIRES_IN_MINUTES = 10;
 const TRUST_DEVICE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-type OtpEmailType = 'sign-in' | 'email-verification' | 'forget-password';
+type OtpEmailType = Exclude<
+    Parameters<EmailOTPOptions['sendVerificationOTP']>[0]['type'],
+    'change-email'
+>;
 
 const OTP_EMAIL_SUBJECTS: Record<OtpEmailType, string> = {
     'sign-in': 'Your Analog sign-in code',

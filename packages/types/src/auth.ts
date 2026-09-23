@@ -35,9 +35,6 @@ export const SignInSchema = z.object({
     password: z.string().min(1, 'Password is required'),
 });
 
-export type SignUpInput = z.infer<typeof SignUpSchema>;
-export type SignInInput = z.infer<typeof SignInSchema>;
-
 export const OTP_LENGTH = 6;
 
 export const OtpSchema = z
@@ -60,7 +57,3 @@ export const ResetPasswordSchema = z.object({
     otp: OtpSchema,
     password: PasswordSchema,
 });
-
-export type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;
-export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
-export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;

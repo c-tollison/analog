@@ -9,18 +9,20 @@ import {
 import { db } from './init.js';
 import { type BookLookup, lookupIsbn } from './open-library.js';
 import { HTTPException } from 'hono/http-exception';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 type CatalogItem = typeof schema.catalogItem.$inferSelect;
 type Series = typeof schema.series.$inferSelect;
 
-interface BookMetadata {
-    subtitle: string | null;
-    authors: string[];
-    publishers: string[];
-    publishDate: string | null;
-    pageCount: number | null;
-}
+const BookMetadataSchema = z.object({
+    subtitle: z.string().nullable(),
+    authors: z.array(z.string()),
+    publishers: z.array(z.string()),
+    publishDate: z.string().nullable(),
+    pageCount: z.number().nullable(),
+});
+
+type BookMetadata = z.infer<typeof BookMetadataSchema>;
 
 export const seriesColumns = {
     id: schema.series.id,
@@ -37,7 +39,8 @@ export function toBookLookup(
     item: CatalogItem,
     series: Series | null
 ): BookLookup {
-    const meta = item.metadata as Partial<BookMetadata>;
+    const parsed = BookMetadataSchema.partial().safeParse(item.metadata);
+    const meta = parsed.success ? parsed.data : {};
     return {
         isbn: item.barcode ?? '',
         title: item.title,
