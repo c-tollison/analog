@@ -21,11 +21,12 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import type { IsbnLookup } from '@/composables/useCatalog';
 import { useAddBook } from '@/composables/useCollections';
-import { AddBookFormSchema } from '@/lib/catalog-schemas';
+import { AddBookFormSchema, SeriesPickSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
-import { CheckCircleIcon } from '@lucide/vue';
+import { CheckCircleIcon, HistoryIcon } from '@lucide/vue';
+import { StorageSerializers, useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -54,6 +55,17 @@ function initialSeries(): SeriesPick | null {
 
 const startingSeries = initialSeries();
 
+const storedLastSeries = useLocalStorage<SeriesPick | null>(
+    'analog:last-series',
+    null,
+    { serializer: StorageSerializers.object }
+);
+
+const lastSeries = computed(() => {
+    const parsed = SeriesPickSchema.safeParse(storedLastSeries.value);
+    return parsed.success ? parsed.data : null;
+});
+
 const addBook = useAddBook();
 
 const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
@@ -79,10 +91,42 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                     : null,
                 volume,
             });
+            if (series) {
+                storedLastSeries.value = { id: series.id, title: series.title };
+            }
             added.value = true;
             return undefined;
         },
     });
+
+function isSameSeries(a: SeriesPick, b: SeriesPick | null | undefined) {
+    if (!b) {
+        return false;
+    }
+    return a.id && b.id
+        ? a.id === b.id
+        : a.title.toLowerCase() === b.title.toLowerCase();
+}
+
+// The last series used, then existing series with titles close to this
+// book's. Hides whichever one is already picked.
+const seriesOptions = computed(() => {
+    const current = values.isSeries ? values.series : null;
+    const options = [
+        ...(lastSeries.value ? [{ ...lastSeries.value, isLast: true }] : []),
+        ...props.lookup.similarSeries.map((s) => ({ ...s, isLast: false })),
+    ];
+    return options.filter(
+        (option, i) =>
+            !isSameSeries(option, current) &&
+            options.findIndex((o) => isSameSeries(o, option)) === i
+    );
+});
+
+function pickSeries({ id, title }: SeriesPick) {
+    setFieldValue('isSeries', true);
+    setFieldValue('series', { id, title });
+}
 
 function onSeriesToggle(checked: boolean | 'indeterminate') {
     setFieldValue('isSeries', checked === true);
@@ -146,6 +190,28 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                     <FormLabel>Part of a series</FormLabel>
                 </FormItem>
             </FormField>
+            <div v-if="seriesOptions.length" class="grid gap-2">
+                <p class="text-muted-foreground text-xs">Suggested series</p>
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        v-for="option in seriesOptions"
+                        :key="option.id ?? option.title"
+                        type="button"
+                        variant="outline"
+                        class="max-w-full"
+                        @click="pickSeries(option)"
+                    >
+                        <HistoryIcon v-if="option.isLast" />
+                        <span class="truncate">
+                            {{
+                                option.isLast
+                                    ? `Use last series: ${option.title}`
+                                    : option.title
+                            }}
+                        </span>
+                    </Button>
+                </div>
+            </div>
             <template v-if="values.isSeries">
                 <FormField
                     v-slot="{ componentField }"

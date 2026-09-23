@@ -58,6 +58,13 @@ watch(search, (text) => {
     model.value = title ? { id: null, title } : null;
 });
 
+watch(model, (pick) => {
+    const title = pick?.title ?? '';
+    if (title !== search.value.trim()) {
+        search.value = title;
+    }
+});
+
 function isSeriesPick(value: unknown): value is SeriesPick {
     return typeof value === 'object' && value !== null && 'title' in value;
 }
