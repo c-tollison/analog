@@ -99,7 +99,9 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 :alt="result.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p class="line-clamp-2 text-sm font-medium">
+                            <p
+                                class="line-clamp-2 min-h-10 text-sm font-medium"
+                            >
                                 {{ result.title }}
                             </p>
                             <div class="flex flex-wrap items-center gap-1.5">

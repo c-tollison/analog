@@ -155,7 +155,9 @@ const headerError = computed(
                                 :alt="entry.series.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p class="line-clamp-2 text-sm font-medium">
+                            <p
+                                class="line-clamp-2 min-h-10 text-sm font-medium"
+                            >
                                 {{ entry.series.title }}
                             </p>
                             <div class="flex items-center gap-1.5">
@@ -175,7 +177,9 @@ const headerError = computed(
                                 :alt="entry.title"
                                 class="aspect-2/3 w-full"
                             />
-                            <p class="line-clamp-2 text-sm font-medium">
+                            <p
+                                class="line-clamp-2 min-h-10 text-sm font-medium"
+                            >
                                 {{ entry.title }}
                             </p>
                             <div class="flex items-center gap-1.5">
