@@ -1,9 +1,10 @@
 import App from './App.vue';
+import { VueQueryPlugin } from '@tanstack/vue-query';
+import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 import './assets/style.css';
-import { API_CLIENT_KEY, createApiClient } from './lib/api';
 import { setUnauthorizedHandler } from './lib/auth';
-import { API_URL } from './lib/env';
+import { queryClient } from './lib/query';
 import { router } from './router';
 
 setUnauthorizedHandler(() => {
@@ -19,7 +20,8 @@ setUnauthorizedHandler(() => {
 
 const app = createApp(App);
 
-app.provide(API_CLIENT_KEY, createApiClient({ baseUrl: API_URL }));
+app.use(createPinia());
+app.use(VueQueryPlugin, { queryClient });
 app.use(router);
 
 app.mount('#app');

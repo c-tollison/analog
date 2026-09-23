@@ -30,15 +30,21 @@ export function useAppForm<Schema extends FormValuesSchema>({
 }: UseAppFormOptions<Schema>) {
     const formError = ref<string | null>(null);
 
-    const { handleSubmit, isSubmitting, submitCount, values, setFieldValue } =
-        useForm<z.input<Schema>, z.output<Schema>>({
-            validationSchema: toTypedSchema<
-                Schema,
-                z.output<Schema>,
-                z.input<Schema>
-            >(schema),
-            initialValues,
-        });
+    const {
+        handleSubmit,
+        isSubmitting,
+        submitCount,
+        values,
+        setFieldValue,
+        resetForm,
+    } = useForm<z.input<Schema>, z.output<Schema>>({
+        validationSchema: toTypedSchema<
+            Schema,
+            z.output<Schema>,
+            z.input<Schema>
+        >(schema),
+        initialValues,
+    });
 
     const fieldProps = computed(() => ({
         validateOnModelUpdate: submitCount.value > 0,
@@ -66,5 +72,6 @@ export function useAppForm<Schema extends FormValuesSchema>({
         fieldProps,
         values,
         setFieldValue,
+        resetForm,
     };
 }
