@@ -19,6 +19,7 @@ export {
     lt,
     ne,
     not,
+    notExists,
     notInArray,
     or,
     sql,
