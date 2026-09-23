@@ -1,20 +1,11 @@
 <script setup lang="ts">
 import { CollectionRole } from '@analog/types';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
-import {
-    AlertDialog,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/shadcn-components/alert-dialog';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Spinner } from '@/components/shadcn-components/spinner';
@@ -52,7 +43,27 @@ const entries = useCollectionEntries(() => props.id, term, {
     pending: isTyping,
 });
 
-const { mutate: removeItem, error: removeError } = useRemoveCollectionItem();
+const {
+    mutate: removeItem,
+    isPending: isRemoving,
+    error: removeError,
+} = useRemoveCollectionItem();
+
+const removing = ref<{ id: string; title: string } | null>(null);
+const confirmingRemove = computed({
+    get: () => removing.value !== null,
+    set: (open) => {
+        if (!open) removing.value = null;
+    },
+});
+
+function onRemove() {
+    if (!removing.value) return;
+    removeItem(
+        { collectionId: props.id, itemId: removing.value.id },
+        { onSettled: () => (removing.value = null) }
+    );
+}
 
 const {
     mutate: deleteCollection,
@@ -118,11 +129,16 @@ const headerError = computed(
                 {{ collection.name }}
             </h1>
             <Spinner v-else-if="!headerError" />
-            <AlertDialog
+            <ConfirmDialog
                 v-if="collection?.role === CollectionRole.Owner"
                 v-model:open="confirmingDelete"
+                :title="`Delete ${collection.name}?`"
+                description="This removes the collection and everything in it for all members."
+                confirm-text="Delete"
+                :pending="isDeleting"
+                @confirm="onDelete"
             >
-                <AlertDialogTrigger as-child>
+                <template #trigger>
                     <Button
                         variant="ghost"
                         size="icon"
@@ -130,34 +146,19 @@ const headerError = computed(
                     >
                         <Trash2Icon />
                     </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Delete {{ collection.name }}?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This removes the collection and everything in it for
-                            all members.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel :disabled="isDeleting">
-                            Cancel
-                        </AlertDialogCancel>
-                        <Button
-                            variant="destructive"
-                            :disabled="isDeleting"
-                            @click="onDelete"
-                        >
-                            <Spinner v-if="isDeleting" />
-                            Delete
-                        </Button>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                </template>
+            </ConfirmDialog>
         </div>
         <FormError :message="headerError" />
+
+        <ConfirmDialog
+            v-model:open="confirmingRemove"
+            :title="`Remove ${removing?.title ?? 'item'}?`"
+            description="This takes it out of the collection."
+            confirm-text="Remove"
+            :pending="isRemoving"
+            @confirm="onRemove"
+        />
 
         <SearchInput v-model="query" placeholder="Search" />
 
@@ -231,7 +232,7 @@ const headerError = computed(
                                 size="icon"
                                 class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                                 :aria-label="`Remove ${entry.title}`"
-                                @click="removeItem({ collectionId: id, itemId: entry.id })"
+                                @click="removing = { id: entry.id, title: entry.title }"
                             >
                                 <XIcon />
                             </Button>

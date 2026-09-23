@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
@@ -36,7 +37,27 @@ const volumes = useCollectionSeriesItems(
     () => props.seriesId
 );
 
-const { mutate: removeItem, error: removeError } = useRemoveCollectionItem();
+const {
+    mutate: removeItem,
+    isPending: isRemoving,
+    error: removeError,
+} = useRemoveCollectionItem();
+
+const removing = ref<{ id: string; title: string } | null>(null);
+const confirmingRemove = computed({
+    get: () => removing.value !== null,
+    set: (open) => {
+        if (!open) removing.value = null;
+    },
+});
+
+function onRemove() {
+    if (!removing.value) return;
+    removeItem(
+        { collectionId: props.id, itemId: removing.value.id },
+        { onSettled: () => (removing.value = null) }
+    );
+}
 
 const headerError = computed(
     () =>
@@ -99,6 +120,15 @@ const headerError = computed(
         </div>
         <FormError :message="headerError" />
 
+        <ConfirmDialog
+            v-model:open="confirmingRemove"
+            :title="`Remove ${removing?.title ?? 'item'}?`"
+            description="This takes it out of the collection."
+            confirm-text="Remove"
+            :pending="isRemoving"
+            @confirm="onRemove"
+        />
+
         <PagedList :list="volumes" empty-text="Nothing from this series here.">
             <template #default="{ items }">
                 <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
@@ -124,7 +154,7 @@ const headerError = computed(
                             size="icon"
                             class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                             :aria-label="`Remove ${item.title}`"
-                            @click="removeItem({ collectionId: id, itemId: item.id })"
+                            @click="removing = { id: item.id, title: item.title }"
                         >
                             <XIcon />
                         </Button>
