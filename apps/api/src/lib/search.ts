@@ -1,6 +1,6 @@
 import { type Column, ilike, or, type SQL, sql } from '@analog/db';
 
-import { containsPattern } from './pagination.js';
+import { likePattern } from './pagination.js';
 
 const MAX_TERMS = 8;
 const NUMBER = /^\d+(\.\d+)?$/;
@@ -36,7 +36,7 @@ export function matchesAllTerms(
     const perTerm = terms.map((term) =>
         or(
             ...columns.flatMap((column) => [
-                ilike(column, containsPattern(term)),
+                ilike(column, likePattern(term)),
                 sql`${term} <% ${column}`,
             ]),
             position && NUMBER.test(term)

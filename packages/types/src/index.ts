@@ -5,3 +5,4 @@ export * from './catalog-enums.js';
 export * from './config.js';
 export * from './isbn.js';
 export * from './pagination.js';
+export * from './social.js';
