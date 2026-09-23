@@ -182,7 +182,7 @@ const error = computed(
                         v-else
                         v-model:open="confirmingRemove"
                         :title="`Unfriend ${person.name}?`"
-                        description="Any pending collection invites between you are cancelled. Shared collections stay shared."
+                        description="Pending invites between you will be canceled, and you'll both be removed from each other's collections."
                         confirm-text="Unfriend"
                         :pending="remove.isPending.value"
                         @confirm="onRemove"
@@ -199,12 +199,7 @@ const error = computed(
 
             <template v-if="isFriend">
                 <Separator />
-                <div class="grid gap-1">
-                    <h2 class="font-medium">Your collections</h2>
-                    <p class="text-muted-foreground text-sm">
-                        Invite {{ person.name }} to edit one with you.
-                    </p>
-                </div>
+                <h2 class="font-medium">Your collections</h2>
 
                 <PagedList
                     :list="collections"

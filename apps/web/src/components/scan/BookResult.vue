@@ -224,10 +224,9 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                             <SeriesPicker v-bind="componentField" />
                         </FormControl>
                         <FormDescription>
-                            Be as specific as possible and include the edition
-                            and language. For example, “Fullmetal Alchemist
-                            (3-in-1 Edition, English)” and “Fullmetal Alchemist
-                            (English)” are separate series.
+                            Include the edition, and the language if you know
+                            it, like “Fullmetal Alchemist (3-in-1 Edition,
+                            English)”. Each edition is its own series.
                         </FormDescription>
                         <FormMessage />
                     </FormItem>

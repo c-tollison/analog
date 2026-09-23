@@ -113,9 +113,7 @@ const emptyText = computed(() => {
     if (term.value) {
         return 'No titles match.';
     }
-    return props.series
-        ? 'Nothing catalogued in this series yet.'
-        : 'Search by title to see what`s in the catalog.';
+    return props.series ? 'Nothing in this series yet.' : 'Search by title.';
 });
 
 watch(open, (isOpen) => {
@@ -131,10 +129,15 @@ watch(open, (isOpen) => {
     <Dialog v-model:open="open">
         <DialogContent class="flex max-h-[85svh] flex-col sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Add from catalog</DialogTitle>
-                <DialogDescription>
-                    Add things that are already in the catalog to
+                <DialogTitle
+                    >{{ series ? 'Add to series' : 'Add media' }}</DialogTitle
+                >
+                <DialogDescription v-if="series">
+                    Quickly add other parts of this series to
                     {{ collectionName }}.
+                </DialogDescription>
+                <DialogDescription v-else>
+                    Pick what to add to {{ collectionName }}.
                 </DialogDescription>
             </DialogHeader>
 

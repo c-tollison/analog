@@ -81,7 +81,7 @@ const headerError = computed(
                     @click="isAddOpen = true"
                 >
                     <LibraryIcon />
-                    Add from catalog
+                    Add media
                 </Button>
                 <Button size="sm" as-child>
                     <RouterLink
@@ -120,7 +120,7 @@ const headerError = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.title ?? 'item'}?`"
-            description="This takes it out of the collection."
+            description="It'll be taken out of this collection."
             confirm-text="Remove"
             :pending="isRemoving"
             @confirm="onRemove"

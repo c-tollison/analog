@@ -82,7 +82,7 @@ const headerError = computed(
                 @click="isAddOpen = true"
             >
                 <PlusIcon />
-                Add volumes
+                Add to series
             </Button>
         </div>
 
@@ -123,7 +123,7 @@ const headerError = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.title ?? 'item'}?`"
-            description="This takes it out of the collection."
+            description="It'll be taken out of this collection."
             confirm-text="Remove"
             :pending="isRemoving"
             @confirm="onRemove"

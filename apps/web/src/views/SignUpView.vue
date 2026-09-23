@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { PASSWORD_MIN_LENGTH } from '@analog/types';
 import FormError from '@/components/FormError.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
@@ -11,7 +10,6 @@ import {
 } from '@/components/shadcn-components/card';
 import {
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -100,10 +98,6 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                                     v-bind="componentField"
                                 />
                             </FormControl>
-                            <FormDescription>
-                                Friends find you by this. Letters, numbers,
-                                underscores and periods.
-                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     </FormField>
@@ -141,9 +135,6 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                                     v-bind="componentField"
                                 />
                             </FormControl>
-                            <FormDescription>
-                                At least {{ PASSWORD_MIN_LENGTH }} characters.
-                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     </FormField>

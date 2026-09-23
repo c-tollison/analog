@@ -137,7 +137,7 @@ const error = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.name ?? 'member'}?`"
-            description="They lose access to this collection."
+            description="They won't be able to see or edit this collection anymore."
             confirm-text="Remove"
             :pending="removeMember.isPending.value"
             @confirm="onRemove"
@@ -154,18 +154,12 @@ const error = computed(
                     <Spinner v-if="!loadError" class="size-6" />
                 </div>
                 <template v-else-if="isOwner">
-                    <div class="grid gap-1">
-                        <h2 class="font-medium">Delete collection</h2>
-                        <p class="text-muted-foreground text-sm">
-                            Removes the collection and everything in it for all
-                            members.
-                        </p>
-                    </div>
+                    <h2 class="font-medium">Delete collection</h2>
                     <div>
                         <ConfirmDialog
                             v-model:open="confirmingDelete"
                             :title="`Delete ${collection.name}?`"
-                            description="This removes the collection and everything in it for all members."
+                            description="This deletes the collection. It can't be restored."
                             confirm-text="Delete"
                             :pending="deleteCollection.isPending.value"
                             @confirm="onDelete"
@@ -180,17 +174,12 @@ const error = computed(
                     </div>
                 </template>
                 <template v-else>
-                    <div class="grid gap-1">
-                        <h2 class="font-medium">Leave collection</h2>
-                        <p class="text-muted-foreground text-sm">
-                            You'll need a new invite to get back in.
-                        </p>
-                    </div>
+                    <h2 class="font-medium">Leave collection</h2>
                     <div>
                         <ConfirmDialog
                             v-model:open="confirmingLeave"
                             :title="`Leave ${collection.name}?`"
-                            description="You'll need a new invite to get back in."
+                            description="You'll lose access until you're invited back."
                             confirm-text="Leave"
                             :pending="leave.isPending.value"
                             @confirm="onLeave"
