@@ -102,7 +102,7 @@ const headerError = computed(
                         :to="{ name: 'scan', query: { collection: id } }"
                     >
                         <ScanBarcodeIcon />
-                        Scan
+                        {{ collection ? `Scan into ${collection.name}` : 'Scan' }}
                     </RouterLink>
                 </Button>
             </div>
