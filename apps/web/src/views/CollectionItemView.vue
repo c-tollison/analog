@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ProgressStatus } from '@analog/types';
+import BackButton from '@/components/BackButton.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
@@ -36,24 +37,35 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import { ArrowLeftIcon, PencilIcon } from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
-import type { RouteLocationRaw } from 'vue-router';
+import { PencilIcon } from '@lucide/vue';
+import { computed, ref } from 'vue';
+import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router';
+
+const TABS = ['details', 'reviews'] as const;
+type Tab = (typeof TABS)[number];
+
+function isTab(value: unknown): value is Tab {
+    return TABS.some((tab) => tab === value);
+}
 
 const props = defineProps<{ id: string; itemId: string }>();
+
+const route = useRoute();
+const router = useRouter();
 
 const { data: item, error: loadError } = useCollectionItem(
     () => props.id,
     () => props.itemId
 );
 
-const tab = ref('details');
-watch(
-    () => props.itemId,
-    () => {
-        tab.value = 'details';
-    }
-);
+// The open tab lives in the URL so coming back from a profile lands on
+// Reviews.
+const tab = computed({
+    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'details'),
+    set: (value) => {
+        router.replace({ query: { ...route.query, tab: value } });
+    },
+});
 
 // Loads when the Reviews tab is first opened.
 const reviews = useCollectionItemReviews(
@@ -116,12 +128,7 @@ const error = computed(
 <template>
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div>
-            <Button variant="ghost" size="sm" as-child>
-                <RouterLink :to="back.to">
-                    <ArrowLeftIcon />
-                    {{ back.text }}
-                </RouterLink>
-            </Button>
+            <BackButton :to="back.to" :text="back.text" />
         </div>
 
         <FormError :message="error" />
