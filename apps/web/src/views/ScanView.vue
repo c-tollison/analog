@@ -36,7 +36,6 @@ import {
     FlashlightOffIcon,
     SwitchCameraIcon,
 } from '@lucide/vue';
-import { useLocalStorage } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { type DetectedBarcode, QrcodeStream } from 'vue-qrcode-reader';
 import { useRoute } from 'vue-router';
@@ -45,7 +44,6 @@ const route = useRoute();
 const lookupIsbn = useIsbnLookup();
 
 const mediaType = ref<MediaTypeValue>(MediaFormat.Book);
-const lastCollectionId = useLocalStorage('analog:last-collection', '');
 const collectionId = ref('');
 
 const collectionsList = useCollections(MAX_PAGE_SIZE);
@@ -98,21 +96,18 @@ const paused = computed(() => isSubmitting.value);
 
 function selectCollection(id: string) {
     collectionId.value = id;
-    lastCollectionId.value = id;
 }
 
 watch(
     collections,
     (list) => {
-        if (collectionId.value || !list.length) {
-            return;
-        }
-        const preferred = [route.query.collection, lastCollectionId.value].find(
-            (id) => list.some((c) => c.id === id)
-        );
-        const initial = preferred ?? list[0]?.id;
-        if (typeof initial === 'string') {
-            selectCollection(initial);
+        const fromRoute = route.query.collection;
+        if (
+            !collectionId.value &&
+            typeof fromRoute === 'string' &&
+            list.some((c) => c.id === fromRoute)
+        ) {
+            selectCollection(fromRoute);
         }
     },
     { immediate: true }
