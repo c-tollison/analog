@@ -1,4 +1,4 @@
-import { pgSchema, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { customType, pgSchema, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const appSchema = pgSchema('app');
 
@@ -13,4 +13,8 @@ export const updatedAt = () =>
 export const timestamps = () => ({
     createdAt: createdAt(),
     updatedAt: updatedAt(),
+});
+
+export const bytea = customType<{ data: Buffer }>({
+    dataType: () => 'bytea',
 });
