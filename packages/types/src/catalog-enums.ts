@@ -1,5 +1,6 @@
 export enum SeriesKind {
     Manga = 'manga',
+    LightNovel = 'light_novel',
     Book = 'book',
     Tv = 'tv',
     Film = 'film',
@@ -19,4 +20,11 @@ export enum CollectionRole {
 
 export enum ExternalSource {
     OpenLibrary = 'openlibrary',
+    AniList = 'anilist',
+}
+
+export enum ProgressStatus {
+    Planned = 'planned',
+    InProgress = 'in_progress',
+    Completed = 'completed',
 }

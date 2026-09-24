@@ -113,9 +113,7 @@ const emptyText = computed(() => {
     if (term.value) {
         return 'No titles match.';
     }
-    return props.series
-        ? 'Nothing catalogued in this series yet.'
-        : 'Search by title to see what`s in the catalog.';
+    return 'Nothing in this series yet.';
 });
 
 watch(open, (isOpen) => {
@@ -131,10 +129,15 @@ watch(open, (isOpen) => {
     <Dialog v-model:open="open">
         <DialogContent class="flex max-h-[85svh] flex-col sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Add from catalog</DialogTitle>
-                <DialogDescription>
-                    Add things that are already in the catalog to
+                <DialogTitle
+                    >{{ series ? 'Add to series' : 'Add media' }}</DialogTitle
+                >
+                <DialogDescription v-if="series">
+                    Quickly add other parts of this series to
                     {{ collectionName }}.
+                </DialogDescription>
+                <DialogDescription v-else class="sr-only">
+                    Add media to {{ collectionName }}
                 </DialogDescription>
             </DialogHeader>
 
@@ -165,14 +168,18 @@ watch(open, (isOpen) => {
                 <FormField name="catalogItemIds">
                     <FormItem class="min-h-0 flex-1">
                         <div class="-mx-1 max-h-[50svh] overflow-y-auto px-1">
-                            <PagedList :list="options" :empty-text="emptyText">
+                            <PagedList
+                                v-if="term || series"
+                                :list="options"
+                                :empty-text="emptyText"
+                            >
                                 <template #default="{ items }">
                                     <ItemGroup>
                                         <Item
                                             v-for="item in items"
                                             :key="item.id"
                                             size="sm"
-                                            class="hover:bg-muted has-disabled:opacity-60"
+                                            class="has-disabled:opacity-60"
                                             as-child
                                         >
                                             <label>

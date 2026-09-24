@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, or, schema, sql } from '@analog/db';
+import { and, asc, eq, ilike, inArray, or, schema, sql } from '@analog/db';
 import {
     CollectionRole,
     PageQuerySchema,
@@ -94,6 +94,40 @@ const friends = new Hono<AppEnv>()
                         and(
                             eq(collectionInvite.inviterId, userId),
                             eq(collectionInvite.inviteeId, me)
+                        )
+                    )
+                );
+            // Each loses editor access to the other's collections.
+            const ownedBy = (ownerId: string) =>
+                tx
+                    .select({ id: collectionMember.collectionId })
+                    .from(collectionMember)
+                    .where(
+                        and(
+                            eq(collectionMember.userId, ownerId),
+                            eq(collectionMember.role, CollectionRole.Owner)
+                        )
+                    );
+            await tx
+                .delete(collectionMember)
+                .where(
+                    and(
+                        eq(collectionMember.role, CollectionRole.Editor),
+                        or(
+                            and(
+                                eq(collectionMember.userId, userId),
+                                inArray(
+                                    collectionMember.collectionId,
+                                    ownedBy(me)
+                                )
+                            ),
+                            and(
+                                eq(collectionMember.userId, me),
+                                inArray(
+                                    collectionMember.collectionId,
+                                    ownedBy(userId)
+                                )
+                            )
                         )
                     )
                 );

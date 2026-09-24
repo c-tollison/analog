@@ -25,6 +25,7 @@ import {
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
+import { formatsCompletedWord } from '@/lib/media-types';
 
 import { PlusIcon, ScanBarcodeIcon, SettingsIcon } from '@lucide/vue';
 import { ref } from 'vue';
@@ -51,7 +52,7 @@ function resultLink(result: SearchResult): RouteLocationRaw {
               name: 'collection-series',
               params: { id, seriesId: result.seriesId },
           }
-        : { name: 'collection', params: { id } };
+        : { name: 'collection-item', params: { id, itemId: result.id } };
 }
 </script>
 
@@ -99,7 +100,9 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 :alt="result.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p class="line-clamp-2 text-sm font-medium">
+                            <p
+                                class="line-clamp-2 min-h-10 text-sm font-medium"
+                            >
                                 {{ result.title }}
                             </p>
                             <div class="flex flex-wrap items-center gap-1.5">
@@ -147,6 +150,10 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                             <ItemDescription>
                                 {{ c.itemCount }}
                                 {{ c.itemCount === 1 ? 'item' : 'items' }}
+                                <template v-if="c.itemCount">
+                                    · {{ c.completedCount }}
+                                    {{ formatsCompletedWord(c.formats) }}
+                                </template>
                             </ItemDescription>
                         </ItemContent>
                         <ItemActions class="relative">

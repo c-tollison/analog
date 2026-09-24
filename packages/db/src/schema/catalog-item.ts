@@ -4,7 +4,15 @@ import { externalSource, mediaFormat, seriesKind } from './enums.js';
 import { appSchema, id, timestamps } from './primitives.js';
 import { series } from './series.js';
 import { relations } from 'drizzle-orm';
-import { date, index, jsonb, numeric, text, uuid } from 'drizzle-orm/pg-core';
+import {
+    date,
+    index,
+    jsonb,
+    numeric,
+    text,
+    timestamp,
+    uuid,
+} from 'drizzle-orm/pg-core';
 
 // One physical product (what a barcode identifies), shared by all users.
 export const catalogItem = appSchema.table(
@@ -29,6 +37,11 @@ export const catalogItem = appSchema.table(
             .$type<Record<string, unknown>>()
             .notNull()
             .default({}),
+        // When we last pulled full details (description, genres) from the
+        // external source. Null means the item page should fetch them.
+        detailsFetchedAt: timestamp('details_fetched_at', {
+            withTimezone: true,
+        }),
         createdByUserId: uuid('created_by_user_id').references(() => user.id, {
             onDelete: 'set null',
         }),

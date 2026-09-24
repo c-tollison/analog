@@ -227,12 +227,7 @@ function scanAnother() {
             </Button>
         </div>
 
-        <div class="grid gap-1">
-            <h1 class="text-lg font-semibold">Scan</h1>
-            <p class="text-muted-foreground text-sm">
-                Point the camera at the barcode, or enter the ISBN.
-            </p>
-        </div>
+        <h1 class="text-lg font-semibold">Scan</h1>
 
         <div class="grid grid-cols-2 gap-2">
             <div class="grid gap-1.5">
@@ -362,7 +357,7 @@ function scanAnother() {
                 >
                     {{
                                 isSubmitting
-                                    ? 'Looking up book…'
+                                    ? 'Looking up…'
                                     : 'Line up the barcode inside the box'
                     }}
                 </span>

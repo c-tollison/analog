@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { PASSWORD_MIN_LENGTH } from '@analog/types';
 import CodeInput from '@/components/CodeInput.vue';
 import FormError from '@/components/FormError.vue';
 import ResendCode from '@/components/ResendCode.vue';
@@ -13,7 +12,6 @@ import {
 } from '@/components/shadcn-components/card';
 import {
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -96,9 +94,6 @@ async function resend() {
                                     v-bind="componentField"
                                 />
                             </FormControl>
-                            <FormDescription>
-                                At least {{ PASSWORD_MIN_LENGTH }} characters.
-                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     </FormField>

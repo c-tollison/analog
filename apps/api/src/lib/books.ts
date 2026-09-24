@@ -6,23 +6,39 @@ import {
     SeriesKind,
 } from '@analog/types';
 
-import { db } from './init.js';
-import { type BookLookup, lookupIsbn } from './open-library.js';
+import { filledFacts, filledLinks } from './details.js';
+import { db, logger } from './init.js';
+import {
+    type BookDetails,
+    type BookLookup,
+    lookupEditionDetails,
+    lookupIsbn,
+} from './open-library.js';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
 type CatalogItem = typeof schema.catalogItem.$inferSelect;
 type Series = typeof schema.series.$inferSelect;
 
+// What's stored in a book's `metadata`. Older rows may be missing fields.
 const BookMetadataSchema = z.object({
-    subtitle: z.string().nullable(),
-    authors: z.array(z.string()),
-    publishers: z.array(z.string()),
-    publishDate: z.string().nullable(),
-    pageCount: z.number().nullable(),
-});
+    subtitle: z.string().nullable().catch(null),
+    authors: z.array(z.string()).catch([]),
+    publishers: z.array(z.string()).catch([]),
+    publishDate: z.string().nullable().catch(null),
+    firstPublishYear: z.number().nullable().catch(null),
+    pageCount: z.number().nullable().catch(null),
+    description: z.string().nullable().catch(null),
+    characters: z.array(z.string()).catch([]),
+    editionName: z.string().nullable().catch(null),
+    physicalFormat: z.string().nullable().catch(null),
+    languages: z.array(z.string()).catch([]),
+    goodreadsId: z.string().nullable().catch(null),
+}) satisfies z.ZodType<BookDetails>;
 
-type BookMetadata = z.infer<typeof BookMetadataSchema>;
+function readMetadata(item: CatalogItem): BookDetails {
+    return BookMetadataSchema.parse(item.metadata);
+}
 
 export const seriesColumns = {
     id: schema.series.id,
@@ -32,24 +48,20 @@ export const seriesColumns = {
 };
 
 function toBookKind(kind: SeriesKind | null | undefined): BookLookup['kind'] {
-    return kind === SeriesKind.Manga ? SeriesKind.Manga : SeriesKind.Book;
+    return kind === SeriesKind.Manga || kind === SeriesKind.LightNovel
+        ? kind
+        : SeriesKind.Book;
 }
 
 export function toBookLookup(
     item: CatalogItem,
     series: Series | null
 ): BookLookup {
-    const parsed = BookMetadataSchema.partial().safeParse(item.metadata);
-    const meta = parsed.success ? parsed.data : {};
     return {
         isbn: item.barcode ?? '',
         title: item.title,
-        subtitle: meta.subtitle ?? null,
-        authors: meta.authors ?? [],
-        publishers: meta.publishers ?? [],
-        publishDate: meta.publishDate ?? null,
+        ...readMetadata(item),
         releaseDate: item.releaseDate,
-        pageCount: meta.pageCount ?? null,
         kind: toBookKind(item.kind),
         series: series?.title ?? null,
         volume: item.position,
@@ -180,19 +192,14 @@ export async function findOrCreateBook(isbn: string, userId: string) {
         return { item: existing, fetched: null };
     }
 
-    const book = await lookupIsbn(isbn);
-    if (!book) {
+    const lookup = await lookupIsbn(isbn);
+    if (!lookup) {
         throw new HTTPException(404, {
             message: `No book found for ISBN ${isbn}`,
         });
     }
-    const metadata: BookMetadata = {
-        subtitle: book.subtitle,
-        authors: book.authors,
-        publishers: book.publishers,
-        publishDate: book.publishDate,
-        pageCount: book.pageCount,
-    };
+    const { book, complete } = lookup;
+    const metadata = BookMetadataSchema.parse(book);
     await db()
         .insert(schema.catalogItem)
         .values({
@@ -205,6 +212,9 @@ export async function findOrCreateBook(isbn: string, userId: string) {
             coverUrl: book.coverUrl,
             releaseDate: book.releaseDate,
             metadata: { ...metadata },
+            // Left empty when part of the lookup failed, so the item page
+            // fills in the rest later.
+            detailsFetchedAt: complete ? new Date() : null,
             createdByUserId: userId,
         })
         .onConflictDoNothing({ target: schema.catalogItem.barcode });
@@ -253,4 +263,94 @@ export async function upsertBook(
             .map(refreshSeriesCover)
     );
     return updated;
+}
+
+const refreshing = new Set<string>();
+
+/**
+ * Pulls a book's details from Open Library in the background. Details are
+ * marked fetched once every part comes back, or Open Library says the
+ * edition is gone. Anything else is retried on a later visit.
+ */
+async function refreshBookDetails(item: CatalogItem): Promise<void> {
+    if (!item.externalId || !item.barcode || refreshing.has(item.id)) {
+        return;
+    }
+    refreshing.add(item.id);
+    try {
+        const result = await lookupEditionDetails(
+            item.externalId,
+            item.barcode
+        );
+        await db()
+            .update(schema.catalogItem)
+            .set({
+                ...(result ? { metadata: { ...result.details } } : {}),
+                detailsFetchedAt:
+                    !result || result.complete ? new Date() : null,
+            })
+            .where(eq(schema.catalogItem.id, item.id));
+    } catch (error) {
+        logger().warn(
+            { error, itemId: item.id },
+            'Book details refresh failed'
+        );
+    } finally {
+        refreshing.delete(item.id);
+    }
+}
+
+/**
+ * The book's details for its page. Books missing details get them in the
+ * background, so the page never waits on Open Library; they show up on the
+ * next visit.
+ */
+export function bookDetails(item: CatalogItem) {
+    const meta = readMetadata(item);
+    if (!item.detailsFetchedAt) {
+        void refreshBookDetails(item);
+    }
+
+    const facts = [
+        { label: 'First published', value: meta.firstPublishYear?.toString() },
+        { label: 'This edition', value: meta.publishDate },
+        { label: 'Publisher', value: meta.publishers.join(', ') },
+        { label: 'Edition', value: meta.editionName },
+        { label: 'Format', value: meta.physicalFormat },
+        { label: 'Language', value: meta.languages.join(', ') },
+        { label: 'Pages', value: meta.pageCount?.toString() },
+        { label: 'Characters', value: meta.characters.join(', ') },
+        { label: 'ISBN', value: item.barcode },
+    ];
+    const links = [
+        {
+            label: 'Goodreads',
+            url: meta.goodreadsId
+                ? `https://www.goodreads.com/book/show/${meta.goodreadsId}`
+                : null,
+        },
+    ];
+
+    return {
+        subtitle: meta.subtitle,
+        creators: meta.authors,
+        description: meta.description,
+        facts: filledFacts(facts),
+        links: filledLinks(links),
+    };
+}
+
+type ItemDetails = ReturnType<typeof bookDetails>;
+
+const NO_DETAILS: ItemDetails = {
+    subtitle: null,
+    creators: [],
+    description: null,
+    facts: [],
+    links: [],
+};
+
+/** What an item's page shows about it, whatever kind of media it is. */
+export function itemDetails(item: CatalogItem): ItemDetails {
+    return item.format === MediaFormat.Book ? bookDetails(item) : NO_DETAILS;
 }

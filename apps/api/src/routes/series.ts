@@ -1,16 +1,28 @@
 import { asc, desc, schema, sql } from '@analog/db';
-import { PageQuerySchema } from '@analog/types';
+import {
+    DetailsSourceSchema,
+    LinkDetailsSourceSchema,
+    PageQuerySchema,
+    SetVolumeCountSchema,
+} from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { seriesColumns } from '../lib/books.js';
 import { db } from '../lib/init.js';
 import { paginate } from '../lib/pagination.js';
+import { IdParamSchema } from '../lib/params.js';
 import {
     matchesAllTerms,
     relevance,
     searchTerms,
     withoutNumbers,
 } from '../lib/search.js';
+import {
+    linkDetailsSource,
+    searchDetailsSource,
+    setVolumeCount,
+    unlinkDetailsSource,
+} from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -18,11 +30,54 @@ import { z } from 'zod';
 const SearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().max(200).optional(),
 });
+const DetailsSearchQuerySchema = z.object({
+    source: DetailsSourceSchema,
+    q: z.string().trim().min(1).max(200),
+});
 
-const series = new Hono<AppEnv>().get(
-    '/',
-    schemaValidator('query', SearchQuerySchema),
-    async (c) => {
+// Series are shared like the rest of the catalog, so anyone can link one.
+const series = new Hono<AppEnv>()
+    .get(
+        '/details-source/search',
+        schemaValidator('query', DetailsSearchQuerySchema),
+        async (c) => {
+            const { source, q } = c.req.valid('query');
+            return c.json(await searchDetailsSource(source, q));
+        }
+    )
+    .put(
+        '/:id/details-source',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('json', LinkDetailsSourceSchema),
+        async (c) => {
+            await linkDetailsSource(
+                c.req.valid('param').id,
+                c.req.valid('json')
+            );
+            return c.body(null, 204);
+        }
+    )
+    .delete(
+        '/:id/details-source',
+        schemaValidator('param', IdParamSchema),
+        async (c) => {
+            await unlinkDetailsSource(c.req.valid('param').id);
+            return c.body(null, 204);
+        }
+    )
+    .put(
+        '/:id/volume-count',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('json', SetVolumeCountSchema),
+        async (c) => {
+            await setVolumeCount(
+                c.req.valid('param').id,
+                c.req.valid('json').volumeCount
+            );
+            return c.body(null, 204);
+        }
+    )
+    .get('/', schemaValidator('query', SearchQuerySchema), async (c) => {
         const { q, ...page } = c.req.valid('query');
         const title = schema.series.title;
         const terms = withoutNumbers(searchTerms(q ?? ''));
@@ -43,7 +98,6 @@ const series = new Hono<AppEnv>().get(
                 .offset(offset)
         );
         return c.json(result);
-    }
-);
+    });
 
 export default series;

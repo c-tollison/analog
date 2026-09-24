@@ -3,7 +3,6 @@ import FormError from '@/components/FormError.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -54,12 +53,9 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
                 :image="user.image"
                 size="lg"
             />
-            <div class="grid min-w-0 flex-1 gap-0.5">
-                <h1 class="truncate text-lg font-semibold">Profile</h1>
-                <p class="text-muted-foreground text-sm">
-                    How you show up to friends.
-                </p>
-            </div>
+            <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">
+                Profile
+            </h1>
             <Button v-if="user?.username" variant="outline" size="sm" as-child>
                 <RouterLink
                     :to="{ name: 'user', params: { username: user.username } }"
@@ -107,10 +103,6 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
                             v-bind="componentField"
                         />
                     </FormControl>
-                    <FormDescription>
-                        Friends find you by this. Letters, numbers, underscores
-                        and periods.
-                    </FormDescription>
                     <FormMessage />
                 </FormItem>
             </FormField>

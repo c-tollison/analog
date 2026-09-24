@@ -1,3 +1,4 @@
+import type { InferResponseType } from '@analog/api/client';
 import {
     type AddBookSchema,
     type AddCatalogItemsSchema,
@@ -5,7 +6,7 @@ import {
     MAX_PAGE_SIZE,
     type UserIdSchema,
 } from '@analog/types';
-import { api, unwrap } from '@/lib/api';
+import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { CATALOG_KEY } from './useCatalog';
 import {
@@ -126,6 +127,55 @@ export function useCollectionSeriesItems(
                     query: { offset },
                 })
             )
+    );
+}
+
+export type CollectionItemDetail = InferResponseType<
+    ApiClient['collections'][':id']['items'][':itemId']['$get'],
+    200
+>;
+
+/** One item in a collection, with everyone's status and reviews. */
+export function useCollectionItem(
+    id: MaybeRefOrGetter<string>,
+    itemId: MaybeRefOrGetter<string>
+) {
+    return useQuery({
+        queryKey: () => [
+            ...collectionKey(toValue(id)),
+            'item',
+            toValue(itemId),
+        ],
+        queryFn: async () =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].$get({
+                    param: { id: toValue(id), itemId: toValue(itemId) },
+                })
+            ),
+    });
+}
+
+/** Everyone else's reviews of an item, a page at a time. */
+export function useCollectionItemReviews(
+    id: MaybeRefOrGetter<string>,
+    itemId: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [
+            ...collectionKey(toValue(id)),
+            'item',
+            toValue(itemId),
+            'reviews',
+        ],
+        async (offset) =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].reviews.$get({
+                    param: { id: toValue(id), itemId: toValue(itemId) },
+                    query: { offset },
+                })
+            ),
+        options
     );
 }
 
