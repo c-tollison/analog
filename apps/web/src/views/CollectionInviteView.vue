@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BackButton from '@/components/BackButton.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
@@ -13,7 +14,6 @@ import {
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 
-import { ArrowLeftIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string }>();
@@ -36,18 +36,15 @@ const error = computed(
 <template>
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div>
-            <Button variant="ghost" size="sm" class="-ml-2" as-child>
-                <RouterLink
-                    :to="{
-                        name: 'collection-settings',
-                        params: { id },
-                        query: { tab: 'members' },
-                    }"
-                >
-                    <ArrowLeftIcon />
-                    Members
-                </RouterLink>
-            </Button>
+            <BackButton
+                :to="{
+                    name: 'collection-settings',
+                    params: { id },
+                    query: { tab: 'members' },
+                }"
+                text="Members"
+                class="-ml-2"
+            />
         </div>
 
         <div class="grid gap-1">

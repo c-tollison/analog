@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
+import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
@@ -26,13 +27,7 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import {
-    ArrowLeftIcon,
-    LinkIcon,
-    PencilIcon,
-    PlusIcon,
-    XIcon,
-} from '@lucide/vue';
+import { LinkIcon, PencilIcon, PlusIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string; seriesId: string }>();
@@ -133,12 +128,10 @@ const headerError = computed(
 <template>
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
-            <Button variant="ghost" size="sm" as-child>
-                <RouterLink :to="{ name: 'collection', params: { id } }">
-                    <ArrowLeftIcon />
-                    Back to collection
-                </RouterLink>
-            </Button>
+            <BackButton
+                :to="{ name: 'collection', params: { id } }"
+                text="Back to collection"
+            />
             <Button
                 variant="outline"
                 size="sm"

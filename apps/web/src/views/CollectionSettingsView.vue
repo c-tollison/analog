@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CollectionRole } from '@analog/types';
+import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import FormError from '@/components/FormError.vue';
 import { Badge } from '@/components/shadcn-components/badge';
@@ -25,13 +26,7 @@ import {
 } from '@/composables/useCollections';
 import { useSessionStore } from '@/stores/session';
 
-import {
-    ArrowLeftIcon,
-    LogOutIcon,
-    Trash2Icon,
-    UserPlusIcon,
-    XIcon,
-} from '@lucide/vue';
+import { LogOutIcon, Trash2Icon, UserPlusIcon, XIcon } from '@lucide/vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -122,12 +117,11 @@ const error = computed(
 <template>
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div>
-            <Button variant="ghost" size="sm" class="-ml-2" as-child>
-                <RouterLink :to="{ name: 'collection', params: { id } }">
-                    <ArrowLeftIcon />
-                    {{ collection?.name ?? 'Collection' }}
-                </RouterLink>
-            </Button>
+            <BackButton
+                :to="{ name: 'collection', params: { id } }"
+                :text="collection?.name ?? 'Collection'"
+                class="-ml-2"
+            />
         </div>
 
         <h1 class="text-lg font-semibold">Settings</h1>

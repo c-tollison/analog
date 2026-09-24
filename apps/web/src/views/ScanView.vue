@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MAX_PAGE_SIZE, MediaFormat } from '@analog/types';
+import BackButton from '@/components/BackButton.vue';
 import FormError from '@/components/FormError.vue';
 import BookResult from '@/components/scan/BookResult.vue';
 import { Alert, AlertDescription } from '@/components/shadcn-components/alert';
@@ -31,12 +32,10 @@ import { MEDIA_TYPES, type MediaTypeValue } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import {
-    ArrowLeftIcon,
     FlashlightIcon,
     FlashlightOffIcon,
     SwitchCameraIcon,
 } from '@lucide/vue';
-import { useLocalStorage } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { type DetectedBarcode, QrcodeStream } from 'vue-qrcode-reader';
 import { useRoute } from 'vue-router';
@@ -45,7 +44,6 @@ const route = useRoute();
 const lookupIsbn = useIsbnLookup();
 
 const mediaType = ref<MediaTypeValue>(MediaFormat.Book);
-const lastCollectionId = useLocalStorage('analog:last-collection', '');
 const collectionId = ref('');
 
 const collectionsList = useCollections(MAX_PAGE_SIZE);
@@ -96,23 +94,30 @@ const collection = computed(() =>
 
 const paused = computed(() => isSubmitting.value);
 
+const back = computed(() => {
+    const from = collections.value.find((c) => c.id === route.query.collection);
+    return from
+        ? {
+              to: { name: 'collection', params: { id: from.id } },
+              text: from.name,
+          }
+        : { to: { name: 'collections' }, text: 'Collections' };
+});
+
 function selectCollection(id: string) {
     collectionId.value = id;
-    lastCollectionId.value = id;
 }
 
 watch(
     collections,
     (list) => {
-        if (collectionId.value || !list.length) {
-            return;
-        }
-        const preferred = [route.query.collection, lastCollectionId.value].find(
-            (id) => list.some((c) => c.id === id)
-        );
-        const initial = preferred ?? list[0]?.id;
-        if (typeof initial === 'string') {
-            selectCollection(initial);
+        const fromRoute = route.query.collection;
+        if (
+            !collectionId.value &&
+            typeof fromRoute === 'string' &&
+            list.some((c) => c.id === fromRoute)
+        ) {
+            selectCollection(fromRoute);
         }
     },
     { immediate: true }
@@ -219,12 +224,7 @@ function scanAnother() {
 <template>
     <main class="mx-auto flex w-full max-w-lg flex-col gap-4 p-4">
         <div>
-            <Button variant="ghost" size="sm" class="-ml-2" as-child>
-                <RouterLink :to="{ name: 'collections' }">
-                    <ArrowLeftIcon />
-                    Collections
-                </RouterLink>
-            </Button>
+            <BackButton :to="back.to" :text="back.text" class="-ml-2" />
         </div>
 
         <h1 class="text-lg font-semibold">Scan</h1>

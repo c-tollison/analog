@@ -225,8 +225,8 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                         </FormControl>
                         <FormDescription>
                             Include the edition, and the language if you know
-                            it, like “Fullmetal Alchemist (3-in-1 Edition,
-                            English)”. Each edition is its own series.
+                            it, like "Fullmetal Alchemist (3-in-1 Edition,
+                            English)". Each edition is its own series.
                         </FormDescription>
                         <FormMessage />
                     </FormItem>

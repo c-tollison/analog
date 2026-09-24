@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Relationship } from '@analog/types';
+import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
@@ -29,7 +30,6 @@ import {
 import { useUser } from '@/composables/useUsers';
 
 import {
-    ArrowLeftIcon,
     CheckIcon,
     PencilIcon,
     UserCheckIcon,
@@ -78,12 +78,11 @@ const error = computed(
 <template>
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div>
-            <Button variant="ghost" size="sm" class="-ml-2" as-child>
-                <RouterLink :to="{ name: 'friends' }">
-                    <ArrowLeftIcon />
-                    Friends
-                </RouterLink>
-            </Button>
+            <BackButton
+                :to="{ name: 'friends' }"
+                text="Friends"
+                class="-ml-2"
+            />
         </div>
 
         <FormError :message="error" />

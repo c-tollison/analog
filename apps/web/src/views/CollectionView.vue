@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
@@ -24,13 +25,7 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import {
-    ArrowLeftIcon,
-    LibraryIcon,
-    ScanBarcodeIcon,
-    SettingsIcon,
-    XIcon,
-} from '@lucide/vue';
+import { LibraryIcon, ScanBarcodeIcon, SettingsIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string }>();
@@ -81,12 +76,7 @@ const headerError = computed(
 <template>
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
-            <Button variant="ghost" size="sm" as-child>
-                <RouterLink :to="{ name: 'collections' }">
-                    <ArrowLeftIcon />
-                    Collections
-                </RouterLink>
-            </Button>
+            <BackButton :to="{ name: 'collections' }" text="Collections" />
             <div class="flex gap-2">
                 <Button
                     variant="outline"
@@ -102,7 +92,7 @@ const headerError = computed(
                         :to="{ name: 'scan', query: { collection: id } }"
                     >
                         <ScanBarcodeIcon />
-                        Scan
+                        {{ collection ? `Scan into ${collection.name}` : 'Scan' }}
                     </RouterLink>
                 </Button>
             </div>
