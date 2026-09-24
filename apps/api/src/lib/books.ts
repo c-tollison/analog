@@ -199,9 +199,10 @@ async function settle<T>(promise: Promise<T | null>): Promise<Settled<T>> {
     }
 }
 
+// Null when the time runs out first.
 function waitAtMost<T>(promise: Promise<Settled<T>>, ms: number) {
-    const timeout = new Promise<Settled<T>>((resolve) =>
-        setTimeout(() => resolve({ value: null, error: null }), ms)
+    const timeout = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), ms)
     );
     return Promise.race([promise, timeout]);
 }
@@ -249,7 +250,9 @@ function fillIn(google: BookLookup, openLibrary: BookLookup): BookLookup {
 /**
  * Looks up an ISBN on Google Books and Open Library at the same time. Google's
  * data wins, and Open Library fills in whatever Google is missing. Open
- * Library's data is used alone when Google has no match or fails.
+ * Library's data is used alone when Google has no match or fails. The result
+ * isn't `complete` when Open Library is too slow or fails, so the item page
+ * fills in the rest later.
  */
 async function lookupBook(
     isbn: string,
@@ -274,14 +277,21 @@ async function lookupBook(
     }
 
     const extra = await waitAtMost(openLibrary, openLibraryWaitMs);
+    if (!extra) {
+        return { ...google.value, complete: false };
+    }
     if (extra.error) {
         logger().warn(
             { error: extra.error, isbn },
             'Open Library lookup failed'
         );
+        return { ...google.value, complete: false };
     }
     return extra.value
-        ? { ...google.value, book: fillIn(google.value.book, extra.value.book) }
+        ? {
+              book: fillIn(google.value.book, extra.value.book),
+              complete: google.value.complete && extra.value.complete,
+          }
         : google.value;
 }
 
@@ -316,8 +326,8 @@ export async function findOrCreateBook(isbn: string, userId: string) {
             coverUrl: book.coverUrl,
             releaseDate: book.releaseDate,
             metadata: { ...metadata },
-            // Left empty when part of the lookup failed, so the item page
-            // fills in the rest later.
+            // Left empty when part of the lookup failed or Open Library was
+            // too slow, so the item page fills in the rest later.
             detailsFetchedAt: complete ? new Date() : null,
             createdByUserId: userId,
         })
@@ -425,13 +435,50 @@ export async function refreshBook(itemId: string) {
 const refreshing = new Set<string>();
 
 /**
+ * A stored book's missing details from Open Library. A Google Books item
+ * keeps what it has and takes only what Google didn't send, the same as when
+ * both sources answer in time.
+ */
+async function fetchMissingDetails(
+    item: CatalogItem,
+    isbn: string,
+    sourceId: string
+) {
+    if (item.externalSource === ExternalSource.GoogleBooks) {
+        const result = await lookupIsbn(isbn);
+        if (!result) {
+            return null;
+        }
+        const book = fillIn(toBookLookup(item, null), result.book);
+        return {
+            values: {
+                kind: book.kind,
+                coverUrl: book.coverUrl,
+                releaseDate: book.releaseDate,
+                metadata: { ...BookMetadataSchema.parse(book) },
+            },
+            complete: result.complete,
+        };
+    }
+
+    const result = await lookupEditionDetails(sourceId, isbn);
+    return result
+        ? {
+              values: { metadata: { ...result.details } },
+              complete: result.complete,
+          }
+        : null;
+}
+
+/**
  * Pulls a book's details from Open Library in the background. Details are
- * marked fetched once every part comes back, or Open Library says the
- * edition is gone. Anything else is retried on a later visit.
+ * marked fetched once every part comes back, or Open Library has no such
+ * book. Anything else is retried on a later visit.
  */
 async function refreshBookDetails(item: CatalogItem): Promise<void> {
     if (
-        item.externalSource !== ExternalSource.OpenLibrary ||
+        (item.externalSource !== ExternalSource.OpenLibrary &&
+            item.externalSource !== ExternalSource.GoogleBooks) ||
         !item.externalId ||
         !item.barcode ||
         refreshing.has(item.id)
@@ -440,18 +487,22 @@ async function refreshBookDetails(item: CatalogItem): Promise<void> {
     }
     refreshing.add(item.id);
     try {
-        const result = await lookupEditionDetails(
-            item.externalId,
-            item.barcode
+        const result = await fetchMissingDetails(
+            item,
+            item.barcode,
+            item.externalId
         );
         await db()
             .update(schema.catalogItem)
             .set({
-                ...(result ? { metadata: { ...result.details } } : {}),
+                ...result?.values,
                 detailsFetchedAt:
                     !result || result.complete ? new Date() : null,
             })
             .where(eq(schema.catalogItem.id, item.id));
+        if (item.seriesId) {
+            await refreshSeriesCover(item.seriesId);
+        }
     } catch (error) {
         logger().warn(
             { error, itemId: item.id },
