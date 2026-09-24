@@ -10,6 +10,7 @@ import type { AppEnv } from '../lib/app-env.js';
 import {
     findOrCreateBook,
     findSimilarSeries,
+    refreshBook,
     suggestSeries,
     toBookLookup,
 } from '../lib/books.js';
@@ -119,6 +120,14 @@ const catalog = new Hono<AppEnv>()
                 });
             }
             return c.json(saved);
+        }
+    )
+    .post(
+        '/items/:id/refresh',
+        schemaValidator('param', IdParamSchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            return c.json(await refreshBook(id));
         }
     )
     .get(

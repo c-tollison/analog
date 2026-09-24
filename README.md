@@ -43,6 +43,11 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
 
+# Look up every book with an ISBN again on Google Books and Open Library, and
+# update its cover and details. Series and volumes aren't changed. Add
+# `--dry-run` to list the books without changing them.
+pnpm books:refresh
+
 # Add one or more shadcn-vue components to the web app
 pnpm add-component button
 pnpm add-component button card dialog
@@ -100,6 +105,8 @@ one directory:
    - `BETTER_AUTH_SECRET` set to the output of `openssl rand -base64 32`
    - `RESEND_API_KEY` set to a Resend sending key for the domain in
      `[deployed.email].from` in `apps/api/config/config.toml`
+   - `GOOGLE_BOOKS_API_KEY` set to a Google Cloud API key restricted to the
+     Books API
    - `IMAGE_TAG` left empty
 
    Then run `chmod 600 ~/analog/.env`.
@@ -153,6 +160,10 @@ click "Re-run failed jobs". You don't need a new push.
 - **Migrations.** On every deploy, the `migrate` service applies any new SQL
   migrations from `packages/db/drizzle` before the API starts. With no new
   migrations it does nothing.
+- **Refresh books.** To look up every book with an ISBN again, run
+  `cd ~/analog && docker compose run --rm --no-deps api node
+  dist/scripts/refresh-books.js`. Add `--dry-run` to list them first. Series
+  and volumes aren't changed.
 
 ### Dependencies
 

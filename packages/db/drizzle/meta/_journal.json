@@ -85,6 +85,13 @@
       "when": 1790251162030,
       "tag": "0011_add_user_avatar",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790256265870,
+      "tag": "0012_add_google_books_source",
+      "breakpoints": true
     }
   ]
 }

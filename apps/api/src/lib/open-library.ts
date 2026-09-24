@@ -74,19 +74,23 @@ function matches(values: string[] | undefined, pattern: RegExp): boolean {
     return !!values?.some((value) => pattern.test(value));
 }
 
-function bookKind(
-    edition: Edition
-): SeriesKind.Manga | SeriesKind.LightNovel | SeriesKind.Book {
+export function bookKind({
+    subjects,
+    publishers,
+}: {
+    subjects?: string[];
+    publishers?: string[];
+}): SeriesKind.Manga | SeriesKind.LightNovel | SeriesKind.Book {
     // Checked first: light novel imprints share publishers with manga.
     if (
-        matches(edition.subjects, LIGHT_NOVEL_SUBJECTS) ||
-        matches(edition.publishers, LIGHT_NOVEL_PUBLISHERS)
+        matches(subjects, LIGHT_NOVEL_SUBJECTS) ||
+        matches(publishers, LIGHT_NOVEL_PUBLISHERS)
     ) {
         return SeriesKind.LightNovel;
     }
     if (
-        matches(edition.subjects, MANGA_SUBJECTS) ||
-        matches(edition.publishers, MANGA_PUBLISHERS)
+        matches(subjects, MANGA_SUBJECTS) ||
+        matches(publishers, MANGA_PUBLISHERS)
     ) {
         return SeriesKind.Manga;
     }
@@ -260,6 +264,8 @@ async function getDetails(edition: Edition, isbn: string) {
         ...(work.subjects ?? []),
         ...(edition.subjects ?? []),
     ];
+    // Open Library's subjects are library tags, not genres.
+    const genres: string[] = [];
     const details = {
         subtitle: edition.subtitle ?? null,
         authors,
@@ -277,6 +283,7 @@ async function getDetails(edition: Edition, isbn: string) {
             .map((language) => languageName(language.key))
             .filter((name): name is string => !!name),
         goodreadsId: edition.identifiers?.goodreads?.[0] ?? null,
+        genres,
     };
     return { details, complete };
 }
@@ -308,6 +315,12 @@ export function cleanSeriesName(raw: string): string {
 
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// A series name from a title that names its volume, e.g. "One Piece, Vol. 3".
+export function seriesFromTitle(title: string): string | null {
+    const match = title.match(/^(.+?)[\s,:;#]*\b(?:vol\.?|volume|v\.)\s*\d/i);
+    return match?.[1]?.trim() || null;
 }
 
 // Volume numbers only live in the title, e.g. "Haikyu!! 1: Hinata and Kageyama"
@@ -378,7 +391,9 @@ export async function lookupIsbn(isbn: string) {
             ...details,
             releaseDate: parseReleaseDate(edition.publish_date),
             kind: bookKind(edition),
-            series: rawSeries ? cleanSeriesName(rawSeries) : null,
+            series: rawSeries
+                ? cleanSeriesName(rawSeries)
+                : seriesFromTitle(edition.title),
             volume: parseVolume(edition.title, rawSeries),
             coverUrl: coverId ? `${COVERS_URL}/b/id/${coverId}-L.jpg` : null,
             source: ExternalSource.OpenLibrary,

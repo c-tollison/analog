@@ -14,3 +14,30 @@ export function filledLinks(
 ): Link[] {
     return links.filter((link): link is Link => !!link.url);
 }
+
+const ENTITIES: Record<string, string> = {
+    '&amp;': '&',
+    '&quot;': '"',
+    '&#039;': "'",
+    '&#39;': "'",
+    '&lt;': '<',
+    '&gt;': '>',
+};
+
+/** Text from a description that comes with some HTML. */
+export function plainText(html: string | null | undefined): string | null {
+    if (!html) {
+        return null;
+    }
+    const text = html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(
+            /&(amp|quot|#039|#39|lt|gt);/g,
+            (entity) => ENTITIES[entity] ?? ''
+        )
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    return text || null;
+}
