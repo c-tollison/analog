@@ -3,7 +3,7 @@ import { defineConfig } from 'drizzle-kit';
 try {
     process.loadEnvFile('.env');
 } catch {
-    // no .env — rely on vars already in the environment (CI)
+    // No .env in CI, so use the vars already in the environment.
 }
 
 const url = process.env.DATABASE_URL;

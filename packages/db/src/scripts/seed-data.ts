@@ -62,7 +62,7 @@ export async function runSeed(db: Database): Promise<void> {
 
     await db
         .insert(collection)
-        .values({ id: SEED_COLLECTION_ID, name: 'Ada’s Shelf' })
+        .values({ id: SEED_COLLECTION_ID, name: "Ada's Shelf" })
         .onConflictDoNothing();
     await db
         .insert(collectionMember)

@@ -111,7 +111,7 @@ function sameSeries(a: unknown, b: unknown) {
                         :value="{ id: null, title: trimmed }"
                     >
                         <PlusIcon />
-                        Create “{{ trimmed }}”
+                        Create "{{ trimmed }}"
                     </ComboboxItem>
                     <ComboboxItem
                         v-for="series in list.items"

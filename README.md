@@ -1,40 +1,47 @@
 # Analog
 
-A personal physical media tracker. Forgetting what in your collection back at home? Use analog to track CDs, DVDs, video games, books, manga/comics. Later versions will hopefully have a barcode scanner.
+Analog tracks the physical media you own, so you can check what's on your shelf back home. It covers CDs, DVDs, video games, books, manga and comics. Scan a book's barcode to add it to a collection.
 
-Side project to get better at a few things:
+I'm building it to get better at:
 - Fullstack TypeScript
 - API design with end-to-end type safety
 - Database management
 - Session auth with token rotation
-- Self-hosting on a VPS: reverse proxy, TLS, CDN, zero-downtime deploys
+- Self-hosting on a VPS with a reverse proxy, TLS, a CDN and zero-downtime deploys
 - CI/CD with automated testing
-- Observability: structured logs, metrics, uptime monitoring
-- Integrating with an online data source
+- Observability with structured logs, metrics and uptime monitoring
+- Pulling data from outside sources
 
-## Dev Info
+## Development
 
-### Important root `package.json` scripts
+### Root scripts
 
 ```bash
 # Format and lint, applying safe fixes in place
 pnpm check
 
-# Format and lint in check-only mode (used in CI)
+# Format and lint without writing changes. CI runs this one.
 pnpm check:ci
 
-# Start local Postgres (if not already running), then all app dev servers
+# Start local Postgres if it isn't running, then the API and web dev servers
 pnpm dev
 
 # Build every workspace package
 pnpm build
 
-# Start / stop the local Postgres container (docker-compose.local.yml)
+# Start local Postgres, then migrate and seed it
 pnpm local:up
+
+# Stop local Postgres
 pnpm local:down
 
-# Stop, wipe the database volume, and start fresh
+# Stop, wipe the database volume, then run local:up
 pnpm local:reset
+
+# Generate a migration from schema changes, apply migrations, seed test data
+pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
 
 # Add one or more shadcn-vue components to the web app
 pnpm add-component button
@@ -43,36 +50,38 @@ pnpm add-component button card dialog
 
 ### Adding shadcn-vue components
 
-`pnpm add-component <name...>` wraps the shadcn-vue CLI (`scripts/add-component.mjs`):
+`pnpm add-component <name...>` wraps the shadcn-vue CLI in `scripts/add-component.mjs`. It:
 
-1. Runs `shadcn-vue add` from inside `apps/web` so it picks up
-   `apps/web/components.json`. Components go in
+1. Runs `shadcn-vue add` from `apps/web`, so it reads
+   `apps/web/components.json`. Components land in
    `apps/web/src/components/shadcn-components/`.
-2. Never overwrites a component that's already there. It answers no to
-   every overwrite prompt and refuses `--overwrite`.
-3. Formats the generated files
+2. Never overwrites an existing component. It answers no to every
+   overwrite prompt and refuses `--overwrite`.
+3. Formats the new files.
 
-Passing no component name starts the shadcn interactive picker.
+With no component name, it opens the shadcn interactive picker.
 
-### Formatting & linting
+### Formatting and linting
 
-Using both Biome and Prettier. Biome formats and lints everything except Vue
-files; Prettier runs those to format the HTML because Biome cannot. Both run in `pnpm check` 
-and in the `lint-staged` pre-commit hook.
+Biome formats and lints everything except the templates in `.vue` files,
+which it can't format. Prettier formats `.vue` files. Both run in
+`pnpm check` and in the lint-staged pre-commit hook.
 
 ## Deployment
 
-Runs on a VPS set up with [vps-infra](https://github.com/c-tollison/vps-infra),
-which provides the shared `vps` and `db` Docker networks, Traefik with
-automatic HTTPS, a single Postgres server, and the deploy script. Every push
-to `main` runs `.github/workflows/deploy.yml`: lint and build, build both
-images for amd64, push them to GitHub Container Registry tagged `latest` and
-`sha-<commit>`, then SSH into the VPS with the tag.
+The app runs on a VPS set up with [vps-infra](https://github.com/c-tollison/vps-infra).
+vps-infra provides the shared `vps` and `db` Docker networks, Traefik with
+automatic HTTPS, one Postgres server and the deploy script.
 
-The SSH key the workflow uses is bound to a forced command on the VPS, so the
-only thing it can do is hand vps-infra's `deploy.sh` a tag. It cannot run
-other commands, copy files, or read the `.env`. The VPS holds no source and
-builds nothing. It has one directory:
+Every push to `main` runs `.github/workflows/deploy.yml`. The workflow lints
+and builds, then builds both images for amd64. It pushes them to GitHub
+Container Registry tagged `latest` and `sha-<commit>`, then SSHes into the VPS
+with the tag.
+
+The workflow's SSH key is bound to a forced command on the VPS. All it can do
+is pass a tag to vps-infra's `deploy.sh`. It can't run other commands, copy
+files or read the `.env`. The VPS holds no source and builds nothing. It has
+one directory:
 
 ```
 ~/analog/
@@ -82,34 +91,39 @@ builds nothing. It has one directory:
 
 ### One-time setup
 
-1. **Database.** On the VPS, in `vps-infra`: `scripts/create-db.sh analog`.
+1. **Database.** On the VPS, in `vps-infra`, run `scripts/create-db.sh analog`.
    Keep the URL it prints.
-2. **Env file.** On the VPS: `mkdir ~/analog`, then write `~/analog/.env`
-   from `.env.example` with `STAGE=deployed`, `DATABASE_URL=` set to that
-   URL, `BETTER_AUTH_SECRET=` set to `openssl rand -base64 32`,
-   `RESEND_API_KEY=` set to a Resend sending key for the domain in
-   `[deployed.email].from` (`apps/api/config/config.toml`), and
-   `IMAGE_TAG=` left empty. `chmod 600 ~/analog/.env`.
+2. **Env file.** On the VPS, run `mkdir ~/analog`. Write `~/analog/.env`
+   from `.env.example` with these values:
+   - `STAGE=deployed`
+   - `DATABASE_URL` set to the URL from step 1
+   - `BETTER_AUTH_SECRET` set to the output of `openssl rand -base64 32`
+   - `RESEND_API_KEY` set to a Resend sending key for the domain in
+     `[deployed.email].from` in `apps/api/config/config.toml`
+   - `IMAGE_TAG` left empty
+
+   Then run `chmod 600 ~/analog/.env`.
 3. **Compose file.** Copy `docker-compose.yml` from this repo to `~/analog/`.
-   Do this again whenever it changes; the workflow does not deliver it.
+   Copy it again whenever it changes. The workflow doesn't deliver it.
 4. **Deploy key.** On your laptop:
    ```bash
    ssh-keygen -t ed25519 -f ~/.ssh/analog-deploy -C github-actions-analog -N ""
    cat ~/.ssh/analog-deploy.pub
    ssh-keyscan -p <port> -H <host>
    ```
-   On the VPS, append one line to `~/.ssh/authorized_keys`, with the public
-   key from `cat` above and the absolute path of your `vps-infra` checkout:
+   On the VPS, append one line to `~/.ssh/authorized_keys`. Use the public
+   key that `cat` printed and the absolute path of your `vps-infra` checkout:
    ```
    restrict,command="/home/<user>/vps-infra/scripts/deploy.sh analog" ssh-ed25519 AAAA... github-actions-analog
    ```
-   Verify from your laptop. The first must be refused, the second deploys
-   whatever tag you name:
+   Test it from your laptop. The VPS should refuse the first command and
+   deploy the tag you name in the second:
    ```bash
    ssh -i ~/.ssh/analog-deploy -o IdentitiesOnly=yes -p <port> <user>@<host> 'docker ps'
    ssh -i ~/.ssh/analog-deploy -o IdentitiesOnly=yes -p <port> <user>@<host> sha-<short sha>
    ```
-5. **Secrets.** Repo Settings, Secrets and variables, Actions:
+5. **Secrets.** In the repo, open Settings, then Secrets and variables, then
+   Actions, and add:
 
    | Secret            | Value                                                          |
    | ----------------- | -------------------------------------------------------------- |
@@ -119,29 +133,30 @@ builds nothing. It has one directory:
    | `VPS_SSH_KEY`     | contents of `~/.ssh/analog-deploy`, including BEGIN/END lines  |
    | `VPS_KNOWN_HOSTS` | full output of the `ssh-keyscan` command                       |
 
-6. **Push to `main`.** Watch the run under Actions. The deploy job ends with
-   `docker compose ps`; api and web should be healthy and migrate exited 0.
-   Then `curl https://analog.coji-dev.com/api/health`.
+6. **First deploy.** Push to `main` and watch the run under Actions. The
+   deploy job ends with `docker compose ps`. The api and web services should
+   be healthy, and migrate should have exited with code 0. Then run
+   `curl https://analog.coji-dev.com/api/health`.
 
-If the deploy job fails it is almost always a secret. Fix it and use
-"Re-run failed jobs"; no new push needed.
+When the deploy job fails, the cause is usually a wrong secret. Fix it and
+click "Re-run failed jobs". You don't need a new push.
 
 ### Day to day
 
-- **Deploy:** push to `main`.
-- **Logs:** on the VPS, `cd ~/analog && docker compose logs -f api`.
-- **Roll back:** on the VPS, set `IMAGE_TAG` in `~/analog/.env` to an older
-  `sha-<commit>` and `docker compose up -d`. The next push to `main` moves it
-  forward again.
-- **Compose changes:** copy the new `docker-compose.yml` to the VPS by hand
-  and `docker compose up -d`.
-- **Migrations:** the `migrate` service runs `drizzle` SQL from
-  `packages/db/drizzle` before the API starts, on every deploy. It is a no-op
-  when nothing is new.
+- **Deploy.** Push to `main`.
+- **Logs.** On the VPS, run `cd ~/analog && docker compose logs -f api`.
+- **Roll back.** On the VPS, set `IMAGE_TAG` in `~/analog/.env` to an older
+  `sha-<commit>` and run `docker compose up -d`. The next push to `main`
+  deploys the latest image again.
+- **Compose changes.** Copy the new `docker-compose.yml` to the VPS by hand
+  and run `docker compose up -d`.
+- **Migrations.** On every deploy, the `migrate` service applies any new SQL
+  migrations from `packages/db/drizzle` before the API starts. With no new
+  migrations it does nothing.
 
 ### Dependencies
 
-Dependabot alerts are on in repo settings, so a dependency with a known
-vulnerability sends an email. Updates are done by hand; there is no
-`dependabot.yml`. `pnpm-workspace.yaml` sets `minimumReleaseAge` so a package
-version has to be at least 3 days old before it can be installed.
+Dependabot alerts are on in the repo settings, so GitHub sends an email when
+a dependency has a known vulnerability. Update dependencies by hand. There is
+no `dependabot.yml`. `pnpm-workspace.yaml` sets `minimumReleaseAge`, so pnpm
+won't install a package version until it is 3 days old.
