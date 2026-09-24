@@ -142,7 +142,7 @@ const headerError = computed(
             "
         >
             <template #default="{ items }">
-                <ul class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <li
                         v-for="entry in items"
                         :key="entry.id"
@@ -154,7 +154,7 @@ const headerError = computed(
                                 name: 'collection-series',
                                 params: { id, seriesId: entry.series.id },
                             }"
-                            class="grid gap-1.5"
+                            class="grid gap-1"
                         >
                             <CoverImage
                                 size="md"
@@ -162,12 +162,10 @@ const headerError = computed(
                                 :alt="entry.series.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p
-                                class="line-clamp-2 min-h-10 text-sm font-medium"
-                            >
+                            <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.series.title }}
                             </p>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex flex-wrap items-center gap-1">
                                 <Badge variant="secondary">
                                     {{ SERIES_KIND_LABELS[entry.series.kind] }}
                                 </Badge>
@@ -189,7 +187,7 @@ const headerError = computed(
                                 name: 'collection-item',
                                 params: { id, itemId: entry.id },
                             }"
-                            class="grid gap-1.5"
+                            class="grid gap-1"
                         >
                             <CoverImage
                                 size="md"
@@ -197,12 +195,10 @@ const headerError = computed(
                                 :alt="entry.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p
-                                class="line-clamp-2 min-h-10 text-sm font-medium"
-                            >
+                            <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.title }}
                             </p>
-                            <div class="flex flex-wrap items-center gap-1.5">
+                            <div class="flex flex-wrap items-center gap-1">
                                 <Badge variant="secondary">
                                     {{
                                         entry.kind
