@@ -278,7 +278,7 @@ const error = computed(
                                                     username: review.username,
                                                 },
                                             }"
-                                            class="hover:underline"
+                                            class="underline-offset-2 hover:underline"
                                         >
                                             {{ review.name }}
                                         </RouterLink>
