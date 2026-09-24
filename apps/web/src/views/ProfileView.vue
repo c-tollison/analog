@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import FormError from '@/components/FormError.vue';
+import { AvatarBadge } from '@/components/shadcn-components/avatar';
 import { Button } from '@/components/shadcn-components/button';
 import {
     FormControl,
@@ -11,6 +12,7 @@ import {
 import { Input } from '@/components/shadcn-components/input';
 import { Label } from '@/components/shadcn-components/label';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import AvatarDialog from '@/components/users/AvatarDialog.vue';
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import { useAppForm } from '@/composables/useAppForm';
 import { useUpdateProfile } from '@/composables/useUsers';
@@ -18,7 +20,7 @@ import { UpdateProfileSchema } from '@/lib/auth-schemas';
 import { vNoAutofill } from '@/lib/no-autofill';
 import { useSessionStore } from '@/stores/session';
 
-import { CheckIcon, ExternalLinkIcon } from '@lucide/vue';
+import { CameraIcon, CheckIcon, ExternalLinkIcon } from '@lucide/vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 
@@ -27,6 +29,7 @@ const user = computed(() => session.value?.user);
 
 const update = useUpdateProfile();
 const saved = ref(false);
+const avatarOpen = ref(false);
 
 const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
     schema: UpdateProfileSchema,
@@ -47,12 +50,21 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
 <template>
     <main class="mx-auto flex w-full max-w-lg flex-col gap-6 p-4">
         <div class="flex items-center gap-3">
-            <UserAvatar
+            <Button
                 v-if="user"
-                :name="user.name"
-                :image="user.image"
-                size="lg"
-            />
+                variant="ghost"
+                class="size-auto rounded-full p-0"
+                aria-label="Change photo"
+                @click="avatarOpen = true"
+            >
+                <UserAvatar :name="user.name" :image="user.image" size="lg">
+                    <AvatarBadge
+                        class="group-data-[size=lg]/avatar:size-4 group-data-[size=lg]/avatar:[&>svg]:size-2.5"
+                    >
+                        <CameraIcon />
+                    </AvatarBadge>
+                </UserAvatar>
+            </Button>
             <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">
                 Profile
             </h1>
@@ -126,5 +138,12 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
                 </span>
             </div>
         </form>
+
+        <AvatarDialog
+            v-if="user"
+            v-model:open="avatarOpen"
+            :name="user.name"
+            :image="user.image"
+        />
     </main>
 </template>

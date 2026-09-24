@@ -34,6 +34,7 @@
         "hono": "catalog:",
         "pino": "^10.3.1",
         "resend": "^6.28.1",
+        "sharp": "^0.35.4",
         "smol-toml": "^1.8.0",
         "zod": "catalog:"
     },

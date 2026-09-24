@@ -78,6 +78,13 @@
       "when": 1790191993442,
       "tag": "0010_add_light_novel_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790251162030,
+      "tag": "0011_add_user_avatar",
+      "breakpoints": true
     }
   ]
 }

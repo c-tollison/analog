@@ -51,11 +51,24 @@ export const useSessionStore = defineStore('session', () => {
         return pending;
     }
 
+    /**
+     * Refetches the session past Better Auth's cookie cache. Call it after
+     * the API changes the user outside Better Auth.
+     */
+    async function refresh(): Promise<void> {
+        const { data } = await authClient.getSession({
+            query: { disableCookieCache: true },
+        });
+        if (data) {
+            cached.value = data;
+        }
+    }
+
     function clear(): void {
         cached.value = undefined;
         pending = undefined;
         queryClient.clear();
     }
 
-    return { session, load, clear };
+    return { session, load, refresh, clear };
 });
