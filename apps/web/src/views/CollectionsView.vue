@@ -27,7 +27,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
 import { formatsCompletedWord } from '@/lib/media-types';
 
-import { PlusIcon, ScanBarcodeIcon, SettingsIcon } from '@lucide/vue';
+import { PlusIcon, ScanBarcodeIcon } from '@lucide/vue';
 import { ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
@@ -156,8 +156,8 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 </template>
                             </ItemDescription>
                         </ItemContent>
-                        <ItemActions class="relative">
-                            <AvatarGroup v-if="c.memberCount > 1">
+                        <ItemActions v-if="c.memberCount > 1">
+                            <AvatarGroup>
                                 <UserAvatar
                                     v-for="member in c.members"
                                     :key="member.id"
@@ -171,21 +171,6 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                     +{{ c.memberCount - c.members.length }}
                                 </AvatarGroupCount>
                             </AvatarGroup>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                :aria-label="`${c.name} settings`"
-                                as-child
-                            >
-                                <RouterLink
-                                    :to="{
-                                        name: 'collection-settings',
-                                        params: { id: c.id },
-                                    }"
-                                >
-                                    <SettingsIcon />
-                                </RouterLink>
-                            </Button>
                         </ItemActions>
                     </Item>
                 </ItemGroup>
