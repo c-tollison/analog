@@ -62,7 +62,7 @@ const DISABLED_PATHS = [
 const BODY_SCHEMAS: Record<string, ZodType> = {
     '/sign-up/email': SignUpSchema,
     '/email-otp/reset-password': ResetPasswordSchema,
-    '/update-user': UpdateProfileSchema,
+    '/update-user': UpdateProfileSchema.strict(),
 };
 
 export type Auth = ReturnType<typeof CreateAuthInstance>;

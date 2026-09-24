@@ -7,7 +7,7 @@ import {
     type PaginatedListOptions,
     usePaginatedList,
 } from './usePaginatedList';
-import { useMutation, useQuery } from '@tanstack/vue-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { type MaybeRefOrGetter, toValue } from 'vue';
 import type { z } from 'zod';
 
@@ -56,6 +56,35 @@ export function useUpdateProfile() {
                 );
             }
             await sessionStore.load();
+        },
+    });
+}
+
+/** Uploads a new profile photo for the signed-in user. */
+export function useUploadAvatar() {
+    const queryClient = useQueryClient();
+    const sessionStore = useSessionStore();
+
+    return useMutation({
+        mutationFn: async (file: File) =>
+            unwrap(await api.users.me.avatar.$put({ form: { file } })),
+        onSuccess: async () => {
+            await sessionStore.refresh();
+            await queryClient.invalidateQueries({ queryKey: USERS_KEY });
+        },
+    });
+}
+
+/** Removes the signed-in user's profile photo. */
+export function useRemoveAvatar() {
+    const queryClient = useQueryClient();
+    const sessionStore = useSessionStore();
+
+    return useMutation({
+        mutationFn: async () => unwrap(await api.users.me.avatar.$delete()),
+        onSuccess: async () => {
+            await sessionStore.refresh();
+            await queryClient.invalidateQueries({ queryKey: USERS_KEY });
         },
     });
 }
