@@ -31,7 +31,7 @@ export const SeriesPickSchema = z.object({
 export const AddBookFormSchema = z
     .object({
         isSeries: z.boolean(),
-        series: SeriesPickSchema.nullable(),
+        series: SeriesPickSchema.nullish(),
         volume: z
             .unknown()
             .transform((value) =>
@@ -44,7 +44,7 @@ export const AddBookFormSchema = z
                     .nullable()
             ),
     })
-    .refine((values) => !values.isSeries || values.series !== null, {
+    .refine((values) => !values.isSeries || values.series != null, {
         message: 'Pick a series or type a new name',
         path: ['series'],
     });
