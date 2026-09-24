@@ -24,6 +24,7 @@
         "typescript": "catalog:"
     },
     "dependencies": {
+        "obscenity": "^0.4.6",
         "zod": "catalog:"
     }
 }
