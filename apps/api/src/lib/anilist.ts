@@ -1,3 +1,4 @@
+import { plainText } from './details.js';
 import type { DetailsSearchResult, SeriesDetails } from './series-details.js';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -97,28 +98,6 @@ async function query(document: string, variables: Record<string, unknown>) {
 
 function titleOf(title: z.infer<typeof TitleSchema>): string {
     return title.english ?? title.romaji ?? 'Untitled';
-}
-
-const ENTITIES: Record<string, string> = {
-    '&amp;': '&',
-    '&quot;': '"',
-    '&#039;': "'",
-    '&lt;': '<',
-    '&gt;': '>',
-};
-
-// Descriptions come with some HTML even when asking for plain text.
-function plainText(html: string | null): string | null {
-    if (!html) {
-        return null;
-    }
-    const text = html
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<[^>]+>/g, '')
-        .replace(/&(amp|quot|#039|lt|gt);/g, (entity) => ENTITIES[entity] ?? '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-    return text || null;
 }
 
 /** Manga and light novels matching a title. */

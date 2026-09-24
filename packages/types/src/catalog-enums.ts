@@ -20,6 +20,7 @@ export enum CollectionRole {
 
 export enum ExternalSource {
     OpenLibrary = 'openlibrary',
+    GoogleBooks = 'googlebooks',
     AniList = 'anilist',
 }
 

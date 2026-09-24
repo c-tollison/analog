@@ -1,0 +1,1 @@
+ALTER TYPE "app"."external_source" ADD VALUE 'googlebooks' BEFORE 'anilist';

@@ -58,6 +58,7 @@ docker run --rm --network analog_default \
 # Run the API, then call it from a sibling container. No ports are published.
 docker run -d --name analog-api-test --network analog_default \
   -e STAGE=deployed -e RESEND_API_KEY=re_placeholder \
+  -e GOOGLE_BOOKS_API_KEY=placeholder \
   -e DATABASE_URL=postgres://analog:analog@analog-db:5432/analog analog-api
 docker run --rm --network analog_default analog-api \
   node -e "fetch('http://analog-api-test:3001/api/health').then(r=>r.text()).then(console.log)"
