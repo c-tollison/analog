@@ -29,3 +29,8 @@ export enum ProgressStatus {
     InProgress = 'in_progress',
     Completed = 'completed',
 }
+
+export enum CollectionSort {
+    Name = 'name',
+    Newest = 'newest',
+}

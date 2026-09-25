@@ -12,7 +12,7 @@ import { db, logger } from './init.js';
 import {
     type BookDetails,
     type BookLookup,
-    lookupEditionDetails,
+    isLatin,
     lookupIsbn,
 } from './open-library.js';
 import { HTTPException } from 'hono/http-exception';
@@ -183,8 +183,9 @@ async function refreshSeriesCover(seriesId: string): Promise<void> {
         );
 }
 
-// Once Google has answered, how much longer to wait for Open Library before
-// going with Google's data alone. Open Library is often slow.
+// Once Google has answered, how much longer a scan waits for Open Library
+// before going with Google's data alone. Open Library is often slow, so its
+// part is saved when it arrives.
 const OPEN_LIBRARY_WAIT_MS = 2_000;
 // A refresh is asked for, so it can wait for Open Library's sharper cover.
 const REFRESH_OPEN_LIBRARY_WAIT_MS = 20_000;
@@ -200,7 +201,7 @@ async function settle<T>(promise: Promise<T | null>): Promise<Settled<T>> {
 }
 
 // Null when the time runs out first.
-function waitAtMost<T>(promise: Promise<Settled<T>>, ms: number) {
+function waitAtMost<T>(promise: Promise<T>, ms: number): Promise<T | null> {
     const timeout = new Promise<null>((resolve) =>
         setTimeout(() => resolve(null), ms)
     );
@@ -221,78 +222,220 @@ function sharperCover(first: string | null, second: string | null) {
     );
 }
 
-/** Google's data, with anything it's missing taken from Open Library. */
-function fillIn(google: BookLookup, openLibrary: BookLookup): BookLookup {
-    return {
-        ...google,
-        subtitle: google.subtitle ?? openLibrary.subtitle,
-        authors: either(google.authors, openLibrary.authors),
-        publishers: either(google.publishers, openLibrary.publishers),
-        publishDate: google.publishDate ?? openLibrary.publishDate,
-        firstPublishYear:
-            google.firstPublishYear ?? openLibrary.firstPublishYear,
-        pageCount: google.pageCount ?? openLibrary.pageCount,
-        description: google.description ?? openLibrary.description,
-        characters: either(google.characters, openLibrary.characters),
-        editionName: google.editionName ?? openLibrary.editionName,
-        physicalFormat: google.physicalFormat ?? openLibrary.physicalFormat,
-        languages: either(google.languages, openLibrary.languages),
-        goodreadsId: google.goodreadsId ?? openLibrary.goodreadsId,
-        genres: either(google.genres, openLibrary.genres),
-        releaseDate: google.releaseDate ?? openLibrary.releaseDate,
-        kind: google.kind === SeriesKind.Book ? openLibrary.kind : google.kind,
-        series: google.series ?? openLibrary.series,
-        volume: google.volume ?? openLibrary.volume,
-        coverUrl: sharperCover(google.coverUrl, openLibrary.coverUrl),
-    };
+// Some records name the book or its authors in Japanese. Take the backup's
+// when it's in English.
+function inEnglish(value: string | null, backup: string | null) {
+    return value && !isLatin(value) && backup && isLatin(backup)
+        ? backup
+        : (value ?? backup);
+}
+
+function allInEnglish(values: string[], backup: string[]): string[] {
+    const english = (names: string[]) =>
+        names.length > 0 && names.every(isLatin);
+    return !english(values) && english(backup)
+        ? backup
+        : either(values, backup);
 }
 
 /**
- * Looks up an ISBN on Google Books and Open Library at the same time. Google's
- * data wins, and Open Library fills in whatever Google is missing. Open
- * Library's data is used alone when Google has no match or fails. The result
- * isn't `complete` when Open Library is too slow or fails, so the item page
- * fills in the rest later.
+ * A book's data, with anything it's missing taken from a backup. Names in
+ * English win over the book's own.
  */
-async function lookupBook(
-    isbn: string,
-    openLibraryWaitMs = OPEN_LIBRARY_WAIT_MS
-) {
-    const openLibrary = settle(lookupIsbn(isbn));
-    const google = await settle(lookupGoogleBooksIsbn(isbn));
-    if (google.error) {
+function fillIn(book: BookLookup, backup: BookLookup): BookLookup {
+    return {
+        ...book,
+        title: inEnglish(book.title, backup.title) ?? book.title,
+        subtitle: inEnglish(book.subtitle, backup.subtitle),
+        authors: allInEnglish(book.authors, backup.authors),
+        publishers: either(book.publishers, backup.publishers),
+        publishDate: book.publishDate ?? backup.publishDate,
+        firstPublishYear: book.firstPublishYear ?? backup.firstPublishYear,
+        pageCount: book.pageCount ?? backup.pageCount,
+        description: book.description ?? backup.description,
+        characters: either(book.characters, backup.characters),
+        editionName: book.editionName ?? backup.editionName,
+        physicalFormat: book.physicalFormat ?? backup.physicalFormat,
+        languages: either(book.languages, backup.languages),
+        goodreadsId: book.goodreadsId ?? backup.goodreadsId,
+        genres: either(book.genres, backup.genres),
+        releaseDate: book.releaseDate ?? backup.releaseDate,
+        kind: book.kind === SeriesKind.Book ? backup.kind : book.kind,
+        series: inEnglish(book.series, backup.series),
+        volume: book.volume ?? backup.volume,
+        coverUrl: sharperCover(book.coverUrl, backup.coverUrl),
+    };
+}
+
+// Earlier books win, and later ones fill in what they're missing.
+function merge(books: (BookLookup | null)[]): BookLookup | null {
+    return books.reduce<BookLookup | null>(
+        (merged, book) =>
+            merged && book ? fillIn(merged, book) : (merged ?? book),
+        null
+    );
+}
+
+type OpenLibraryResult = NonNullable<Awaited<ReturnType<typeof lookupIsbn>>>;
+
+// Each source's time is set when it answered, whether or not it had the book.
+type Lookup = {
+    book: BookLookup;
+    googleBooksFetchedAt: Date | null;
+    openLibraryFetchedAt: Date | null;
+};
+
+/**
+ * Google Books' data wins over Open Library's, and fresh data wins over
+ * stored data from the same source. A source that's null wasn't asked or
+ * hasn't answered yet.
+ */
+function combine(
+    stored: BookLookup | null,
+    google: Settled<BookLookup> | null,
+    openLibrary: Settled<OpenLibraryResult> | null
+): Lookup | null {
+    const fresh = google?.value ?? null;
+    const extra = openLibrary?.value?.book ?? null;
+    const book = merge(
+        stored?.source === ExternalSource.GoogleBooks
+            ? [fresh, stored, extra]
+            : [fresh, extra, stored]
+    );
+    if (!book) {
+        return null;
+    }
+    const now = new Date();
+    const openLibraryDone =
+        openLibrary &&
+        !openLibrary.error &&
+        openLibrary.value?.complete !== false;
+    return {
+        book,
+        googleBooksFetchedAt: google && !google.error ? now : null,
+        openLibraryFetchedAt: openLibraryDone ? now : null,
+    };
+}
+
+async function lookupGoogleBooks(isbn: string) {
+    const result = await settle(lookupGoogleBooksIsbn(isbn));
+    if (result.error) {
         logger().warn(
-            { error: google.error, isbn },
+            { error: result.error, isbn },
             'Google Books lookup failed'
         );
     }
+    return result;
+}
 
-    if (!google.value) {
-        const fallback = await openLibrary;
-        const error = fallback.error ?? (fallback.value ? null : google.error);
-        if (error) {
-            throw error;
-        }
-        return fallback.value;
-    }
-
-    const extra = await waitAtMost(openLibrary, openLibraryWaitMs);
-    if (!extra) {
-        return { ...google.value, complete: false };
-    }
-    if (extra.error) {
+async function lookupOpenLibrary(isbn: string) {
+    const result = await settle(lookupIsbn(isbn));
+    if (result.error) {
         logger().warn(
-            { error: extra.error, isbn },
+            { error: result.error, isbn },
             'Open Library lookup failed'
         );
-        return { ...google.value, complete: false };
     }
-    return extra.value
-        ? {
-              book: fillIn(google.value.book, extra.value.book),
-              complete: google.value.complete && extra.value.complete,
-          }
-        : google.value;
+    return result;
+}
+
+type LookupOptions = {
+    // The book as it's stored, when looking it up again.
+    stored: BookLookup | null;
+    google: boolean;
+    openLibrary: boolean;
+    refresh: boolean;
+};
+
+/**
+ * Looks up an ISBN on Google Books and Open Library at the same time, or on
+ * just the sources asked for. Open Library fills in whatever Google is
+ * missing, like a sharper cover. When Google fails during a scan, Open
+ * Library's data is used alone. A refresh fails instead, so it can be tried
+ * again later.
+ *
+ * When Open Library is too slow, Google's data comes back without it, and
+ * `later` has the full lookup to save once Open Library answers.
+ */
+async function lookupBook(isbn: string, options: LookupOptions) {
+    const { stored, refresh } = options;
+    const openLibrary = options.openLibrary ? lookupOpenLibrary(isbn) : null;
+    const google = options.google ? await lookupGoogleBooks(isbn) : null;
+    if (google?.error && refresh) {
+        throw google.error;
+    }
+
+    if (!google?.value) {
+        const extra = openLibrary ? await openLibrary : null;
+        const lookup = combine(stored, google, extra);
+        const error = extra?.error ?? google?.error;
+        if (!lookup && error) {
+            throw error;
+        }
+        return lookup && { ...lookup, later: null };
+    }
+
+    if (!openLibrary) {
+        const lookup = combine(stored, google, null);
+        return lookup && { ...lookup, later: null };
+    }
+    const later = openLibrary.then((extra) => combine(stored, google, extra));
+    const done = await waitAtMost(
+        later,
+        refresh ? REFRESH_OPEN_LIBRARY_WAIT_MS : OPEN_LIBRARY_WAIT_MS
+    );
+    if (done) {
+        return { ...done, later: null };
+    }
+    const lookup = combine(stored, google, null);
+    return lookup && { ...lookup, later };
+}
+
+/** Saves a lookup over a stored book. Series and volume aren't touched. */
+async function saveBook(itemId: string, lookup: Lookup) {
+    const { book } = lookup;
+    const [updated] = await db()
+        .update(schema.catalogItem)
+        .set({
+            kind: book.kind,
+            title: book.title,
+            externalSource: book.source,
+            externalId: book.sourceId,
+            coverUrl: book.coverUrl,
+            releaseDate: book.releaseDate,
+            metadata: { ...BookMetadataSchema.parse(book) },
+            // A source that didn't answer keeps its last time.
+            googleBooksFetchedAt: lookup.googleBooksFetchedAt ?? undefined,
+            openLibraryFetchedAt: lookup.openLibraryFetchedAt ?? undefined,
+            updatedAt: new Date(),
+        })
+        .where(eq(schema.catalogItem.id, itemId))
+        .returning({
+            id: schema.catalogItem.id,
+            title: schema.catalogItem.title,
+            coverUrl: schema.catalogItem.coverUrl,
+            seriesId: schema.catalogItem.seriesId,
+        });
+    if (!updated) {
+        return null;
+    }
+    const { seriesId, ...saved } = updated;
+    if (seriesId) {
+        await refreshSeriesCover(seriesId);
+    }
+    return saved;
+}
+
+// Saves a lookup that was still waiting on Open Library.
+async function saveLater(itemId: string, later: Promise<Lookup | null>) {
+    try {
+        const lookup = await later;
+        if (lookup) {
+            await saveBook(itemId, lookup);
+        }
+    } catch (error) {
+        logger().warn({ error, itemId }, 'Saving late book lookup failed');
+    }
 }
 
 /**
@@ -306,13 +449,18 @@ export async function findOrCreateBook(isbn: string, userId: string) {
         return { item: existing, fetched: null };
     }
 
-    const lookup = await lookupBook(isbn);
+    const lookup = await lookupBook(isbn, {
+        stored: null,
+        google: true,
+        openLibrary: true,
+        refresh: false,
+    });
     if (!lookup) {
         throw new HTTPException(404, {
             message: `No book found for ISBN ${isbn}`,
         });
     }
-    const { book, complete } = lookup;
+    const { book, later } = lookup;
     const metadata = BookMetadataSchema.parse(book);
     await db()
         .insert(schema.catalogItem)
@@ -326,15 +474,17 @@ export async function findOrCreateBook(isbn: string, userId: string) {
             coverUrl: book.coverUrl,
             releaseDate: book.releaseDate,
             metadata: { ...metadata },
-            // Left empty when part of the lookup failed or Open Library was
-            // too slow, so the item page fills in the rest later.
-            detailsFetchedAt: complete ? new Date() : null,
+            googleBooksFetchedAt: lookup.googleBooksFetchedAt,
+            openLibraryFetchedAt: lookup.openLibraryFetchedAt,
             createdByUserId: userId,
         })
         .onConflictDoNothing({ target: schema.catalogItem.barcode });
     const item = await findBookByIsbn(isbn);
     if (!item) {
         throw new Error(`Catalog item for ${isbn} missing after insert`);
+    }
+    if (later) {
+        void saveLater(item.id, later);
     }
     return { item, fetched: book };
 }
@@ -382,9 +532,10 @@ export async function upsertBook(
 /**
  * Looks up a stored book again. What the lookup finds wins, and anything it
  * comes back without keeps its stored value. Series and volume stay as the
- * user set them.
+ * user set them. With `onlyMissing`, only sources that haven't answered for
+ * this book are asked.
  */
-export async function refreshBook(itemId: string) {
+export async function refreshBook(itemId: string, onlyMissing = false) {
     const item = await db().query.catalogItem.findFirst({
         where: eq(schema.catalogItem.id, itemId),
         with: { series: true },
@@ -397,132 +548,26 @@ export async function refreshBook(itemId: string) {
             message: 'Only books with an ISBN can be refreshed',
         });
     }
-    const lookup = await lookupBook(item.barcode, REFRESH_OPEN_LIBRARY_WAIT_MS);
+    const lookup = await lookupBook(item.barcode, {
+        stored: toBookLookup(item, item.series),
+        google: !onlyMissing || !item.googleBooksFetchedAt,
+        openLibrary: !onlyMissing || !item.openLibraryFetchedAt,
+        refresh: true,
+    });
     if (!lookup) {
         throw new HTTPException(404, {
             message: `No book found for ISBN ${item.barcode}`,
         });
     }
-
-    const book = fillIn(lookup.book, toBookLookup(item, item.series));
-    const [updated] = await db()
-        .update(schema.catalogItem)
-        .set({
-            kind: book.kind,
-            title: book.title,
-            externalSource: book.source,
-            externalId: book.sourceId,
-            coverUrl: book.coverUrl,
-            releaseDate: book.releaseDate,
-            metadata: { ...BookMetadataSchema.parse(book) },
-            // Set even when part of the lookup failed. The background refresh
-            // would replace the merged details with Open Library's alone.
-            detailsFetchedAt: new Date(),
-            updatedAt: new Date(),
-        })
-        .where(eq(schema.catalogItem.id, item.id))
-        .returning({
-            id: schema.catalogItem.id,
-            title: schema.catalogItem.title,
-            coverUrl: schema.catalogItem.coverUrl,
-        });
-    if (item.seriesId) {
-        await refreshSeriesCover(item.seriesId);
+    if (lookup.later) {
+        void saveLater(item.id, lookup.later);
     }
-    return updated;
+    return saveBook(item.id, lookup);
 }
 
-const refreshing = new Set<string>();
-
-/**
- * A stored book's missing details from Open Library. A Google Books item
- * keeps what it has and takes only what Google didn't send, the same as when
- * both sources answer in time.
- */
-async function fetchMissingDetails(
-    item: CatalogItem,
-    isbn: string,
-    sourceId: string
-) {
-    if (item.externalSource === ExternalSource.GoogleBooks) {
-        const result = await lookupIsbn(isbn);
-        if (!result) {
-            return null;
-        }
-        const book = fillIn(toBookLookup(item, null), result.book);
-        return {
-            values: {
-                kind: book.kind,
-                coverUrl: book.coverUrl,
-                releaseDate: book.releaseDate,
-                metadata: { ...BookMetadataSchema.parse(book) },
-            },
-            complete: result.complete,
-        };
-    }
-
-    const result = await lookupEditionDetails(sourceId, isbn);
-    return result
-        ? {
-              values: { metadata: { ...result.details } },
-              complete: result.complete,
-          }
-        : null;
-}
-
-/**
- * Pulls a book's details from Open Library in the background. Details are
- * marked fetched once every part comes back, or Open Library has no such
- * book. Anything else is retried on a later visit.
- */
-async function refreshBookDetails(item: CatalogItem): Promise<void> {
-    if (
-        (item.externalSource !== ExternalSource.OpenLibrary &&
-            item.externalSource !== ExternalSource.GoogleBooks) ||
-        !item.externalId ||
-        !item.barcode ||
-        refreshing.has(item.id)
-    ) {
-        return;
-    }
-    refreshing.add(item.id);
-    try {
-        const result = await fetchMissingDetails(
-            item,
-            item.barcode,
-            item.externalId
-        );
-        await db()
-            .update(schema.catalogItem)
-            .set({
-                ...result?.values,
-                detailsFetchedAt:
-                    !result || result.complete ? new Date() : null,
-            })
-            .where(eq(schema.catalogItem.id, item.id));
-        if (item.seriesId) {
-            await refreshSeriesCover(item.seriesId);
-        }
-    } catch (error) {
-        logger().warn(
-            { error, itemId: item.id },
-            'Book details refresh failed'
-        );
-    } finally {
-        refreshing.delete(item.id);
-    }
-}
-
-/**
- * The book's details for its page. Books missing details get them in the
- * background, so the page never waits on Open Library; they show up on the
- * next visit.
- */
+/** The book's details for its page, from what's stored. */
 export function bookDetails(item: CatalogItem) {
     const meta = readMetadata(item);
-    if (!item.detailsFetchedAt) {
-        void refreshBookDetails(item);
-    }
 
     const facts = [
         { label: 'Genres', value: meta.genres.join(', ') },

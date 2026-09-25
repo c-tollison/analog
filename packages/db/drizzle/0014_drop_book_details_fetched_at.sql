@@ -1,0 +1,1 @@
+ALTER TABLE "app"."catalog_item" DROP COLUMN "details_fetched_at";

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CollectionSort } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
@@ -8,6 +9,13 @@ import ProgressMark from '@/components/progress/ProgressMark.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/shadcn-components/select';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import {
     useCollection,
@@ -34,7 +42,13 @@ const { term, isTyping } = useSearchTerm(query);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 
-const entries = useCollectionEntries(() => props.id, term, {
+const SORT_LABELS: Record<CollectionSort, string> = {
+    [CollectionSort.Name]: 'Name',
+    [CollectionSort.Newest]: 'Recently added',
+};
+const sort = ref(CollectionSort.Name);
+
+const entries = useCollectionEntries(() => props.id, term, sort, {
     pending: isTyping,
 });
 
@@ -111,7 +125,23 @@ const headerError = computed(
             @confirm="onRemove"
         />
 
-        <SearchInput v-model="query" placeholder="Search" />
+        <div class="flex gap-2">
+            <SearchInput v-model="query" placeholder="Search" />
+            <Select v-model="sort" :disabled="!!query">
+                <SelectTrigger class="w-auto shrink-0" aria-label="Sort by">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem
+                        v-for="(label, value) in SORT_LABELS"
+                        :key="value"
+                        :value="value"
+                    >
+                        {{ label }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
 
         <PagedList
             :list="entries"

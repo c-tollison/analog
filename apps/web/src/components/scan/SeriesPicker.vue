@@ -65,6 +65,24 @@ watch(model, (pick) => {
     }
 });
 
+// A typed name joins the series with that exact name when the book is added,
+// so pick that series here to show it's not new.
+watch(
+    () => list.items,
+    (items) => {
+        const pick = model.value;
+        const match =
+            pick && !pick.id
+                ? items.find(
+                      (s) => s.title.toLowerCase() === pick.title.toLowerCase()
+                  )
+                : undefined;
+        if (match) {
+            model.value = { id: match.id, title: match.title };
+        }
+    }
+);
+
 function isSeriesPick(value: unknown): value is SeriesPick {
     return typeof value === 'object' && value !== null && 'title' in value;
 }

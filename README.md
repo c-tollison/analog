@@ -43,8 +43,9 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
 
-# Look up every book with an ISBN again on Google Books and Open Library, and
-# update its cover and details. Series and volumes aren't changed. Add
+# Look up books again on Google Books and Open Library when either one didn't
+# answer last time, and update their covers and details. Series and volumes
+# aren't changed. Add `--all` to look up every book with an ISBN, and
 # `--dry-run` to list the books without changing them.
 pnpm books:refresh
 
@@ -160,10 +161,12 @@ click "Re-run failed jobs". You don't need a new push.
 - **Migrations.** On every deploy, the `migrate` service applies any new SQL
   migrations from `packages/db/drizzle` before the API starts. With no new
   migrations it does nothing.
-- **Refresh books.** To look up every book with an ISBN again, run
-  `cd ~/analog && docker compose run --rm --no-deps api node
-  dist/scripts/refresh-books.js`. Add `--dry-run` to list them first. Series
-  and volumes aren't changed.
+- **Refresh books.** To look up books again when Google Books or Open Library
+  didn't answer last time, run `cd ~/analog && docker compose run --rm
+  --no-deps api node dist/scripts/refresh-books.js`. Add `--all` to look up
+  every book with an ISBN, and `--dry-run` to list them first. Series and
+  volumes aren't changed. Google allows 1,000 requests a day, and each book
+  uses 1.
 
 ### Dependencies
 

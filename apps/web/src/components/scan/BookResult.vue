@@ -80,7 +80,7 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 series = null;
                 volume = null;
             }
-            await addBook.mutateAsync({
+            const saved = await addBook.mutateAsync({
                 collectionId: props.collectionId,
                 isbn: book.value.isbn,
                 series: series
@@ -91,7 +91,11 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 volume,
             });
             if (series) {
-                storedLastSeries.value = { id: series.id, title: series.title };
+                // A new series has its id now.
+                storedLastSeries.value = {
+                    id: saved.seriesId ?? series.id,
+                    title: series.title,
+                };
             }
             added.value = true;
             emit('added');
@@ -121,6 +125,28 @@ const seriesOptions = computed(() => {
             !isSameSeries(option, current) &&
             options.findIndex((o) => isSameSeries(o, option)) === i
     );
+});
+
+// Says whether the book joins a series you already have or starts a new one,
+// so scanning volumes in a row doesn't split one series in two.
+const seriesNote = computed(() => {
+    const pick = values.isSeries ? values.series : null;
+    const title = pick?.title?.trim();
+    if (!pick || !title) {
+        return null;
+    }
+    if (!pick.id) {
+        return {
+            isNew: true,
+            text: `"${title}" doesn't exist yet. Adding this book creates it.`,
+        };
+    }
+    return {
+        isNew: false,
+        text: isSameSeries({ id: pick.id, title }, lastSeries.value)
+            ? `Adds to "${title}", the same series as your last book.`
+            : `Adds to "${title}", which is already in Analog.`,
+    };
 });
 
 function pickSeries({ id, title }: SeriesPick) {
@@ -223,6 +249,24 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                         <FormControl>
                             <SeriesPicker v-bind="componentField" />
                         </FormControl>
+                        <p
+                            v-if="seriesNote"
+                            class="flex items-start gap-2 text-sm"
+                        >
+                            <Badge
+                                :variant="
+                                    seriesNote.isNew ? 'default' : 'secondary'
+                                "
+                                class="shrink-0"
+                            >
+                                {{
+                                    seriesNote.isNew
+                                        ? 'New series'
+                                        : 'Existing series'
+                                }}
+                            </Badge>
+                            <span>{{ seriesNote.text }}</span>
+                        </p>
                         <FormDescription>
                             Include the edition, and the language if you know
                             it, like "Fullmetal Alchemist (3-in-1 Edition,

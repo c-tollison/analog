@@ -14,7 +14,6 @@ import { z } from 'zod';
 
 const BASE_URL = 'https://www.googleapis.com/books/v1';
 const TIMEOUT_MS = 8_000;
-const VOLUME_ID = /^[\w-]+$/;
 const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
 
 const VolumeSchema = z.object({
@@ -42,9 +41,6 @@ const VolumeSchema = z.object({
 type Volume = z.infer<typeof VolumeSchema>;
 
 const SearchSchema = z.object({ items: z.array(VolumeSchema).optional() });
-
-// Largest first. Search results only carry the two thumbnails.
-const IMAGE_SIZES = ['large', 'medium', 'small', 'thumbnail'];
 
 async function getJson(path: string, apiKey: string): Promise<unknown> {
     const url = new URL(`${BASE_URL}${path}`);
@@ -87,8 +83,10 @@ export function isGoogleBooksCover(url: string | null): boolean {
     return !!url && COVER_URL.test(url);
 }
 
+// Search results only carry small thumbnails. Open Library's cover is used
+// when it has one.
 function coverUrl(imageLinks: Record<string, string> | undefined) {
-    const url = IMAGE_SIZES.map((size) => imageLinks?.[size]).find(Boolean);
+    const url = imageLinks?.thumbnail ?? imageLinks?.smallThumbnail;
     return url?.replace(/^http:/, 'https:').replace('&edge=curl', '') ?? null;
 }
 
@@ -118,56 +116,51 @@ function displayNumber(volume: Volume): number | null {
     return Number.isFinite(number) && number > 0 ? number : null;
 }
 
-/** Looks up an ISBN on Google Books. Returns null when there's no match. */
+/**
+ * Looks up an ISBN on Google Books with one request. Returns null when
+ * there's no match.
+ */
 export async function lookupGoogleBooksIsbn(
     isbn: string
-): Promise<{ book: BookLookup; complete: boolean } | null> {
+): Promise<BookLookup | null> {
     const { apiKey } = config().googleBooks;
 
     const search = SearchSchema.safeParse(
         await getJson(`/volumes?q=isbn:${isbn}`, apiKey)
     );
-    const found = search.data?.items?.find((item) => hasIsbn(item, isbn));
-    if (!found || !VOLUME_ID.test(found.id)) {
+    const volume = search.data?.items?.find((item) => hasIsbn(item, isbn));
+    if (!volume) {
         return null;
     }
-    // The full record has larger covers and the whole description.
-    const full = VolumeSchema.safeParse(
-        await getJson(`/volumes/${found.id}`, apiKey)
-    );
-    const volume = full.data ?? found;
     const info = volume.volumeInfo;
     const publishers = info.publisher ? [info.publisher] : [];
     const language = languageName(info.language);
     const number = displayNumber(volume);
 
     return {
-        book: {
-            isbn,
-            title: info.title,
-            subtitle: info.subtitle ?? null,
-            authors: info.authors ?? [],
-            publishers,
-            publishDate: info.publishedDate ?? null,
-            firstPublishYear: null,
-            pageCount: info.pageCount || null,
-            description: plainText(info.description),
-            characters: [],
-            editionName: null,
-            physicalFormat: null,
-            languages: language ? [language] : [],
-            goodreadsId: null,
-            genres: genres(info.categories),
-            releaseDate: parseReleaseDate(info.publishedDate),
-            kind: bookKind({ subjects: info.categories, publishers }),
-            // Google only knows a series by id, so name it from the title.
-            // A numbered volume's title is often just the series name.
-            series: seriesFromTitle(info.title) ?? (number ? info.title : null),
-            volume: parseVolume(info.title, null) ?? number,
-            coverUrl: coverUrl(info.imageLinks),
-            source: ExternalSource.GoogleBooks,
-            sourceId: volume.id,
-        },
-        complete: true,
+        isbn,
+        title: info.title,
+        subtitle: info.subtitle ?? null,
+        authors: info.authors ?? [],
+        publishers,
+        publishDate: info.publishedDate ?? null,
+        firstPublishYear: null,
+        pageCount: info.pageCount || null,
+        description: plainText(info.description),
+        characters: [],
+        editionName: null,
+        physicalFormat: null,
+        languages: language ? [language] : [],
+        goodreadsId: null,
+        genres: genres(info.categories),
+        releaseDate: parseReleaseDate(info.publishedDate),
+        kind: bookKind({ subjects: info.categories, publishers }),
+        // Google only knows a series by id, so name it from the title.
+        // A numbered volume's title is often just the series name.
+        series: seriesFromTitle(info.title) ?? (number ? info.title : null),
+        volume: parseVolume(info.title, null) ?? number,
+        coverUrl: coverUrl(info.imageLinks),
+        source: ExternalSource.GoogleBooks,
+        sourceId: volume.id,
     };
 }

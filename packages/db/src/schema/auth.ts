@@ -9,20 +9,30 @@ import {
     uuid,
 } from 'drizzle-orm/pg-core';
 
-export const user = appSchema.table('user', {
-    id: uuid('id').default(sql`pg_catalog.gen_random_uuid()`).primaryKey(),
-    name: text('name').notNull(),
-    email: text('email').notNull().unique(),
-    username: text('username').notNull().unique(),
-    emailVerified: boolean('email_verified').default(false).notNull(),
-    image: text('image'),
-    twoFactorEnabled: boolean('two_factor_enabled').default(true).notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at')
-        .defaultNow()
-        .$onUpdate(() => /* @__PURE__ */ new Date())
-        .notNull(),
-});
+export const user = appSchema.table(
+    'user',
+    {
+        id: uuid('id').default(sql`pg_catalog.gen_random_uuid()`).primaryKey(),
+        name: text('name').notNull(),
+        email: text('email').notNull().unique(),
+        username: text('username').notNull().unique(),
+        emailVerified: boolean('email_verified').default(false).notNull(),
+        image: text('image'),
+        twoFactorEnabled: boolean('two_factor_enabled').default(true).notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at')
+            .defaultNow()
+            .$onUpdate(() => /* @__PURE__ */ new Date())
+            .notNull(),
+    },
+    (table) => [
+        index('user_name_trgm_idx').using('gin', table.name.op('gin_trgm_ops')),
+        index('user_username_trgm_idx').using(
+            'gin',
+            table.username.op('gin_trgm_ops')
+        ),
+    ]
+);
 
 export const session = appSchema.table(
     'session',

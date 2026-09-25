@@ -16,6 +16,7 @@ import {
     AddBookSchema,
     AddCatalogItemsSchema,
     CollectionRole,
+    CollectionSort,
     CreateCollectionSchema,
     type MediaFormat,
     PageQuerySchema,
@@ -90,6 +91,7 @@ const SeriesParamSchema = CollectionParamSchema.extend({
 });
 const EntriesQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().max(200).optional(),
+    sort: z.enum(CollectionSort).default(CollectionSort.Name),
 });
 const SearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().min(1).max(200),
@@ -97,7 +99,8 @@ const SearchQuerySchema = PageQuerySchema.extend({
 const FriendsQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().max(100).optional(),
 });
-const CatalogQuerySchema = EntriesQuerySchema.extend({
+const CatalogQuerySchema = PageQuerySchema.extend({
+    q: z.string().trim().max(200).optional(),
     seriesId: z.uuid('Invalid id').optional(),
 });
 
@@ -277,7 +280,7 @@ const collections = new Hono<AppEnv>()
         schemaValidator('query', EntriesQuerySchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { q, ...pageQuery } = c.req.valid('query');
+            const { q, sort, ...pageQuery } = c.req.valid('query');
             const me = c.get('user').id;
             await requireMember(id, me);
 
@@ -354,6 +357,9 @@ const collections = new Hono<AppEnv>()
                     .where(eq(collectionItem.collectionId, id))
                     .groupBy(groupKey, series.id)
                     .orderBy(
+                        ...(sort === CollectionSort.Newest
+                            ? [desc(sql`max(${collectionItem.createdAt})`)]
+                            : []),
                         sql`lower(coalesce(${series.title}, ${itemTitle}))`,
                         groupKey
                     )
@@ -467,6 +473,7 @@ const collections = new Hono<AppEnv>()
             await requireMember(id, c.get('user').id);
 
             const terms = searchTerms(q ?? '');
+            const titles = [catalogItem.title, series.title];
             const page = await paginate(pageQuery, (limit, offset) =>
                 db()
                     .select({
@@ -485,26 +492,21 @@ const collections = new Hono<AppEnv>()
                             eq(collectionItem.collectionId, id)
                         )
                     )
+                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
                     .where(
                         and(
                             seriesId
                                 ? eq(catalogItem.seriesId, seriesId)
                                 : undefined,
                             matchesAllTerms(terms, {
-                                columns: [catalogItem.title],
+                                columns: titles,
                                 position: catalogItem.position,
                             })
                         )
                     )
                     .orderBy(
                         ...(terms.length
-                            ? [
-                                  desc(
-                                      relevance(terms.join(' '), [
-                                          catalogItem.title,
-                                      ])
-                                  ),
-                              ]
+                            ? [desc(relevance(terms.join(' '), titles))]
                             : []),
                         sql`${catalogItem.position} asc nulls last`,
                         asc(catalogItem.title),
@@ -579,7 +581,7 @@ const collections = new Hono<AppEnv>()
                 });
             }
 
-            return c.json({ id: added.id }, 201);
+            return c.json({ id: added.id, seriesId: item.seriesId }, 201);
         }
     )
     .get(

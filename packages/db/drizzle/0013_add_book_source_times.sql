@@ -1,0 +1,2 @@
+ALTER TABLE "app"."catalog_item" ADD COLUMN "google_books_fetched_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "app"."catalog_item" ADD COLUMN "open_library_fetched_at" timestamp with time zone;

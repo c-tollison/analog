@@ -37,9 +37,12 @@ export const catalogItem = appSchema.table(
             .$type<Record<string, unknown>>()
             .notNull()
             .default({}),
-        // When we last pulled full details (description, genres) from the
-        // external source. Null means the item page should fetch them.
-        detailsFetchedAt: timestamp('details_fetched_at', {
+        // When each source last answered for this book. Null means it hasn't,
+        // so the book is looked up there again.
+        googleBooksFetchedAt: timestamp('google_books_fetched_at', {
+            withTimezone: true,
+        }),
+        openLibraryFetchedAt: timestamp('open_library_fetched_at', {
             withTimezone: true,
         }),
         createdByUserId: uuid('created_by_user_id').references(() => user.id, {
