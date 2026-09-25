@@ -81,3 +81,16 @@ export const ResetPasswordSchema = z.object({
     otp: OtpSchema,
     password: PasswordSchema,
 });
+
+export enum UserRole {
+    Member = 'member',
+    Admin = 'admin',
+}
+
+export const USER_FIELDS = {
+    role: {
+        type: [UserRole.Member, UserRole.Admin],
+        defaultValue: UserRole.Member,
+        input: false as const,
+    },
+};
