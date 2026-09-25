@@ -2,6 +2,7 @@ import type { InferResponseType } from '@analog/api/client';
 import {
     type AddBookSchema,
     type AddCatalogItemsSchema,
+    type CollectionSort,
     type CreateCollectionSchema,
     MAX_PAGE_SIZE,
     type UserIdSchema,
@@ -73,15 +74,25 @@ export function useCollection(id: MaybeRefOrGetter<string>) {
 export function useCollectionEntries(
     id: MaybeRefOrGetter<string>,
     q: MaybeRefOrGetter<string>,
+    sort: MaybeRefOrGetter<CollectionSort>,
     options: PaginatedListOptions = {}
 ) {
     return usePaginatedList(
-        () => [...collectionKey(toValue(id)), 'entries', toValue(q)],
+        () => [
+            ...collectionKey(toValue(id)),
+            'entries',
+            toValue(q),
+            toValue(sort),
+        ],
         async (offset) =>
             unwrap(
                 await api.collections[':id'].entries.$get({
                     param: { id: toValue(id) },
-                    query: { offset, ...(toValue(q) ? { q: toValue(q) } : {}) },
+                    query: {
+                        offset,
+                        sort: toValue(sort),
+                        ...(toValue(q) ? { q: toValue(q) } : {}),
+                    },
                 })
             ),
         options
