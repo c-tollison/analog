@@ -56,7 +56,6 @@ const SearchSchema = z.object({
 });
 const AUTHOR_KEY = /^\/authors\/OL\d+A$/;
 const WORK_KEY = /^\/works\/OL\d+W$/;
-const EDITION_ID = /^OL\d+M$/;
 const MAX_CHARACTERS = 8;
 const FICTIONAL_CHARACTER = /\s*\(fictitious character\)\s*$/i;
 // Anything outside the Latin alphabet, ignoring spaces, punctuation and accents.
@@ -289,20 +288,6 @@ async function getDetails(edition: Edition, isbn: string) {
 }
 
 export type BookDetails = Awaited<ReturnType<typeof getDetails>>['details'];
-
-/** Fresh details for a stored edition id, e.g. "OL123M". */
-export async function lookupEditionDetails(
-    editionId: string,
-    isbn: string
-): Promise<{ details: BookDetails; complete: boolean } | null> {
-    if (!EDITION_ID.test(editionId)) {
-        return null;
-    }
-    const parsed = EditionSchema.safeParse(
-        await getJson(`/books/${editionId}.json`)
-    );
-    return parsed.success ? getDetails(parsed.data, isbn) : null;
-}
 
 // Catalogers write series inconsistently: "Haikyu!!", "Haikyu!!, v. 40",
 // "Haikyu!! ; 40". Strip the trailing volume designation.

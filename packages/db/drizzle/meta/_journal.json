@@ -92,6 +92,20 @@
       "when": 1790256265870,
       "tag": "0012_add_google_books_source",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790303366907,
+      "tag": "0013_add_book_source_times",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790303375352,
+      "tag": "0014_drop_book_details_fetched_at",
+      "breakpoints": true
     }
   ]
 }
