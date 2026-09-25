@@ -5,9 +5,9 @@ import { refreshBook } from '../lib/books.js';
 import { loadConfig } from '../lib/config.js';
 import { db, init, logger } from '../lib/init.js';
 
-// Looks up every book with an ISBN again, the same as the item page's Refresh
-// details button. Series and volumes aren't touched. Pass --dry-run to list
-// the books without changing them.
+// Looks up every book with an ISBN again, the same as the refresh endpoint.
+// Series and volumes aren't touched. Pass --dry-run to list the books without
+// changing them.
 
 // Open Library allows 3 requests a second, and one lookup makes up to 4.
 const PAUSE_MS = 1_500;

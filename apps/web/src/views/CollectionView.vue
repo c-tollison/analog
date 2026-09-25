@@ -2,7 +2,6 @@
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
-import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
@@ -25,14 +24,13 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import { LibraryIcon, ScanBarcodeIcon, SettingsIcon, XIcon } from '@lucide/vue';
+import { PlusIcon, SettingsIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string }>();
 
 const query = ref('');
 const { term, isTyping } = useSearchTerm(query);
-const isAddOpen = ref(false);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 
@@ -77,33 +75,13 @@ const headerError = computed(
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <BackButton :to="{ name: 'collections' }" text="Collections" />
-            <div class="flex gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="!collection"
-                    @click="isAddOpen = true"
-                >
-                    <LibraryIcon />
-                    Add media
-                </Button>
-                <Button size="sm" as-child>
-                    <RouterLink
-                        :to="{ name: 'scan', query: { collection: id } }"
-                    >
-                        <ScanBarcodeIcon />
-                        {{ collection ? `Scan into ${collection.name}` : 'Scan' }}
-                    </RouterLink>
-                </Button>
-            </div>
+            <Button size="sm" as-child>
+                <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
+                    <PlusIcon />
+                    {{ collection ? `Add to ${collection.name}` : 'Add' }}
+                </RouterLink>
+            </Button>
         </div>
-
-        <AddFromCatalogDialog
-            v-if="collection"
-            v-model:open="isAddOpen"
-            :collection-id="id"
-            :collection-name="collection.name"
-        />
 
         <div class="flex min-h-7 items-center justify-between gap-2">
             <div v-if="collection" class="grid">
@@ -142,7 +120,7 @@ const headerError = computed(
             "
         >
             <template #default="{ items }">
-                <ul class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <li
                         v-for="entry in items"
                         :key="entry.id"
@@ -154,7 +132,7 @@ const headerError = computed(
                                 name: 'collection-series',
                                 params: { id, seriesId: entry.series.id },
                             }"
-                            class="grid gap-1.5"
+                            class="grid gap-1"
                         >
                             <CoverImage
                                 size="md"
@@ -162,12 +140,10 @@ const headerError = computed(
                                 :alt="entry.series.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p
-                                class="line-clamp-2 min-h-10 text-sm font-medium"
-                            >
+                            <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.series.title }}
                             </p>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex flex-wrap items-center gap-1">
                                 <Badge variant="secondary">
                                     {{ SERIES_KIND_LABELS[entry.series.kind] }}
                                 </Badge>
@@ -189,7 +165,7 @@ const headerError = computed(
                                 name: 'collection-item',
                                 params: { id, itemId: entry.id },
                             }"
-                            class="grid gap-1.5"
+                            class="grid gap-1"
                         >
                             <CoverImage
                                 size="md"
@@ -197,12 +173,10 @@ const headerError = computed(
                                 :alt="entry.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p
-                                class="line-clamp-2 min-h-10 text-sm font-medium"
-                            >
+                            <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.title }}
                             </p>
-                            <div class="flex flex-wrap items-center gap-1.5">
+                            <div class="flex flex-wrap items-center gap-1">
                                 <Badge variant="secondary">
                                     {{
                                         entry.kind

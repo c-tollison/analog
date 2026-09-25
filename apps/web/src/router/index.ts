@@ -13,6 +13,11 @@ declare module 'vue-router' {
     }
 }
 
+const requireCollectionQuery: NavigationGuard = (to) =>
+    typeof to.query.collection === 'string' && to.query.collection !== ''
+        ? true
+        : { name: 'collections' };
+
 const requireEmailQuery: NavigationGuard = (to) =>
     typeof to.query.email === 'string' && to.query.email !== ''
         ? true
@@ -36,6 +41,18 @@ export const router = createRouter({
                     path: 'scan',
                     name: 'scan',
                     component: () => import('@/views/ScanView.vue'),
+                },
+                {
+                    path: 'lookup',
+                    name: 'lookup',
+                    component: () => import('@/views/LookupView.vue'),
+                    beforeEnter: requireCollectionQuery,
+                    props: (route) => ({
+                        collectionId:
+                            typeof route.query.collection === 'string'
+                                ? route.query.collection
+                                : '',
+                    }),
                 },
                 {
                     path: 'collections',

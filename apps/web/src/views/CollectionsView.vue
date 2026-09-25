@@ -27,7 +27,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
 import { formatsCompletedWord } from '@/lib/media-types';
 
-import { PlusIcon, ScanBarcodeIcon, SettingsIcon } from '@lucide/vue';
+import { PlusIcon, ScanBarcodeIcon } from '@lucide/vue';
 import { ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
@@ -88,11 +88,11 @@ function resultLink(result: SearchResult): RouteLocationRaw {
             empty-text="Nothing in your collections matches."
         >
             <template #default="{ items }">
-                <ul class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <li v-for="result in items" :key="result.id">
                         <RouterLink
                             :to="resultLink(result)"
-                            class="group grid gap-1.5"
+                            class="group grid gap-1"
                         >
                             <CoverImage
                                 size="md"
@@ -100,12 +100,10 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 :alt="result.title"
                                 class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
                             />
-                            <p
-                                class="line-clamp-2 min-h-10 text-sm font-medium"
-                            >
+                            <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ result.title }}
                             </p>
-                            <div class="flex flex-wrap items-center gap-1.5">
+                            <div class="flex flex-wrap items-center gap-1">
                                 <Badge variant="secondary">
                                     {{ result.collectionName }}
                                 </Badge>
@@ -156,8 +154,8 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 </template>
                             </ItemDescription>
                         </ItemContent>
-                        <ItemActions class="relative">
-                            <AvatarGroup v-if="c.memberCount > 1">
+                        <ItemActions v-if="c.memberCount > 1">
+                            <AvatarGroup>
                                 <UserAvatar
                                     v-for="member in c.members"
                                     :key="member.id"
@@ -171,21 +169,6 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                     +{{ c.memberCount - c.members.length }}
                                 </AvatarGroupCount>
                             </AvatarGroup>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                :aria-label="`${c.name} settings`"
-                                as-child
-                            >
-                                <RouterLink
-                                    :to="{
-                                        name: 'collection-settings',
-                                        params: { id: c.id },
-                                    }"
-                                >
-                                    <SettingsIcon />
-                                </RouterLink>
-                            </Button>
                         </ItemActions>
                     </Item>
                 </ItemGroup>
