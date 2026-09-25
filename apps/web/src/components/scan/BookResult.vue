@@ -4,7 +4,6 @@ import FormError from '@/components/FormError.vue';
 import SeriesPicker, {
     type SeriesPick,
 } from '@/components/scan/SeriesPicker.vue';
-import { Alert, AlertDescription } from '@/components/shadcn-components/alert';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Checkbox } from '@/components/shadcn-components/checkbox';
@@ -25,7 +24,7 @@ import { AddBookFormSchema, SeriesPickSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
-import { CheckCircleIcon, HistoryIcon } from '@lucide/vue';
+import { HistoryIcon } from '@lucide/vue';
 import { StorageSerializers, useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
@@ -35,7 +34,7 @@ const props = defineProps<{
     collectionName: string;
 }>();
 
-const emit = defineEmits<{ done: [] }>();
+const emit = defineEmits<{ done: []; added: [] }>();
 
 const book = computed(() => props.lookup.book);
 const added = ref(false);
@@ -95,6 +94,7 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 storedLastSeries.value = { id: series.id, title: series.title };
             }
             added.value = true;
+            emit('added');
             return undefined;
         },
     });
@@ -257,13 +257,6 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                 Add to {{ collectionName }}
             </Button>
         </form>
-
-        <Alert v-if="added">
-            <CheckCircleIcon />
-            <AlertDescription>
-                Added to {{ collectionName }}.
-            </AlertDescription>
-        </Alert>
 
         <Button variant="outline" @click="emit('done')">Scan another</Button>
     </section>

@@ -72,75 +72,78 @@ watch(
 
         <h1 class="text-lg font-semibold">Scan</h1>
 
-        <div class="grid grid-cols-2 gap-2">
-            <div class="grid gap-1.5">
-                <Label for="media-type">Type</Label>
-                <Select v-model="mediaType">
-                    <SelectTrigger id="media-type" class="w-full">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem
-                            v-for="type in MEDIA_TYPES"
-                            :key="type.value"
-                            :value="type.value"
-                        >
-                            {{ type.label }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
+        <IsbnScanner :formats="formats" :collection="collection">
+            <div class="grid grid-cols-2 gap-2">
+                <div class="grid gap-1.5">
+                    <Label for="media-type">Type</Label>
+                    <Select v-model="mediaType">
+                        <SelectTrigger id="media-type" class="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="type in MEDIA_TYPES"
+                                :key="type.value"
+                                :value="type.value"
+                            >
+                                {{ type.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-1.5">
+                    <Label for="collection">Add to</Label>
+                    <Select
+                        :model-value="collectionId"
+                        :disabled="!collections.length"
+                        @update:model-value="
+                                    (id) => selectCollection(String(id))
+                                "
+                    >
+                        <SelectTrigger id="collection" class="w-full">
+                            <Spinner v-if="collectionsList.isLoading" />
+                            <SelectValue
+                                :placeholder="
+                                            collectionsList.isLoading
+                                                ? 'Loading…'
+                                                : 'No collections'
+                                        "
+                            />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="c in collections"
+                                :key="c.id"
+                                :value="c.id"
+                            >
+                                {{ c.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
-            <div class="grid gap-1.5">
-                <Label for="collection">Add to</Label>
-                <Select
-                    :model-value="collectionId"
-                    :disabled="!collections.length"
-                    @update:model-value="
-                                (id) => selectCollection(String(id))
-                            "
-                >
-                    <SelectTrigger id="collection" class="w-full">
-                        <Spinner v-if="collectionsList.isLoading" />
-                        <SelectValue
-                            :placeholder="
-                                        collectionsList.isLoading
-                                            ? 'Loading…'
-                                            : 'No collections'
-                                    "
-                        />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem
-                            v-for="c in collections"
-                            :key="c.id"
-                            :value="c.id"
+
+            <FormError :message="collectionsList.error" />
+            <Alert
+                v-if="
+                            !collectionsList.isLoading &&
+                            !collectionsList.error &&
+                            !collections.length
+                        "
+            >
+                <AlertDescription>
+                    <span>
+                        You need a collection to add items to.
+                        <RouterLink
+                            class="underline"
+                            :to="{ name: 'collections' }"
                         >
-                            {{ c.name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-        </div>
-
-        <FormError :message="collectionsList.error" />
-        <Alert
-            v-if="
-                        !collectionsList.isLoading &&
-                        !collectionsList.error &&
-                        !collections.length
-                    "
-        >
-            <AlertDescription>
-                <span>
-                    You need a collection to add items to.
-                    <RouterLink class="underline" :to="{ name: 'collections' }">
-                        Create one
-                    </RouterLink>
-                    first.
-                </span>
-            </AlertDescription>
-        </Alert>
-
-        <IsbnScanner :formats="formats" :collection="collection" />
+                            Create one
+                        </RouterLink>
+                        first.
+                    </span>
+                </AlertDescription>
+            </Alert>
+        </IsbnScanner>
     </main>
 </template>

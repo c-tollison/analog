@@ -11,7 +11,6 @@ import {
     FormMessage,
 } from '@/components/shadcn-components/form';
 import { Input } from '@/components/shadcn-components/input';
-import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { type IsbnLookup, useIsbnLookup } from '@/composables/useCatalog';
@@ -20,6 +19,7 @@ import { isbnFromBarcode } from '@/lib/isbn';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import {
+    CheckCircleIcon,
     FlashlightIcon,
     FlashlightOffIcon,
     SwitchCameraIcon,
@@ -31,7 +31,7 @@ import {
     QrcodeStream,
 } from 'vue-qrcode-reader';
 
-defineProps<{
+const props = defineProps<{
     formats: BarcodeFormat[];
     collection?: { id: string; name: string };
 }>();
@@ -39,6 +39,7 @@ defineProps<{
 const lookupIsbn = useIsbnLookup();
 
 const lookup = ref<IsbnLookup | null>(null);
+const lastAdded = ref<string | null>(null);
 const cameraError = ref<string | null>(null);
 const cameraReady = ref(false);
 const facingMode = ref<'environment' | 'user'>('environment');
@@ -70,22 +71,28 @@ const {
     initialValues: { isbn: '' },
     onSubmit: async ({ isbn }) => {
         lookup.value = await lookupIsbn(isbn);
+        lastAdded.value = null;
         return undefined;
     },
 });
 
-const paused = computed(() => isSubmitting.value);
+// Only the result shows until it's added or dismissed. The camera stays on
+// behind it so the next scan is instant, but scans are ignored until then.
+// It's never paused, because pausing turns the camera off.
+const showingResult = computed(
+    () => lookup.value !== null && !!props.collection
+);
 
 const RESCAN_COOLDOWN_MS = 3000;
 let lastScan: { isbn: string; at: number } | null = null;
 
 function onDetect(codes: DetectedBarcode[]) {
-    if (isSubmitting.value) {
+    if (isSubmitting.value || showingResult.value) {
         return;
     }
     for (const code of codes) {
         const isbn = isbnFromBarcode(code.rawValue);
-        if (!isbn || isbn === lookup.value?.book.isbn) {
+        if (!isbn) {
             continue;
         }
 
@@ -167,23 +174,51 @@ function onCameraError(err: Error) {
     cameraError.value = messages[err.name] ?? `Camera error: ${err.message}`;
 }
 
+function onAdded() {
+    lastAdded.value = lookup.value?.book.title ?? null;
+    scanAnother();
+}
+
 function scanAnother() {
     lookup.value = null;
-    lastScan = null;
+    // The last book may still be in view, so give time to swap it out.
+    if (lastScan) {
+        lastScan.at = Date.now();
+    }
     resetForm();
 }
 </script>
 
 <template>
+    <BookResult
+        v-if="lookup && collection"
+        :key="`${lookup.book.isbn}:${collection.id}`"
+        :lookup="lookup"
+        :collection-id="collection.id"
+        :collection-name="collection.name"
+        @done="scanAnother"
+        @added="onAdded"
+    />
+    <template v-else>
+        <slot />
+
+        <Alert v-if="lastAdded && collection">
+            <CheckCircleIcon />
+            <AlertDescription>
+                Added {{ lastAdded }} to {{ collection.name }}.
+            </AlertDescription>
+        </Alert>
+    </template>
+
     <div
         v-if="!cameraError"
+        v-show="!showingResult"
         ref="cameraBox"
         class="bg-muted relative -mx-4 aspect-square overflow-hidden sm:mx-0 sm:aspect-4/3 sm:rounded-md"
     >
         <QrcodeStream
             :constraints="constraints"
             :formats="formats"
-            :paused="paused"
             :track="outlineBarcodes"
             @detect="onDetect"
             @error="onCameraError"
@@ -194,7 +229,7 @@ function scanAnother() {
             :class="{ 'ring-green-500': justScanned }"
         />
         <div
-            v-if="cameraReady && !paused"
+            v-if="cameraReady && !isSubmitting"
             class="pointer-events-none absolute inset-x-8 inset-y-3/10 rounded-sm border-2 border-white/60"
         >
             <div
@@ -247,46 +282,41 @@ function scanAnother() {
             </span>
         </div>
     </div>
-    <Alert v-else>
+    <Alert v-else-if="!showingResult">
         <AlertDescription>{{ cameraError }}</AlertDescription>
     </Alert>
 
-    <form class="grid gap-2" novalidate @submit="submit">
-        <FormError :message="formError" />
-        <FormField v-slot="{ componentField }" v-bind="fieldProps" name="isbn">
-            <FormItem>
-                <FormLabel>ISBN</FormLabel>
-                <div class="flex gap-2">
-                    <FormControl>
-                        <Input
-                            inputmode="numeric"
-                            v-no-autofill
-                            placeholder="978…"
-                            v-bind="componentField"
-                        />
-                    </FormControl>
-                    <Button
-                        type="submit"
-                        variant="outline"
-                        :disabled="isSubmitting"
-                    >
-                        <Spinner v-if="isSubmitting" />
-                        Look up
-                    </Button>
-                </div>
-                <FormMessage />
-            </FormItem>
-        </FormField>
-    </form>
-
-    <template v-if="lookup && collection">
-        <Separator />
-        <BookResult
-            :key="`${lookup.book.isbn}:${collection.id}`"
-            :lookup="lookup"
-            :collection-id="collection.id"
-            :collection-name="collection.name"
-            @done="scanAnother"
-        />
+    <template v-if="!showingResult">
+        <form class="grid gap-2" novalidate @submit="submit">
+            <FormError :message="formError" />
+            <FormField
+                v-slot="{ componentField }"
+                v-bind="fieldProps"
+                name="isbn"
+            >
+                <FormItem>
+                    <FormLabel>ISBN</FormLabel>
+                    <div class="flex gap-2">
+                        <FormControl>
+                            <Input
+                                inputmode="numeric"
+                                v-no-autofill
+                                placeholder="978…"
+                                v-bind="componentField"
+                            />
+                        </FormControl>
+                        <Button
+                            type="submit"
+                            variant="outline"
+                            :disabled="isSubmitting"
+                        >
+                            <Spinner v-if="isSubmitting" />
+                            Look up
+                        </Button>
+                    </div>
+                    <FormMessage />
+                </FormItem>
+            </FormField>
+        </form>
     </template>
 </template>

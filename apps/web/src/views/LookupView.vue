@@ -173,25 +173,25 @@ const error = computed(
             </TabsContent>
 
             <TabsContent value="scan" class="grid gap-4 pt-2">
-                <div class="grid gap-1.5">
-                    <Label for="media-type">Type</Label>
-                    <Select v-model="mediaType">
-                        <SelectTrigger id="media-type" class="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="type in MEDIA_TYPES"
-                                :key="type.value"
-                                :value="type.value"
-                            >
-                                {{ type.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <IsbnScanner :formats="formats" :collection="collection" />
+                <IsbnScanner :formats="formats" :collection="collection">
+                    <div class="grid gap-1.5">
+                        <Label for="media-type">Type</Label>
+                        <Select v-model="mediaType">
+                            <SelectTrigger id="media-type" class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="type in MEDIA_TYPES"
+                                    :key="type.value"
+                                    :value="type.value"
+                                >
+                                    {{ type.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </IsbnScanner>
             </TabsContent>
         </Tabs>
     </main>
