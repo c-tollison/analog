@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { UserRole } from '@analog/types';
 import { Button } from '@/components/shadcn-components/button';
 import {
     DropdownMenu,
@@ -16,6 +17,7 @@ import {
     ChevronDownIcon,
     LogOutIcon,
     MoonIcon,
+    ShieldIcon,
     SunIcon,
     UserIcon,
 } from '@lucide/vue';
@@ -76,6 +78,13 @@ async function onSignOut() {
             <DropdownMenuItem @select="router.push({ name: 'profile' })">
                 <UserIcon />
                 Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                v-if="user?.role === UserRole.Admin"
+                @select="router.push({ name: 'admin' })"
+            >
+                <ShieldIcon />
+                Enter admin dashboard
             </DropdownMenuItem>
             <DropdownMenuItem @select="toggleTheme">
                 <SunIcon v-if="isDark" />

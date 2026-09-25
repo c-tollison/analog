@@ -1,3 +1,4 @@
+import { UserRole } from '@analog/types';
 import { useSessionStore } from '@/stores/session';
 
 import {
@@ -10,6 +11,7 @@ declare module 'vue-router' {
     interface RouteMeta {
         requiresAuth?: boolean;
         guestOnly?: boolean;
+        requiresAdmin?: boolean;
     }
 }
 
@@ -111,6 +113,12 @@ export const router = createRouter({
                     name: 'profile',
                     component: () => import('@/views/ProfileView.vue'),
                 },
+                {
+                    path: 'admin',
+                    name: 'admin',
+                    component: () => import('@/views/AdminView.vue'),
+                    meta: { requiresAdmin: true },
+                },
             ],
         },
         {
@@ -166,6 +174,10 @@ router.beforeEach(async (to) => {
     }
 
     if (to.meta.guestOnly && session) {
+        return { name: 'home' };
+    }
+
+    if (to.meta.requiresAdmin && session?.user.role !== UserRole.Admin) {
         return { name: 'home' };
     }
 
