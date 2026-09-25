@@ -2,7 +2,6 @@
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
-import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
@@ -25,14 +24,13 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import { LibraryIcon, ScanBarcodeIcon, SettingsIcon, XIcon } from '@lucide/vue';
+import { PlusIcon, SettingsIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string }>();
 
 const query = ref('');
 const { term, isTyping } = useSearchTerm(query);
-const isAddOpen = ref(false);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 
@@ -77,33 +75,13 @@ const headerError = computed(
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div class="flex items-center justify-between">
             <BackButton :to="{ name: 'collections' }" text="Collections" />
-            <div class="flex gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="!collection"
-                    @click="isAddOpen = true"
-                >
-                    <LibraryIcon />
-                    Add media
-                </Button>
-                <Button size="sm" as-child>
-                    <RouterLink
-                        :to="{ name: 'scan', query: { collection: id } }"
-                    >
-                        <ScanBarcodeIcon />
-                        {{ collection ? `Scan into ${collection.name}` : 'Scan' }}
-                    </RouterLink>
-                </Button>
-            </div>
+            <Button size="sm" as-child>
+                <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
+                    <PlusIcon />
+                    {{ collection ? `Add to ${collection.name}` : 'Add' }}
+                </RouterLink>
+            </Button>
         </div>
-
-        <AddFromCatalogDialog
-            v-if="collection"
-            v-model:open="isAddOpen"
-            :collection-id="id"
-            :collection-name="collection.name"
-        />
 
         <div class="flex min-h-7 items-center justify-between gap-2">
             <div v-if="collection" class="grid">
