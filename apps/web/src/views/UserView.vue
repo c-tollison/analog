@@ -2,24 +2,11 @@
 import { Relationship } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import InviteToCollectionsDialog from '@/components/collections/InviteToCollectionsDialog.vue';
 import FormError from '@/components/FormError.vue';
-import PagedList from '@/components/lists/PagedList.vue';
-import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import {
-    Item,
-    ItemActions,
-    ItemContent,
-    ItemGroup,
-    ItemTitle,
-} from '@/components/shadcn-components/item';
-import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import UserAvatar from '@/components/users/UserAvatar.vue';
-import {
-    useFriendCollections,
-    useInviteToCollection,
-} from '@/composables/useCollections';
 import {
     useAcceptFriendRequest,
     useCancelFriendRequest,
@@ -31,6 +18,7 @@ import { useUser } from '@/composables/useUsers';
 
 import {
     CheckIcon,
+    LibraryIcon,
     PencilIcon,
     UserCheckIcon,
     UserPlusIcon,
@@ -63,15 +51,12 @@ function onRemove() {
     );
 }
 
-const collections = useFriendCollections(userId, { enabled: isFriend });
-const invite = useInviteToCollection();
+const inviting = ref(false);
 
 const error = computed(
     () =>
-        (
-            loadError.value ??
-            [...actions, invite].find((a) => a.error.value)?.error.value
-        )?.message ?? null
+        (loadError.value ?? actions.find((a) => a.error.value)?.error.value)
+            ?.message ?? null
 );
 </script>
 
@@ -193,67 +178,19 @@ const error = computed(
                             </Button>
                         </template>
                     </ConfirmDialog>
+
+                    <Button v-if="isFriend" size="sm" @click="inviting = true">
+                        <LibraryIcon />
+                        Invite to collection
+                    </Button>
                 </div>
             </div>
 
-            <template v-if="isFriend">
-                <Separator />
-                <h2 class="font-medium">Your collections</h2>
-
-                <PagedList
-                    :list="collections"
-                    empty-text="You don't own any collections yet."
-                >
-                    <template #default="{ items }">
-                        <ItemGroup class="gap-2">
-                            <Item
-                                v-for="c in items"
-                                :key="c.id"
-                                variant="outline"
-                            >
-                                <ItemContent>
-                                    <ItemTitle>{{ c.name }}</ItemTitle>
-                                </ItemContent>
-                                <ItemActions>
-                                    <Badge
-                                        v-if="c.isMember"
-                                        variant="secondary"
-                                    >
-                                        Member
-                                    </Badge>
-                                    <Badge
-                                        v-else-if="c.isInvited"
-                                        variant="secondary"
-                                    >
-                                        Invited
-                                    </Badge>
-                                    <Button
-                                        v-else
-                                        size="sm"
-                                        variant="outline"
-                                        :disabled="invite.isPending.value"
-                                        @click="
-                                            invite.mutate({
-                                                collectionId: c.id,
-                                                userId: person.id,
-                                            })
-                                        "
-                                    >
-                                        <Spinner
-                                            v-if="
-                                                invite.isPending.value &&
-                                                invite.variables.value
-                                                    ?.collectionId === c.id
-                                            "
-                                        />
-                                        Invite
-                                    </Button>
-                                </ItemActions>
-                            </Item>
-                        </ItemGroup>
-                    </template>
-                </PagedList>
-            </template>
+            <InviteToCollectionsDialog
+                v-if="isFriend"
+                v-model:open="inviting"
+                :friend="person"
+            />
         </template>
     </main>
 </template>
