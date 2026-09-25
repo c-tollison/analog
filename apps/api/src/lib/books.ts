@@ -12,6 +12,7 @@ import { db, logger } from './init.js';
 import {
     type BookDetails,
     type BookLookup,
+    isLatin,
     lookupIsbn,
 } from './open-library.js';
 import { HTTPException } from 'hono/http-exception';
@@ -221,12 +222,32 @@ function sharperCover(first: string | null, second: string | null) {
     );
 }
 
-/** A book's data, with anything it's missing taken from a backup. */
+// Some records name the book or its authors in Japanese. Take the backup's
+// when it's in English.
+function inEnglish(value: string | null, backup: string | null) {
+    return value && !isLatin(value) && backup && isLatin(backup)
+        ? backup
+        : (value ?? backup);
+}
+
+function allInEnglish(values: string[], backup: string[]): string[] {
+    const english = (names: string[]) =>
+        names.length > 0 && names.every(isLatin);
+    return !english(values) && english(backup)
+        ? backup
+        : either(values, backup);
+}
+
+/**
+ * A book's data, with anything it's missing taken from a backup. Names in
+ * English win over the book's own.
+ */
 function fillIn(book: BookLookup, backup: BookLookup): BookLookup {
     return {
         ...book,
-        subtitle: book.subtitle ?? backup.subtitle,
-        authors: either(book.authors, backup.authors),
+        title: inEnglish(book.title, backup.title) ?? book.title,
+        subtitle: inEnglish(book.subtitle, backup.subtitle),
+        authors: allInEnglish(book.authors, backup.authors),
         publishers: either(book.publishers, backup.publishers),
         publishDate: book.publishDate ?? backup.publishDate,
         firstPublishYear: book.firstPublishYear ?? backup.firstPublishYear,
@@ -240,7 +261,7 @@ function fillIn(book: BookLookup, backup: BookLookup): BookLookup {
         genres: either(book.genres, backup.genres),
         releaseDate: book.releaseDate ?? backup.releaseDate,
         kind: book.kind === SeriesKind.Book ? backup.kind : book.kind,
-        series: book.series ?? backup.series,
+        series: inEnglish(book.series, backup.series),
         volume: book.volume ?? backup.volume,
         coverUrl: sharperCover(book.coverUrl, backup.coverUrl),
     };

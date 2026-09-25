@@ -60,6 +60,11 @@ const MAX_CHARACTERS = 8;
 const FICTIONAL_CHARACTER = /\s*\(fictitious character\)\s*$/i;
 // Anything outside the Latin alphabet, ignoring spaces, punctuation and accents.
 const NON_LATIN = /[^\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
+
+/** Whether English readers can read it, e.g. "Atsushi Ōkubo" but not "大久保篤". */
+export function isLatin(text: string): boolean {
+    return !NON_LATIN.test(text);
+}
 const LANGUAGE_KEY = /^\/languages\/([a-z]{3})$/;
 const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
 
@@ -143,7 +148,7 @@ async function getAuthorName(key: string): Promise<string | null> {
     const { name, personal_name, alternate_names = [] } = parsed.data;
     return (
         [name, personal_name, ...alternate_names].find(
-            (candidate) => candidate && !NON_LATIN.test(candidate)
+            (candidate) => candidate && isLatin(candidate)
         ) ?? name
     );
 }
