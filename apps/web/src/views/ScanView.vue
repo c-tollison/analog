@@ -65,7 +65,7 @@ watch(
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-lg flex-col gap-4 p-4">
+    <div class="flex max-w-lg flex-col gap-4">
         <div>
             <BackButton :to="back.to" :text="back.text" class="-ml-2" />
         </div>
@@ -145,5 +145,5 @@ watch(
                 </AlertDescription>
             </Alert>
         </IsbnScanner>
-    </main>
+    </div>
 </template>

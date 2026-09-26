@@ -27,7 +27,7 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 ## API
 
 - Routes select only the columns the UI needs and return the rows as they are, with `c.json(rows)`. Don't write response mappers or `c.json<T>()` annotations. Keep rows flat.
-- Lists use `paginate()` from `lib/pagination.ts`.
+- Lists use `paginate()` from `lib/pagination.ts`. Admin tables with page numbers are the exception: they use `paginateWithTotal()`, which also returns the total count.
 - Errors are always `{ error: string }`.
 - `noConsole` is an error. Use the pino logger.
 
@@ -56,11 +56,12 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 
 - Signed-in pages are children of the `/` route, which renders `AppLayout` and sets `meta.requiresAuth`. The shell components `AppLayout`, `AppTopNav` and `UserMenu` live in `src/components/layout/`.
 - Pages inside the layout must not set `min-h-svh`. The layout sets the height.
+- `AppLayout` sets the page width and padding in its `<main>`. A page inside it has a plain `div` root with its own spacing, like `flex flex-col gap-4`, and never its own `<main>`, `mx-auto`, width or padding. A narrow page can add `max-w-lg`.
 
 ### Data and state
 
 - **API calls.** Each domain gets one composable file in `src/composables/`, such as `useCollections.ts`, `useSeries.ts` and `useCatalog.ts`. The file owns the domain's root query key and exports hooks like `useCollection(id)` and `useCreateCollection()`. Queries call `unwrap(await api.x.$get(...))`. Mutations take ids in their variables and invalidate queries in their own `onSuccess`. Views and components only call these hooks. They never use `useQuery`, `useMutation` or `api` directly.
-- **Paginated lists.** Use `usePaginatedList` inside the domain composable and render the list with `PagedList` or `LoadMore`. Search uses `useSearchTerm`.
+- **Paginated lists.** Use `usePaginatedList` inside the domain composable and render the list with `PagedList` or `LoadMore`. Search uses `useSearchTerm`. Admin tables are the exception: they page by number with `adminListQuery()`, `AdminTable` and `AdminPagination`, and keep their state in the URL.
 - **Client state.** Pinia stores live in `src/stores/`. `useSessionStore` holds the session.
 - Show errors as `error?.message ?? null`. Every async load shows a spinner.
 

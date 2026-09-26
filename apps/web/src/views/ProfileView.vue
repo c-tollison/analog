@@ -48,7 +48,7 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-lg flex-col gap-6 p-4">
+    <div class="flex max-w-lg flex-col gap-6">
         <div class="flex items-center gap-3">
             <Button
                 v-if="user"
@@ -145,5 +145,5 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
             :name="user.name"
             :image="user.image"
         />
-    </main>
+    </div>
 </template>

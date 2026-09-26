@@ -4,6 +4,7 @@ import {
     ProgressStatus,
     ReviewSchema,
     SetProgressStatusSchema,
+    UserRole,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
@@ -18,6 +19,7 @@ import { db } from '../lib/init.js';
 import { IdParamSchema } from '../lib/params.js';
 import { isCompleted } from '../lib/progress.js';
 import { schemaValidator } from '../lib/validator.js';
+import { requireRole } from '../middleware/require-role.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -124,6 +126,7 @@ const catalog = new Hono<AppEnv>()
     )
     .post(
         '/items/:id/refresh',
+        requireRole(UserRole.Admin),
         schemaValidator('param', IdParamSchema),
         async (c) => {
             const { id } = c.req.valid('param');
@@ -154,6 +157,9 @@ const catalog = new Hono<AppEnv>()
                     : null,
                 similarSeries,
                 inCollectionIds,
+                // Set by an earlier scan, so this one can't change them.
+                savedSeriesTitle: item.series?.title ?? null,
+                savedVolume: item.series ? item.position : null,
             });
         }
     );

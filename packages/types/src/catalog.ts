@@ -3,17 +3,48 @@ import { IsbnSchema } from './isbn.js';
 import { z } from 'zod';
 
 export const SERIES_TITLE_MAX_LENGTH = 200;
+
+/** Languages a series can be in, as ISO 639-1 codes. */
+export const SERIES_LANGUAGES = [
+    'en',
+    'ja',
+    'ko',
+    'zh',
+    'fr',
+    'es',
+    'de',
+    'it',
+    'pt',
+] as const;
+
+export type SeriesLanguage = (typeof SERIES_LANGUAGES)[number];
+
+export const SeriesLanguageSchema = z.enum(SERIES_LANGUAGES);
+
+export const DEFAULT_SERIES_LANGUAGE: SeriesLanguage = 'en';
+
+export const SERIES_LANGUAGE_LABELS: Record<SeriesLanguage, string> = {
+    en: 'English',
+    ja: 'Japanese',
+    ko: 'Korean',
+    zh: 'Chinese',
+    fr: 'French',
+    es: 'Spanish',
+    de: 'German',
+    it: 'Italian',
+    pt: 'Portuguese',
+};
 export const COLLECTION_NAME_MAX_LENGTH = 64;
+
+export const SeriesTitleSchema = z
+    .string()
+    .trim()
+    .min(1, 'Series name is required')
+    .max(SERIES_TITLE_MAX_LENGTH);
 
 export const SeriesChoiceSchema = z.union([
     z.object({ id: z.uuid() }),
-    z.object({
-        title: z
-            .string()
-            .trim()
-            .min(1, 'Series name is required')
-            .max(SERIES_TITLE_MAX_LENGTH),
-    }),
+    z.object({ title: SeriesTitleSchema }),
 ]);
 
 export const AddBookSchema = z.object({

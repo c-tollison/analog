@@ -24,7 +24,8 @@
         "dev:types": "tsc --watch --preserveWatchOutput",
         "build": "tsc",
         "start": "node dist/index.js",
-        "refresh-books": "tsx --conditions=development --env-file=.env src/scripts/refresh-books.ts"
+        "refresh-books": "tsx --conditions=development --env-file=.env src/scripts/refresh-books.ts",
+        "set-role": "tsx --conditions=development --env-file=.env src/scripts/set-role.ts"
     },
     "dependencies": {
         "@analog/db": "workspace:*",

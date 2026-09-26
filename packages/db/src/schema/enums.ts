@@ -4,6 +4,7 @@ import {
     MediaFormat,
     ProgressStatus,
     SeriesKind,
+    UserRole,
 } from '@analog/types';
 
 import { appSchema } from './primitives.js';
@@ -33,3 +34,4 @@ export const progressStatus = appSchema.enum(
     'progress_status',
     values(ProgressStatus)
 );
+export const userRole = appSchema.enum('user_role', values(UserRole));

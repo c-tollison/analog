@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
@@ -9,8 +8,6 @@ import PagedList from '@/components/lists/PagedList.vue';
 import ExternalLinks from '@/components/media/ExternalLinks.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
-import LinkDetailsSourceDialog from '@/components/series/LinkDetailsSourceDialog.vue';
-import VolumeCountDialog from '@/components/series/VolumeCountDialog.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Progress } from '@/components/shadcn-components/progress';
@@ -26,15 +23,14 @@ import {
     kindStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
+import { missingVolumes } from '@/lib/volumes';
 
-import { LinkIcon, PencilIcon, PlusIcon, XIcon } from '@lucide/vue';
+import { PlusIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string; seriesId: string }>();
 
 const isAddOpen = ref(false);
-const isLinkOpen = ref(false);
-const isVolumeCountOpen = ref(false);
 
 const { data: detail, error: detailError } = useCollectionSeries(
     () => props.id,
@@ -85,11 +81,6 @@ const percent = computed(() =>
         : 0
 );
 
-// Where this kind of series can get more details, e.g. AniList for manga.
-const linkSource = computed(() =>
-    detail.value ? detailsSourceFor(detail.value.series.kind) : null
-);
-
 const hasDetails = computed(
     () =>
         !!detail.value &&
@@ -98,24 +89,11 @@ const hasDetails = computed(
             detail.value.facts.length > 0)
 );
 
-// Whole-numbered volumes up to the total that aren't here, as "4, 7–9".
 const missing = computed(() => {
     const total = detail.value?.volumeCount;
-    if (!detail.value || !total) return null;
-    const owned = new Set(detail.value.ownedPositions);
-    const ranges: string[] = [];
-    let start: number | null = null;
-    for (let volume = 1; volume <= total + 1; volume++) {
-        const isMissing = volume <= total && !owned.has(volume);
-        if (isMissing && start === null) {
-            start = volume;
-        } else if (!isMissing && start !== null) {
-            const end = volume - 1;
-            ranges.push(end === start ? `${start}` : `${start}–${end}`);
-            start = null;
-        }
-    }
-    return ranges.join(', ') || null;
+    return detail.value && total
+        ? missingVolumes(detail.value.ownedPositions, total)
+        : null;
 });
 
 const headerError = computed(
@@ -126,7 +104,7 @@ const headerError = computed(
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+    <div class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
             <BackButton
                 :to="{ name: 'collection', params: { id } }"
@@ -142,24 +120,6 @@ const headerError = computed(
                 Add to series
             </Button>
         </div>
-
-        <VolumeCountDialog
-            v-if="detail"
-            v-model:open="isVolumeCountOpen"
-            :series-id="seriesId"
-            :volume-count="detail.volumeCount"
-        />
-
-        <LinkDetailsSourceDialog
-            v-if="detail && linkSource"
-            v-model:open="isLinkOpen"
-            :series-id="seriesId"
-            :series-title="detail.series.title"
-            :source="linkSource"
-            :linked-id="detail.detailsId"
-            :linked-title="detail.detailsTitle"
-            :volume-count="detail.volumeCount"
-        />
 
         <AddFromCatalogDialog
             v-if="detail && collectionName"
@@ -193,39 +153,15 @@ const headerError = computed(
                             {{ detail.ownedCount }} owned
                         </template>
                     </span>
-                    <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label="Edit total volumes"
-                        @click="isVolumeCountOpen = true"
-                    >
-                        <PencilIcon />
-                    </Button>
                 </div>
                 <p v-if="missing" class="text-muted-foreground text-xs">
                     Missing {{ missing }}
                 </p>
-                <div v-if="linkSource" class="flex flex-wrap gap-2 pt-1">
-                    <template v-if="detail.detailsSource">
-                        <ExternalLinks :links="detail.links" />
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            @click="isLinkOpen = true"
-                        >
-                            <PencilIcon />
-                            Edit link
-                        </Button>
-                    </template>
-                    <Button
-                        v-else
-                        variant="outline"
-                        size="sm"
-                        @click="isLinkOpen = true"
-                    >
-                        <LinkIcon />
-                        Link {{ DETAILS_SOURCE_INFO[linkSource].label }}
-                    </Button>
+                <div
+                    v-if="detail.links.length"
+                    class="flex flex-wrap gap-2 pt-1"
+                >
+                    <ExternalLinks :links="detail.links" />
                 </div>
                 <div
                     v-if="detail.ownedCount"
@@ -318,5 +254,5 @@ const headerError = computed(
                 </ul>
             </template>
         </PagedList>
-    </main>
+    </div>
 </template>

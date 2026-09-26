@@ -6,6 +6,7 @@ import type {
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
+import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
 import {
     type PaginatedListOptions,
@@ -65,12 +66,12 @@ export function useDetailsSearch(
     });
 }
 
-// Series pages live under collection keys, so both refresh.
+// Series pages live under collection and admin keys, so all refresh.
 function useInvalidateSeries() {
     const queryClient = useQueryClient();
     return () =>
         Promise.all(
-            [COLLECTIONS_KEY, SERIES_KEY].map((queryKey) =>
+            [COLLECTIONS_KEY, SERIES_KEY, ADMIN_KEY].map((queryKey) =>
                 queryClient.invalidateQueries({ queryKey })
             )
         );

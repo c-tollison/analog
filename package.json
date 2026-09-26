@@ -16,7 +16,8 @@
         "db:generate": "pnpm --filter @analog/db generate",
         "db:migrate": "pnpm --filter @analog/db migrate",
         "db:seed": "pnpm --filter @analog/db seed",
-        "books:refresh": "pnpm --filter @analog/api refresh-books"
+        "books:refresh": "pnpm --filter @analog/api refresh-books",
+        "users:set-role": "pnpm --filter @analog/api set-role"
     },
     "devEngines": {
         "packageManager": {

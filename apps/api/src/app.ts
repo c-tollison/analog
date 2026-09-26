@@ -4,6 +4,7 @@ import { auth, logger } from './lib/init.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { createRequestLoggerMiddleware } from './middleware/request-logger.js';
 import { requireAuth } from './middleware/require-auth.js';
+import admin from './routes/admin.js';
 import catalog from './routes/catalog.js';
 import collections from './routes/collections.js';
 import friends from './routes/friends.js';
@@ -46,7 +47,8 @@ export function createApp(config: Config) {
         .route('/friends', friends)
         .route('/users', users)
         .route('/invites', invites)
-        .route('/notifications', notifications);
+        .route('/notifications', notifications)
+        .route('/admin', admin);
 }
 
 export type ApiRoutes = ReturnType<typeof createApp>;

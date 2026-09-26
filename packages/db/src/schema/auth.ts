@@ -1,3 +1,6 @@
+import { UserRole } from '@analog/types';
+
+import { userRole } from './enums.js';
 import { appSchema } from './primitives.js';
 import { relations, sql } from 'drizzle-orm';
 import {
@@ -19,6 +22,7 @@ export const user = appSchema.table(
         emailVerified: boolean('email_verified').default(false).notNull(),
         image: text('image'),
         twoFactorEnabled: boolean('two_factor_enabled').default(true).notNull(),
+        role: userRole('role').default(UserRole.Member).notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at')
             .defaultNow()

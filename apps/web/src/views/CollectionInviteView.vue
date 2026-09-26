@@ -34,7 +34,7 @@ const error = computed(
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+    <div class="flex flex-col gap-4">
         <div>
             <BackButton
                 :to="{
@@ -100,5 +100,5 @@ const error = computed(
                 </ItemGroup>
             </template>
         </PagedList>
-    </main>
+    </div>
 </template>

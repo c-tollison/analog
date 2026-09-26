@@ -44,10 +44,14 @@ pnpm db:migrate
 pnpm db:seed
 
 # Look up books again on Google Books and Open Library when either one didn't
-# answer last time, and update their covers and details. Series and volumes
-# aren't changed. Add `--all` to look up every book with an ISBN, and
-# `--dry-run` to list the books without changing them.
+# answer last time, and update their covers and details. Only the missing
+# source is asked. Series, volumes and admin-verified books aren't changed.
+# Add `--dry-run` to list the books without changing them.
 pnpm books:refresh
+
+# Make a user an admin, or back to a member. There is no API for this.
+pnpm users:set-role you@example.com admin
+pnpm users:set-role you@example.com member
 
 # Add one or more shadcn-vue components to the web app
 pnpm add-component button
@@ -154,8 +158,10 @@ click "Re-run failed jobs". You don't need a new push.
 - **Deploy.** Push to `main`.
 - **Logs.** On the VPS, run `cd ~/analog && docker compose logs -f api`.
 - **Roll back.** On the VPS, set `IMAGE_TAG` in `~/analog/.env` to an older
-  `sha-<commit>` and run `docker compose up -d`. The next push to `main`
-  deploys the latest image again.
+  `sha-<commit>` and run `docker compose up -d`. Deploys delete old images,
+  so compose pulls that tag from GHCR first. The next push to `main` deploys
+  the latest image again, so revert or fix the bad commit on `main` too.
+  Migrations don't roll back: the old code runs against the new schema.
 - **Compose changes.** Copy the new `docker-compose.yml` to the VPS by hand
   and run `docker compose up -d`.
 - **Migrations.** On every deploy, the `migrate` service applies any new SQL
@@ -163,10 +169,14 @@ click "Re-run failed jobs". You don't need a new push.
   migrations it does nothing.
 - **Refresh books.** To look up books again when Google Books or Open Library
   didn't answer last time, run `cd ~/analog && docker compose run --rm
-  --no-deps api node dist/scripts/refresh-books.js`. Add `--all` to look up
-  every book with an ISBN, and `--dry-run` to list them first. Series and
-  volumes aren't changed. Google allows 1,000 requests a day, and each book
+  --no-deps api node dist/scripts/refresh-books.js`. Only the missing source
+  is asked. Add `--dry-run` to list the books first. Series, volumes and
+  admin-verified books aren't changed. Google allows 1,000 requests a day, and each book
   uses 1.
+- **Admins.** To make someone an admin, run `cd ~/analog && docker compose
+  run --rm --no-deps api node dist/scripts/set-role.js you@example.com
+  admin`. Use `member` to undo it. The change can take up to 5 minutes to
+  reach their session. Then they reload the app.
 
 ### Dependencies
 

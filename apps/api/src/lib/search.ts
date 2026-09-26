@@ -1,5 +1,16 @@
-import { type Column, ilike, or, type SQL, sql } from '@analog/db';
+import {
+    and,
+    type Column,
+    eq,
+    ilike,
+    inArray,
+    or,
+    type SQL,
+    schema,
+    sql,
+} from '@analog/db';
 
+import { db } from './init.js';
 import { likePattern } from './pagination.js';
 
 const MAX_TERMS = 8;
@@ -10,9 +21,23 @@ export function searchTerms(q: string): string[] {
     return q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, MAX_TERMS);
 }
 
+/** The term as a volume number, when it's a bare number like "19". */
+export function termNumber(term: string): number | null {
+    return NUMBER.test(term) ? Number(term) : null;
+}
+
+/**
+ * True when `term` is a substring of the column or a close fuzzy match to a
+ * word in it (pg_trgm `<%`, so typos like "haikyuu" still hit "Haikyu!!").
+ * Both can use the column's trigram index.
+ */
+export function matchesTerm(term: string, column: Column): SQL {
+    return sql`(${ilike(column, likePattern(term))} or ${term} <% ${column})`;
+}
+
 /** Drops bare numbers, for searching things that have no volume number. */
 export function withoutNumbers(terms: string[]): string[] {
-    const words = terms.filter((term) => !NUMBER.test(term));
+    const words = terms.filter((term) => termNumber(term) === null);
     return words.length ? words : terms;
 }
 
@@ -33,17 +58,15 @@ export function matchesAllTerms(
     if (!terms.length) {
         return undefined;
     }
-    const perTerm = terms.map((term) =>
-        or(
-            ...columns.flatMap((column) => [
-                ilike(column, likePattern(term)),
-                sql`${term} <% ${column}`,
-            ]),
-            position && NUMBER.test(term)
-                ? sql`${position} = ${Number(term)}`
+    const perTerm = terms.map((term) => {
+        const number = termNumber(term);
+        return or(
+            ...columns.map((column) => matchesTerm(term, column)),
+            position && number !== null
+                ? sql`${position} = ${number}`
                 : undefined
-        )
-    );
+        );
+    });
     return sql.join(
         perTerm.map((clause) => sql`(${clause})`),
         sql` and `
@@ -56,4 +79,35 @@ export function relevance(q: string, columns: Column[]): SQL<number> {
         (column) => sql`coalesce(word_similarity(${q}, ${column}), 0)`
     );
     return sql<number>`greatest(${sql.join(scores, sql`, `)})`;
+}
+
+/**
+ * Catalog items whose own title or series title matches every term, or whose
+ * volume is a number term. Each title is looked up through its own trigram
+ * index and the ids combined. One condition across both tables would make
+ * Postgres check every row.
+ */
+export function catalogItemsMatching(terms: string[]): SQL | undefined {
+    if (!terms.length) {
+        return undefined;
+    }
+    const { catalogItem, series } = schema;
+    return and(
+        ...terms.map((term) => {
+            const byTitle = db()
+                .select({ id: catalogItem.id })
+                .from(catalogItem)
+                .where(matchesTerm(term, catalogItem.title));
+            const bySeries = db()
+                .select({ id: catalogItem.id })
+                .from(catalogItem)
+                .innerJoin(series, eq(catalogItem.seriesId, series.id))
+                .where(matchesTerm(term, series.title));
+            const ids = inArray(catalogItem.id, byTitle.unionAll(bySeries));
+            const number = termNumber(term);
+            return number === null
+                ? ids
+                : or(eq(catalogItem.position, number), ids);
+        })
+    );
 }

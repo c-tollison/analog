@@ -33,7 +33,12 @@ import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { isCompleted, whenCompleted } from '../lib/progress.js';
-import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
+import {
+    catalogItemsMatching,
+    matchesAllTerms,
+    relevance,
+    searchTerms,
+} from '../lib/search.js';
 import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
@@ -414,6 +419,7 @@ const collections = new Hono<AppEnv>()
                     id: found.id,
                     title: found.title,
                     kind: found.kind,
+                    language: found.language,
                     coverUrl: found.coverUrl,
                 },
                 ownedCount: counted?.ownedCount ?? 0,
@@ -498,10 +504,7 @@ const collections = new Hono<AppEnv>()
                             seriesId
                                 ? eq(catalogItem.seriesId, seriesId)
                                 : undefined,
-                            matchesAllTerms(terms, {
-                                columns: titles,
-                                position: catalogItem.position,
-                            })
+                            catalogItemsMatching(terms)
                         )
                     )
                     .orderBy(

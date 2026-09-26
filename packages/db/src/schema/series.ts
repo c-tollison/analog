@@ -1,3 +1,6 @@
+import type { SeriesLanguage } from '@analog/types';
+
+import { user } from './auth.js';
 import { catalogItem } from './catalog-item.js';
 import { externalSource, seriesKind } from './enums.js';
 import { appSchema, id, timestamps } from './primitives.js';
@@ -9,6 +12,7 @@ import {
     text,
     timestamp,
     unique,
+    uuid,
 } from 'drizzle-orm/pg-core';
 
 // Our own grouping record, e.g. "Haikyu!! (English)". External ids are
@@ -19,6 +23,8 @@ export const series = appSchema.table(
         id: id(),
         title: text('title').notNull(),
         kind: seriesKind('kind').notNull(),
+        // Empty until an admin sets it on older series.
+        language: text('language').$type<SeriesLanguage>(),
         coverUrl: text('cover_url'),
         externalSource: externalSource('external_source'),
         externalId: text('external_id'),
@@ -37,6 +43,11 @@ export const series = appSchema.table(
         // How many volumes this edition has in total. Set by people, since
         // omnibus editions don't match the original count.
         volumeCount: integer('volume_count'),
+        verifiedAt: timestamp('verified_at', { withTimezone: true }),
+        verifiedByUserId: uuid('verified_by_user_id').references(
+            () => user.id,
+            { onDelete: 'set null' }
+        ),
         ...timestamps(),
     },
     (table) => [

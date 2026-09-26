@@ -1,0 +1,39 @@
+<script setup lang="ts">
+import type { ButtonVariants } from '@/components/shadcn-components/button';
+import { buttonVariants } from '@/components/shadcn-components/button';
+import { cn } from '@/lib/utils';
+
+import type { HTMLAttributes } from 'vue';
+
+const props = withDefaults(
+    defineProps<{
+        href?: string;
+        size?: ButtonVariants['size'];
+        isActive?: boolean;
+        class?: HTMLAttributes['class'];
+    }>(),
+    {
+        size: 'icon',
+        isActive: false,
+    }
+);
+</script>
+
+<template>
+    <a
+        :href="href"
+        data-slot="pagination-link"
+        :data-active="isActive ? '' : undefined"
+        :aria-current="isActive ? 'page' : undefined"
+        :class="cn(
+      buttonVariants({
+        variant: isActive ? 'outline' : 'ghost',
+        size,
+      }),
+      '',
+      props.class,
+    )"
+    >
+        <slot />
+    </a>
+</template>

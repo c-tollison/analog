@@ -1,6 +1,7 @@
 import type { InferResponseType } from '@analog/api/client';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
+import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
 import { SERIES_KEY } from './useSeries';
 import { useMutation, useQueryClient } from '@tanstack/vue-query';
@@ -31,7 +32,7 @@ export function useIsbnLookup() {
 
 /**
  * Looks up a book again to fill in missing details. Its cover shows in
- * lookups, series and collection lists, so all three refresh.
+ * lookups, series, collection lists and admin pages, so all of them refresh.
  */
 export function useRefreshBook() {
     const queryClient = useQueryClient();
@@ -45,8 +46,8 @@ export function useRefreshBook() {
             ),
         onSuccess: () =>
             Promise.all(
-                [COLLECTIONS_KEY, CATALOG_KEY, SERIES_KEY].map((queryKey) =>
-                    queryClient.invalidateQueries({ queryKey })
+                [COLLECTIONS_KEY, CATALOG_KEY, SERIES_KEY, ADMIN_KEY].map(
+                    (queryKey) => queryClient.invalidateQueries({ queryKey })
                 )
             ),
     });

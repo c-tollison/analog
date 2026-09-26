@@ -1,8 +1,10 @@
+import { USER_FIELDS } from '@analog/types';
 import { useSessionStore } from '@/stores/session';
 
 import { API_URL } from './env';
 import {
     emailOTPClient,
+    inferAdditionalFields,
     twoFactorClient,
     usernameClient,
 } from 'better-auth/client/plugins';
@@ -10,7 +12,12 @@ import { createAuthClient } from 'better-auth/vue';
 
 export const authClient = createAuthClient({
     baseURL: `${API_URL}/api/auth`,
-    plugins: [emailOTPClient(), twoFactorClient(), usernameClient()],
+    plugins: [
+        emailOTPClient(),
+        twoFactorClient(),
+        usernameClient(),
+        inferAdditionalFields({ user: USER_FIELDS }),
+    ],
     fetchOptions: {
         credentials: 'include',
         onSuccess: (ctx) => {

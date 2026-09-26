@@ -7,6 +7,7 @@ import {
     SignUpSchema,
     Stage,
     UpdateProfileSchema,
+    USER_FIELDS,
     USERNAME_MAX_LENGTH,
     USERNAME_MIN_LENGTH,
 } from '@analog/types';
@@ -110,6 +111,7 @@ export function CreateAuthInstance(
                 maxAge: SESSION_COOKIE_CACHE_MAX_AGE,
             },
         },
+        user: { additionalFields: USER_FIELDS },
         emailAndPassword: {
             enabled: true,
             minPasswordLength: PASSWORD_MIN_LENGTH,

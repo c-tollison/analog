@@ -5,6 +5,7 @@ import {
     DetailsSourceSchema,
     ExternalSource,
     type LinkDetailsSourceSchema,
+    SERIES_LANGUAGE_LABELS,
 } from '@analog/types';
 
 import { getManga, searchManga } from './anilist.js';
@@ -13,7 +14,18 @@ import { db, logger } from './init.js';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
-type Series = typeof schema.series.$inferSelect;
+// The columns a series' details come from.
+type Series = Pick<
+    typeof schema.series.$inferSelect,
+    | 'id'
+    | 'kind'
+    | 'detailsSource'
+    | 'detailsId'
+    | 'details'
+    | 'detailsFetchedAt'
+    | 'volumeCount'
+    | 'language'
+>;
 
 // Linked details are refreshed this often, so ongoing series stay current.
 const REFRESH_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
@@ -126,6 +138,11 @@ export function seriesDetails(series: Series) {
         description: details?.description ?? null,
         genres: details?.genres ?? [],
         facts: filledFacts([
+            {
+                label: 'Language',
+                value:
+                    series.language && SERIES_LANGUAGE_LABELS[series.language],
+            },
             { label: 'Status', value: details?.status },
             { label: 'Published', value: run },
             {

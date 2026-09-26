@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SERIES_LANGUAGE_LABELS } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SeriesPicker, {
@@ -117,7 +118,16 @@ function isSameSeries(a: SeriesPick, b: SeriesPick | null | undefined) {
 const seriesOptions = computed(() => {
     const current = values.isSeries ? values.series : null;
     const options = [
-        ...(lastSeries.value ? [{ ...lastSeries.value, isLast: true }] : []),
+        ...(lastSeries.value
+            ? [
+                  {
+                      ...lastSeries.value,
+                      kind: null,
+                      language: null,
+                      isLast: true,
+                  },
+              ]
+            : []),
         ...props.lookup.similarSeries.map((s) => ({ ...s, isLast: false })),
     ];
     return options.filter(
@@ -191,6 +201,9 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                     <Badge variant="secondary">
                         {{ SERIES_KIND_LABELS[book.kind] }}
                     </Badge>
+                    <Badge v-if="book.languages.length" variant="secondary">
+                        {{ book.languages.join(', ') }}
+                    </Badge>
                     <Badge v-if="alreadyInCollection">
                         In {{ collectionName }}
                     </Badge>
@@ -205,96 +218,112 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             @submit="submit"
         >
             <FormError :message="formError" />
-            <FormField v-slot="{ value }" name="isSeries" type="checkbox">
-                <FormItem class="flex items-center gap-2">
-                    <FormControl>
-                        <Checkbox
-                            :model-value="value"
-                            @update:model-value="onSeriesToggle"
-                        />
-                    </FormControl>
-                    <FormLabel>Part of a series</FormLabel>
-                </FormItem>
-            </FormField>
-            <div v-if="seriesOptions.length" class="grid gap-2">
-                <p class="text-muted-foreground text-xs">Suggested series</p>
-                <div class="flex flex-wrap gap-2">
-                    <Button
-                        v-for="option in seriesOptions"
-                        :key="option.id ?? option.title"
-                        type="button"
-                        variant="outline"
-                        class="max-w-full"
-                        @click="pickSeries(option)"
-                    >
-                        <HistoryIcon v-if="option.isLast" />
-                        <span class="truncate">
-                            {{
+            <p v-if="lookup.savedSeriesTitle" class="text-sm">
+                {{ lookup.savedSeriesTitle }}
+                <template v-if="lookup.savedVolume !== null">
+                    · Vol. {{ lookup.savedVolume }}
+                </template>
+            </p>
+            <template v-else>
+                <FormField v-slot="{ value }" name="isSeries" type="checkbox">
+                    <FormItem class="flex items-center gap-2">
+                        <FormControl>
+                            <Checkbox
+                                :model-value="value"
+                                @update:model-value="onSeriesToggle"
+                            />
+                        </FormControl>
+                        <FormLabel>Part of a series</FormLabel>
+                    </FormItem>
+                </FormField>
+                <div v-if="seriesOptions.length" class="grid gap-2">
+                    <p class="text-muted-foreground text-xs">
+                        Suggested series
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <Button
+                            v-for="option in seriesOptions"
+                            :key="option.id ?? option.title"
+                            type="button"
+                            variant="outline"
+                            class="max-w-full"
+                            @click="pickSeries(option)"
+                        >
+                            <HistoryIcon v-if="option.isLast" />
+                            <span class="truncate">
+                                {{
                                 option.isLast
                                     ? `Use last series: ${option.title}`
                                     : option.title
-                            }}
-                        </span>
-                    </Button>
+                                }}
+                                <template v-if="option.kind">
+                                    · {{ SERIES_KIND_LABELS[option.kind] }}
+                                </template>
+                                <template v-if="option.language">
+                                    ·
+                                    {{ SERIES_LANGUAGE_LABELS[option.language] }}
+                                </template>
+                            </span>
+                        </Button>
+                    </div>
                 </div>
-            </div>
-            <template v-if="values.isSeries">
-                <FormField
-                    v-slot="{ componentField }"
-                    v-bind="fieldProps"
-                    name="series"
-                >
-                    <FormItem>
-                        <FormLabel>Series</FormLabel>
-                        <FormControl>
-                            <SeriesPicker v-bind="componentField" />
-                        </FormControl>
-                        <p
-                            v-if="seriesNote"
-                            class="flex items-start gap-2 text-sm"
-                        >
-                            <Badge
-                                :variant="
+                <template v-if="values.isSeries">
+                    <FormField
+                        v-slot="{ componentField }"
+                        v-bind="fieldProps"
+                        name="series"
+                    >
+                        <FormItem>
+                            <FormLabel>Series</FormLabel>
+                            <FormControl>
+                                <SeriesPicker v-bind="componentField" />
+                            </FormControl>
+                            <p
+                                v-if="seriesNote"
+                                class="flex items-start gap-2 text-sm"
+                            >
+                                <Badge
+                                    :variant="
                                     seriesNote.isNew ? 'default' : 'secondary'
                                 "
-                                class="shrink-0"
-                            >
-                                {{
+                                    class="shrink-0"
+                                >
+                                    {{
                                     seriesNote.isNew
                                         ? 'New series'
                                         : 'Existing series'
-                                }}
-                            </Badge>
-                            <span>{{ seriesNote.text }}</span>
-                        </p>
-                        <FormDescription>
-                            Include the edition, and the language if you know
-                            it, like "Fullmetal Alchemist (3-in-1 Edition,
-                            English)". Each edition is its own series.
-                        </FormDescription>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
-                <FormField
-                    v-slot="{ componentField }"
-                    v-bind="fieldProps"
-                    name="volume"
-                >
-                    <FormItem class="w-24">
-                        <FormLabel>Volume</FormLabel>
-                        <FormControl>
-                            <Input
-                                type="number"
-                                inputmode="decimal"
-                                v-no-autofill
-                                min="0"
-                                step="any"
-                                v-bind="componentField"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
+                                    }}
+                                </Badge>
+                                <span>{{ seriesNote.text }}</span>
+                            </p>
+                            <FormDescription>
+                                Include the edition, like "Fullmetal Alchemist
+                                3-in-1 Edition". Each edition is its own series.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                    <FormField
+                        v-slot="{ componentField }"
+                        v-bind="fieldProps"
+                        name="volume"
+                    >
+                        <FormItem class="w-24">
+                            <FormLabel>Volume</FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="number"
+                                    inputmode="decimal"
+                                    v-no-autofill
+                                    min="0"
+                                    step="any"
+                                    v-bind="componentField"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </template>
             </template>
             <Button type="submit" :disabled="isSubmitting">
                 <Spinner v-if="isSubmitting" />

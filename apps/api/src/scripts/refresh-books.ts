@@ -6,10 +6,10 @@ import { loadConfig } from '../lib/config.js';
 import { db, init, logger } from '../lib/init.js';
 import { HTTPException } from 'hono/http-exception';
 
-// Looks up books with an ISBN again, the same as the refresh endpoint, until
-// both Google Books and Open Library have answered for each. Series and
-// volumes aren't touched. Pass --all to look up every book, and --dry-run to
-// list the books without changing them.
+// Looks up unverified books with an ISBN that Google Books or Open Library
+// hasn't answered for yet, and asks only the missing source. Series and
+// volumes aren't touched. Pass --dry-run to list the books without changing
+// them.
 
 // Open Library allows 3 requests a second, and one lookup makes up to 4.
 // Google allows 100 a minute, and one lookup makes 1.
@@ -24,7 +24,6 @@ const { catalogItem } = schema;
 async function main() {
     await init(loadConfig());
     const dryRun = process.argv.includes('--dry-run');
-    const all = process.argv.includes('--all');
 
     const books = await db()
         .select({ id: catalogItem.id, title: catalogItem.title })
@@ -33,16 +32,15 @@ async function main() {
             and(
                 eq(catalogItem.format, MediaFormat.Book),
                 isNotNull(catalogItem.barcode),
-                all
-                    ? undefined
-                    : or(
-                          isNull(catalogItem.googleBooksFetchedAt),
-                          isNull(catalogItem.openLibraryFetchedAt)
-                      )
+                isNull(catalogItem.verifiedAt),
+                or(
+                    isNull(catalogItem.googleBooksFetchedAt),
+                    isNull(catalogItem.openLibraryFetchedAt)
+                )
             )
         )
         .orderBy(asc(catalogItem.title));
-    logger().info({ count: books.length, all, dryRun }, 'Books to refresh');
+    logger().info({ count: books.length, dryRun }, 'Books to refresh');
 
     let failed = 0;
     let busyTries = 0;
@@ -56,7 +54,7 @@ async function main() {
             continue;
         }
         try {
-            const updated = await refreshBook(book.id, !all);
+            const updated = await refreshBook(book.id, true);
             busyTries = 0;
             logger().info(
                 { title: updated?.title, hasCover: !!updated?.coverUrl },
