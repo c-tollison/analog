@@ -43,21 +43,19 @@ export function useFriends(
                     query: { offset, ...(toValue(q) ? { q: toValue(q) } : {}) },
                 })
             ),
-        options
+        { ...options, poll: true }
     );
 }
 
-/**
- * Friend requests sent to the signed-in user. Keyed under notifications so
- * it reloads with them.
- */
+/** Friend requests sent to the signed-in user. */
 export function useFriendRequests() {
     return usePaginatedList(
-        () => [...NOTIFICATIONS_KEY, 'friend-requests'],
+        () => [...FRIENDS_KEY, 'requests'],
         async (offset) =>
             unwrap(
                 await api.friends.requests.received.$get({ query: { offset } })
-            )
+            ),
+        { poll: true }
     );
 }
 

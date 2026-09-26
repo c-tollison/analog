@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { Relationship, USER_SEARCH_MIN_LENGTH } from '@analog/types';
+import AcceptDeclineButtons from '@/components/AcceptDeclineButtons.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
-import { Button } from '@/components/shadcn-components/button';
 import { ItemGroup } from '@/components/shadcn-components/item';
-import { Spinner } from '@/components/shadcn-components/spinner';
 import UserItem from '@/components/users/UserItem.vue';
 import {
     useAcceptFriendRequest,
@@ -17,7 +16,6 @@ import {
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useUserSearch } from '@/composables/useUsers';
 
-import { CheckIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const RELATIONSHIP_LABELS: Partial<Record<Relationship, string>> = {
@@ -42,26 +40,30 @@ const requests = useFriendRequests();
 
 const acceptRequest = useAcceptFriendRequest();
 const declineRequest = useDeclineFriendRequest();
+
+const actions = [acceptRequest, declineRequest];
 const answerError = computed(
-    () =>
-        (acceptRequest.error.value ?? declineRequest.error.value)?.message ??
-        null
+    () => actions.find((a) => a.error.value)?.error.value?.message ?? null
 );
 
 // The request and button being answered, so only that one shows a spinner.
-const answering = ref<{ userId: string; accept: boolean } | null>(null);
+const answering = ref<{ userId: string; action: 'accept' | 'decline' } | null>(
+    null
+);
 
-function answer(userId: string, accept: boolean) {
-    answering.value = { userId, accept };
-    const mutation = accept ? acceptRequest : declineRequest;
+function answer(userId: string, action: 'accept' | 'decline') {
+    for (const a of actions) a.reset();
+    answering.value = { userId, action };
+    const mutation = action === 'accept' ? acceptRequest : declineRequest;
     mutation.mutate({ userId }, { onSettled: () => (answering.value = null) });
 }
 
-function isAnswering(userId: string, accept: boolean) {
-    return (
-        answering.value?.userId === userId && answering.value.accept === accept
-    );
+function pendingFor(userId: string) {
+    return answering.value?.userId === userId
+        ? answering.value.action
+        : undefined;
 }
+
 const results = useUserSearch(searchTerm, {
     enabled: () => searchTerm.value !== '',
     pending: isTyping,
@@ -103,11 +105,17 @@ const results = useUserSearch(searchTerm, {
         </PagedList>
 
         <template v-else>
-            <FormError :message="answerError" />
-
-            <section v-if="requests.items.length" class="grid gap-2">
+            <section
+                v-if="
+                    requests.isLoading ||
+                    requests.error ||
+                    requests.items.length
+                "
+                class="grid gap-2"
+            >
                 <h2 class="text-sm font-medium">Friend requests</h2>
-                <PagedList :list="requests" empty-text="">
+                <FormError :message="answerError" />
+                <PagedList :list="requests" empty-text="No pending requests.">
                     <template #default="{ items }">
                         <ItemGroup class="gap-2">
                             <UserItem
@@ -116,29 +124,12 @@ const results = useUserSearch(searchTerm, {
                                 :user="person"
                             >
                                 <template #actions>
-                                    <Button
-                                        size="sm"
+                                    <AcceptDeclineButtons
                                         :disabled="answering !== null"
-                                        @click="answer(person.id, true)"
-                                    >
-                                        <Spinner
-                                            v-if="isAnswering(person.id, true)"
-                                        />
-                                        <CheckIcon v-else />
-                                        Accept
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        :disabled="answering !== null"
-                                        @click="answer(person.id, false)"
-                                    >
-                                        <Spinner
-                                            v-if="isAnswering(person.id, false)"
-                                        />
-                                        <XIcon v-else />
-                                        Decline
-                                    </Button>
+                                        :pending="pendingFor(person.id)"
+                                        @accept="answer(person.id, 'accept')"
+                                        @decline="answer(person.id, 'decline')"
+                                    />
                                 </template>
                             </UserItem>
                         </ItemGroup>
