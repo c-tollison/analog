@@ -48,6 +48,13 @@ export const catalogItem = appSchema.table(
         createdByUserId: uuid('created_by_user_id').references(() => user.id, {
             onDelete: 'set null',
         }),
+        // Set when an admin has checked the item. Lookups never change a
+        // verified item, only hand edits do.
+        verifiedAt: timestamp('verified_at', { withTimezone: true }),
+        verifiedByUserId: uuid('verified_by_user_id').references(
+            () => user.id,
+            { onDelete: 'set null' }
+        ),
         ...timestamps(),
     },
     (table) => [

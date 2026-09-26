@@ -120,6 +120,20 @@
       "when": 1790351885691,
       "tag": "0016_add_user_role",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790450084113,
+      "tag": "0017_add_verification_and_language",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790451000113,
+      "tag": "0018_backfill_series_language",
+      "breakpoints": true
     }
   ]
 }
