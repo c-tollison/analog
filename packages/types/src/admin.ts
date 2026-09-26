@@ -30,12 +30,14 @@ export const SetVerifiedSchema = z.object({ verified: z.boolean() });
 
 const VolumeSchema = z.number().nonnegative().max(100_000).nullable();
 
+const ItemTitleSchema = z
+    .string()
+    .trim()
+    .min(1, 'Title is required')
+    .max(CATALOG_TITLE_MAX_LENGTH);
+
 export const UpdateCatalogItemSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Title is required')
-        .max(CATALOG_TITLE_MAX_LENGTH),
+    title: ItemTitleSchema,
     series: SeriesChoiceSchema.nullable(),
     volume: VolumeSchema,
 });
@@ -52,9 +54,17 @@ export const UpdateSeriesSchema = z.object({
 
 export const MAX_SERIES_VOLUMES = 1000;
 
-export const SetSeriesVolumesSchema = z.object({
-    volumes: z
-        .array(z.object({ id: z.uuid(), volume: VolumeSchema }))
+/** Edits to a series' items from its admin page, changed rows only. */
+export const SetSeriesItemsSchema = z.object({
+    items: z
+        .array(
+            z.object({
+                id: z.uuid(),
+                title: ItemTitleSchema,
+                volume: VolumeSchema,
+                verified: z.boolean(),
+            })
+        )
         .min(1)
         .max(MAX_SERIES_VOLUMES),
 });

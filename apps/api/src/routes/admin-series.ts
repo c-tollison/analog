@@ -13,7 +13,7 @@ import {
     AdminListQuerySchema,
     MAX_SERIES_VOLUMES,
     MergeSeriesSchema,
-    SetSeriesVolumesSchema,
+    SetSeriesItemsSchema,
     SetVerifiedSchema,
     UpdateSeriesSchema,
 } from '@analog/types';
@@ -146,7 +146,7 @@ const adminSeries = new Hono<AppEnv>()
             sameTitle,
         });
     })
-    // Every item, so all the volume numbers can be edited at once.
+    // Every item, so they can all be edited at once.
     .get('/:id/items', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');
         await requireSeries(id);
@@ -192,14 +192,15 @@ const adminSeries = new Hono<AppEnv>()
         }
     )
     .put(
-        '/:id/volumes',
+        '/:id/items',
         schemaValidator('param', IdParamSchema),
-        schemaValidator('json', SetSeriesVolumesSchema),
+        schemaValidator('json', SetSeriesItemsSchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { volumes } = c.req.valid('json');
+            const { items } = c.req.valid('json');
+            const me = c.get('user').id;
             await requireSeries(id);
-            const ids = volumes.map((v) => v.id);
+            const ids = items.map((item) => item.id);
             const inSeries = await db()
                 .select({ id: catalogItem.id })
                 .from(catalogItem)
@@ -215,10 +216,23 @@ const adminSeries = new Hono<AppEnv>()
                 });
             }
             await db().transaction(async (tx) => {
-                for (const { id: itemId, volume } of volumes) {
+                for (const { id: itemId, title, volume, verified } of items) {
                     await tx
                         .update(catalogItem)
-                        .set({ position: volume, updatedAt: new Date() })
+                        .set({
+                            title,
+                            position: volume,
+                            // Items already verified keep who verified them.
+                            verifiedAt: verified
+                                ? sql`coalesce(${catalogItem.verifiedAt}, now())`
+                                : null,
+                            verifiedByUserId: verified
+                                ? sql`case when ${catalogItem.verifiedAt} is null
+                                    then ${me}::uuid
+                                    else ${catalogItem.verifiedByUserId} end`
+                                : null,
+                            updatedAt: new Date(),
+                        })
                         .where(eq(catalogItem.id, itemId));
                 }
             });
