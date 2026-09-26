@@ -1,4 +1,14 @@
-import { and, asc, eq, ilike, inArray, or, schema, sql } from '@analog/db';
+import {
+    and,
+    asc,
+    desc,
+    eq,
+    ilike,
+    inArray,
+    or,
+    schema,
+    sql,
+} from '@analog/db';
 import {
     CollectionRole,
     PageQuerySchema,
@@ -174,6 +184,24 @@ const friends = new Hono<AppEnv>()
                         )
                     )
                     .orderBy(sql`lower(${collection.name})`, asc(collection.id))
+                    .limit(limit)
+                    .offset(offset)
+            );
+            return c.json(page);
+        }
+    )
+    .get(
+        '/requests/received',
+        schemaValidator('query', PageQuerySchema),
+        async (c) => {
+            const me = c.get('user').id;
+            const page = await paginate(c.req.valid('query'), (limit, offset) =>
+                db()
+                    .select(userColumns)
+                    .from(friendRequest)
+                    .innerJoin(user, eq(user.id, friendRequest.senderId))
+                    .where(eq(friendRequest.recipientId, me))
+                    .orderBy(desc(friendRequest.createdAt), asc(user.id))
                     .limit(limit)
                     .offset(offset)
             );

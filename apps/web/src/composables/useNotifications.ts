@@ -1,31 +1,30 @@
 import { api, unwrap } from '@/lib/api';
 
 import { COLLECTIONS_KEY } from './useCollections';
-import { usePaginatedList } from './usePaginatedList';
+import { POLL_MS, usePaginatedList } from './usePaginatedList';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 
 export const NOTIFICATIONS_KEY = ['notifications'] as const;
-
-const COUNT_REFRESH_MS = 5 * 60_000;
 
 /** Incoming friend requests and collection invites, newest first. */
 export function useNotifications() {
     return usePaginatedList(
         () => [...NOTIFICATIONS_KEY, 'list'],
         async (offset) =>
-            unwrap(await api.notifications.$get({ query: { offset } }))
+            unwrap(await api.notifications.$get({ query: { offset } })),
+        { poll: true }
     );
 }
 
 /**
- * How many requests and invites are waiting, for the bell. Refreshes when
- * the tab regains focus, and every few minutes as a fallback.
+ * How many requests and invites are waiting, for the bell. Checks every 30
+ * seconds and when the tab regains focus.
  */
 export function useNotificationCount() {
     return useQuery({
         queryKey: [...NOTIFICATIONS_KEY, 'count'],
         queryFn: async () => unwrap(await api.notifications.count.$get()),
-        refetchInterval: COUNT_REFRESH_MS,
+        refetchInterval: POLL_MS,
         refetchOnWindowFocus: true,
     });
 }

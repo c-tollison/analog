@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { InferResponseType } from '@analog/api/client';
 import { NotificationKind } from '@analog/types';
+import AcceptDeclineButtons from '@/components/AcceptDeclineButtons.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
-import { Button } from '@/components/shadcn-components/button';
 import { ItemGroup } from '@/components/shadcn-components/item';
-import { Spinner } from '@/components/shadcn-components/spinner';
 import UserItem from '@/components/users/UserItem.vue';
 import {
     useAcceptFriendRequest,
@@ -18,7 +17,6 @@ import {
 } from '@/composables/useNotifications';
 import type { ApiClient } from '@/lib/api';
 
-import { CheckIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 type Notification = InferResponseType<
@@ -39,14 +37,18 @@ const error = computed(
 );
 
 // The row and button being answered, so only that one shows a spinner.
-const answering = ref<{ key: string; accept: boolean } | null>(null);
+const answering = ref<{ key: string; action: 'accept' | 'decline' } | null>(
+    null
+);
 
 function rowKey(n: Notification) {
     return `${n.kind}:${n.userId}:${n.collectionId ?? ''}`;
 }
 
-function answer(n: Notification, accept: boolean) {
-    answering.value = { key: rowKey(n), accept };
+function answer(n: Notification, action: 'accept' | 'decline') {
+    for (const a of actions) a.reset();
+    answering.value = { key: rowKey(n), action };
+    const accept = action === 'accept';
     const done = { onSettled: () => (answering.value = null) };
     if (n.kind === NotificationKind.FriendRequest) {
         const mutation = accept ? acceptRequest : declineRequest;
@@ -57,10 +59,10 @@ function answer(n: Notification, accept: boolean) {
     }
 }
 
-function isAnswering(n: Notification, accept: boolean) {
-    return (
-        answering.value?.key === rowKey(n) && answering.value.accept === accept
-    );
+function pendingFor(n: Notification) {
+    return answering.value?.key === rowKey(n)
+        ? answering.value.action
+        : undefined;
 }
 </script>
 
@@ -88,25 +90,12 @@ function isAnswering(n: Notification, accept: boolean) {
                             </template>
                         </template>
                         <template #actions>
-                            <Button
-                                size="sm"
+                            <AcceptDeclineButtons
                                 :disabled="answering !== null"
-                                @click="answer(n, true)"
-                            >
-                                <Spinner v-if="isAnswering(n, true)" />
-                                <CheckIcon v-else />
-                                Accept
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                :disabled="answering !== null"
-                                @click="answer(n, false)"
-                            >
-                                <Spinner v-if="isAnswering(n, false)" />
-                                <XIcon v-else />
-                                Decline
-                            </Button>
+                                :pending="pendingFor(n)"
+                                @accept="answer(n, 'accept')"
+                                @decline="answer(n, 'decline')"
+                            />
                         </template>
                     </UserItem>
                 </ItemGroup>

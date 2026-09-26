@@ -95,7 +95,7 @@ const error = computed(
 </script>
 
 <template>
-    <div class="flex max-w-lg flex-col gap-4">
+    <div class="mx-auto flex w-full max-w-lg flex-col gap-4">
         <div>
             <BackButton
                 :to="{ name: 'collection', params: { id: collectionId } }"

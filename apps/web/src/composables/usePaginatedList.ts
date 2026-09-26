@@ -7,9 +7,14 @@ interface Page {
     nextOffset: number | null;
 }
 
+/** How often live lists and counts check for changes. */
+export const POLL_MS = 30_000;
+
 export interface PaginatedListOptions {
     enabled?: MaybeRefOrGetter<boolean>;
     pending?: MaybeRefOrGetter<boolean>;
+    /** Reload every `POLL_MS` while the list is on screen. */
+    poll?: boolean;
 }
 
 export interface PaginatedList<T> {
@@ -24,7 +29,8 @@ export interface PaginatedList<T> {
 /**
  * An offset-paginated API list backed by TanStack's infinite query, for the
  * list composables to build on. While a new key loads the previous items
- * stay visible. `fetchPage` must only read values that are in the key.
+ * stay visible. Background reloads don't count as loading. `fetchPage` must
+ * only read values that are in the key.
  *
  *     return usePaginatedList(
  *         () => [...COLLECTIONS_KEY, 'list'],
@@ -34,7 +40,7 @@ export interface PaginatedList<T> {
 export function usePaginatedList<P extends Page>(
     queryKey: () => QueryKey,
     fetchPage: (offset: string) => Promise<P>,
-    { enabled = true, pending = false }: PaginatedListOptions = {}
+    { enabled = true, pending = false, poll = false }: PaginatedListOptions = {}
 ): PaginatedList<P['items'][number]> {
     const query = useInfiniteQuery({
         queryKey: computed(queryKey),
@@ -43,6 +49,7 @@ export function usePaginatedList<P extends Page>(
         getNextPageParam: (last: P) => last.nextOffset ?? undefined,
         enabled: () => toValue(enabled),
         placeholderData: keepPreviousData,
+        refetchInterval: poll ? POLL_MS : false,
     });
 
     return reactive({
@@ -56,7 +63,7 @@ export function usePaginatedList<P extends Page>(
                 toValue(pending) ||
                 (toValue(enabled) &&
                     query.isFetching.value &&
-                    !query.isFetchingNextPage.value)
+                    (query.isPending.value || query.isPlaceholderData.value))
         ),
         isLoadingMore: query.isFetchingNextPage,
         error: computed(() => query.error.value?.message ?? null),
