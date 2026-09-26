@@ -1,4 +1,4 @@
-import { and, asc, eq, schema } from '@analog/db';
+import { and, asc, eq, inArray, or, type SQL, schema } from '@analog/db';
 import {
     AdminListQuerySchema,
     SetVerifiedSchema,
@@ -22,7 +22,7 @@ import {
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
-import { matchesAllTerms, searchTerms } from '../lib/search.js';
+import { matchesTerm, searchTerms, termNumber } from '../lib/search.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -44,15 +44,42 @@ async function refreshCovers(seriesIds: (string | null)[]) {
     await Promise.all([...unique].map(refreshSeriesCover));
 }
 
+/**
+ * Items whose own title or series title matches every term, or whose volume
+ * is a number term. Each title is looked up through its own trigram index and
+ * the ids combined. One condition across both tables would make Postgres
+ * check every row.
+ */
+function itemsMatching(terms: string[]): SQL | undefined {
+    if (!terms.length) {
+        return undefined;
+    }
+    return and(
+        ...terms.map((term) => {
+            const byTitle = db()
+                .select({ id: catalogItem.id })
+                .from(catalogItem)
+                .where(matchesTerm(term, catalogItem.title));
+            const bySeries = db()
+                .select({ id: catalogItem.id })
+                .from(catalogItem)
+                .innerJoin(series, eq(catalogItem.seriesId, series.id))
+                .where(matchesTerm(term, series.title));
+            const ids = inArray(catalogItem.id, byTitle.union(bySeries));
+            const number = termNumber(term);
+            return number === null
+                ? ids
+                : or(eq(catalogItem.position, number), ids);
+        })
+    );
+}
+
 const adminItems = new Hono<AppEnv>()
     .get('/', schemaValidator('query', AdminListQuerySchema), async (c) => {
         const { q, status, sort, ...page } = c.req.valid('query');
         const where = and(
             whereVerified(catalogItem.verifiedAt, status),
-            matchesAllTerms(searchTerms(q ?? ''), {
-                columns: [catalogItem.title, series.title],
-                position: catalogItem.position,
-            })
+            itemsMatching(searchTerms(q ?? ''))
         );
 
         const result = await paginateWithTotal(
@@ -87,7 +114,6 @@ const adminItems = new Hono<AppEnv>()
                 const [row] = await db()
                     .select({ total: totalCount })
                     .from(catalogItem)
-                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
                     .where(where);
                 return row?.total ?? 0;
             }

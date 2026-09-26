@@ -10,6 +10,20 @@ export function searchTerms(q: string): string[] {
     return q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, MAX_TERMS);
 }
 
+/** The term as a volume number, when it's a bare number like "19". */
+export function termNumber(term: string): number | null {
+    return NUMBER.test(term) ? Number(term) : null;
+}
+
+/**
+ * True when `term` is a substring of the column or a close fuzzy match to a
+ * word in it (pg_trgm `<%`, so typos like "haikyuu" still hit "Haikyu!!").
+ * Both can use the column's trigram index.
+ */
+export function matchesTerm(term: string, column: Column): SQL {
+    return sql`(${ilike(column, likePattern(term))} or ${term} <% ${column})`;
+}
+
 /** Drops bare numbers, for searching things that have no volume number. */
 export function withoutNumbers(terms: string[]): string[] {
     const words = terms.filter((term) => !NUMBER.test(term));
@@ -33,17 +47,15 @@ export function matchesAllTerms(
     if (!terms.length) {
         return undefined;
     }
-    const perTerm = terms.map((term) =>
-        or(
-            ...columns.flatMap((column) => [
-                ilike(column, likePattern(term)),
-                sql`${term} <% ${column}`,
-            ]),
-            position && NUMBER.test(term)
-                ? sql`${position} = ${Number(term)}`
+    const perTerm = terms.map((term) => {
+        const number = termNumber(term);
+        return or(
+            ...columns.map((column) => matchesTerm(term, column)),
+            position && number !== null
+                ? sql`${position} = ${number}`
                 : undefined
-        )
-    );
+        );
+    });
     return sql.join(
         perTerm.map((clause) => sql`(${clause})`),
         sql` and `
