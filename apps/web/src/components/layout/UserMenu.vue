@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UserRole } from '@analog/types';
+import { hasRole, UserRole } from '@analog/types';
 import { Button } from '@/components/shadcn-components/button';
 import {
     DropdownMenu,
@@ -80,7 +80,7 @@ async function onSignOut() {
                 Profile
             </DropdownMenuItem>
             <DropdownMenuItem
-                v-if="user?.role === UserRole.Admin"
+                v-if="hasRole(user, UserRole.Admin)"
                 @select="router.push({ name: 'admin' })"
             >
                 <ShieldIcon />
