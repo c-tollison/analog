@@ -182,10 +182,25 @@ async function resolveSeries(
 }
 
 /**
+ * The series a book goes in, creating it from a title when needed. A new
+ * series takes the book's kind and language.
+ */
+export function seriesForItem(
+    choice: SeriesChoice,
+    item: CatalogItem
+): Promise<Series> {
+    return resolveSeries(
+        choice,
+        toBookKind(item.kind),
+        guessLanguage(readMetadata(item).languages)
+    );
+}
+
+/**
  * Sets a series' cover to its earliest-released item's cover. Series linked
  * to an external source keep the cover that source provided.
  */
-async function refreshSeriesCover(seriesId: string): Promise<void> {
+export async function refreshSeriesCover(seriesId: string): Promise<void> {
     const { series, catalogItem } = schema;
     await db()
         .update(series)
@@ -537,11 +552,7 @@ export async function upsertBook(
     }
 
     const series = seriesChoice
-        ? await resolveSeries(
-              seriesChoice,
-              toBookKind(item.kind),
-              guessLanguage(readMetadata(item).languages)
-          )
+        ? await seriesForItem(seriesChoice, item)
         : null;
 
     const { catalogItem } = schema;
