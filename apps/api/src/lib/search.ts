@@ -1,5 +1,16 @@
-import { type Column, ilike, or, type SQL, sql } from '@analog/db';
+import {
+    and,
+    type Column,
+    eq,
+    ilike,
+    inArray,
+    or,
+    type SQL,
+    schema,
+    sql,
+} from '@analog/db';
 
+import { db } from './init.js';
 import { likePattern } from './pagination.js';
 
 const MAX_TERMS = 8;
@@ -26,7 +37,7 @@ export function matchesTerm(term: string, column: Column): SQL {
 
 /** Drops bare numbers, for searching things that have no volume number. */
 export function withoutNumbers(terms: string[]): string[] {
-    const words = terms.filter((term) => !NUMBER.test(term));
+    const words = terms.filter((term) => termNumber(term) === null);
     return words.length ? words : terms;
 }
 
@@ -68,4 +79,35 @@ export function relevance(q: string, columns: Column[]): SQL<number> {
         (column) => sql`coalesce(word_similarity(${q}, ${column}), 0)`
     );
     return sql<number>`greatest(${sql.join(scores, sql`, `)})`;
+}
+
+/**
+ * Catalog items whose own title or series title matches every term, or whose
+ * volume is a number term. Each title is looked up through its own trigram
+ * index and the ids combined. One condition across both tables would make
+ * Postgres check every row.
+ */
+export function catalogItemsMatching(terms: string[]): SQL | undefined {
+    if (!terms.length) {
+        return undefined;
+    }
+    const { catalogItem, series } = schema;
+    return and(
+        ...terms.map((term) => {
+            const byTitle = db()
+                .select({ id: catalogItem.id })
+                .from(catalogItem)
+                .where(matchesTerm(term, catalogItem.title));
+            const bySeries = db()
+                .select({ id: catalogItem.id })
+                .from(catalogItem)
+                .innerJoin(series, eq(catalogItem.seriesId, series.id))
+                .where(matchesTerm(term, series.title));
+            const ids = inArray(catalogItem.id, byTitle.unionAll(bySeries));
+            const number = termNumber(term);
+            return number === null
+                ? ids
+                : or(eq(catalogItem.position, number), ids);
+        })
+    );
 }
