@@ -65,7 +65,7 @@ function isAnswering(n: Notification, accept: boolean) {
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+    <div class="flex flex-col gap-4">
         <h1 class="text-lg font-semibold">Notifications</h1>
 
         <FormError :message="error" />
@@ -112,5 +112,5 @@ function isAnswering(n: Notification, accept: boolean) {
                 </ItemGroup>
             </template>
         </PagedList>
-    </main>
+    </div>
 </template>

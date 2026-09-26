@@ -57,7 +57,7 @@ function resultLink(result: SearchResult): RouteLocationRaw {
 </script>
 
 <template>
-    <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+    <div class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
             <h1 class="text-lg font-semibold">Collections</h1>
             <div class="flex gap-2">
@@ -174,5 +174,5 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                 </ItemGroup>
             </template>
         </PagedList>
-    </main>
+    </div>
 </template>
