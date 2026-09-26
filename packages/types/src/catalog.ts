@@ -36,15 +36,15 @@ export const SERIES_LANGUAGE_LABELS: Record<SeriesLanguage, string> = {
 };
 export const COLLECTION_NAME_MAX_LENGTH = 64;
 
+export const SeriesTitleSchema = z
+    .string()
+    .trim()
+    .min(1, 'Series name is required')
+    .max(SERIES_TITLE_MAX_LENGTH);
+
 export const SeriesChoiceSchema = z.union([
     z.object({ id: z.uuid() }),
-    z.object({
-        title: z
-            .string()
-            .trim()
-            .min(1, 'Series name is required')
-            .max(SERIES_TITLE_MAX_LENGTH),
-    }),
+    z.object({ title: SeriesTitleSchema }),
 ]);
 
 export const AddBookSchema = z.object({

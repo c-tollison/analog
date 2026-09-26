@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { SERIES_LANGUAGE_LABELS, SERIES_LANGUAGES } from '@analog/types';
 import FormError from '@/components/FormError.vue';
+import SaveButton from '@/components/SaveButton.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     FormControl,
@@ -22,7 +23,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/shadcn-components/select';
-import { Spinner } from '@/components/shadcn-components/spinner';
 import { type AdminSeries, useUpdateAdminSeries } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
 import { AdminSeriesFormSchema, NO_LANGUAGE } from '@/lib/admin-schemas';
@@ -141,14 +141,6 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                 </FormItem>
             </FormField>
         </div>
-        <div class="flex items-center gap-3">
-            <Button type="submit" :disabled="isSubmitting">
-                <Spinner v-if="isSubmitting" />
-                Save
-            </Button>
-            <span v-if="saved" class="text-muted-foreground text-sm">
-                Saved
-            </span>
-        </div>
+        <SaveButton :pending="isSubmitting" :saved="saved" />
     </form>
 </template>

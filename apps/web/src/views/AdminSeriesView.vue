@@ -21,6 +21,11 @@ import {
 } from '@/components/shadcn-components/alert';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/shadcn-components/popover';
 import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import {
@@ -31,9 +36,11 @@ import {
 } from '@/composables/useAdmin';
 import { timeAgo } from '@/lib/dates';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { goBackOr } from '@/lib/navigation';
 
 import {
     CopyIcon,
+    InfoIcon,
     LinkIcon,
     MergeIcon,
     PencilIcon,
@@ -55,6 +62,13 @@ const remove = useDeleteAdminSeries();
 const isLinkOpen = ref(false);
 const isVolumeCountOpen = ref(false);
 const isMergeOpen = ref(false);
+// The series to merge into, when picked from the duplicate warning.
+const mergeInto = ref<{ id: string; title: string } | null>(null);
+
+function openMerge(into: { id: string; title: string } | null) {
+    mergeInto.value = into;
+    isMergeOpen.value = true;
+}
 const confirmingDelete = ref(false);
 
 // Where this kind of series can get more details, e.g. AniList for manga.
@@ -79,13 +93,7 @@ const error = computed(
 
 function onDelete() {
     remove.mutate(props.id, {
-        onSuccess: () => {
-            if (window.history.state?.back) {
-                router.back();
-            } else {
-                router.replace({ name: 'admin' });
-            }
-        },
+        onSuccess: () => goBackOr(router, { name: 'admin' }),
         onSettled: () => {
             confirmingDelete.value = false;
         },
@@ -117,6 +125,7 @@ function onDelete() {
                 v-model:open="isMergeOpen"
                 :series-id="series.id"
                 :series-title="series.title"
+                :into="mergeInto"
             />
             <VolumeCountDialog
                 v-model:open="isVolumeCountOpen"
@@ -139,15 +148,30 @@ function onDelete() {
                 <AlertTitle>
                     Another series has this name and language
                 </AlertTitle>
-                <AlertDescription>
-                    <RouterLink
+                <AlertDescription class="grid gap-2">
+                    <div
                         v-for="other in series.sameTitle"
                         :key="other.id"
-                        :to="{ name: 'admin-series', params: { id: other.id } }"
-                        class="underline"
+                        class="flex flex-wrap items-center gap-2"
                     >
-                        {{ other.title }}
-                    </RouterLink>
+                        <RouterLink
+                            :to="{
+                                name: 'admin-series',
+                                params: { id: other.id },
+                            }"
+                            class="underline"
+                        >
+                            {{ other.title }}
+                        </RouterLink>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            @click="openMerge(other)"
+                        >
+                            <MergeIcon />
+                            Merge into this
+                        </Button>
+                    </div>
                 </AlertDescription>
             </Alert>
 
@@ -227,25 +251,35 @@ function onDelete() {
                             <Spinner v-if="setVerified.isPending.value" />
                             {{ series.verifiedAt ? 'Unverify' : 'Verify' }}
                         </Button>
-                        <Button variant="outline" @click="isMergeOpen = true">
+                        <Button variant="outline" @click="openMerge(null)">
                             <MergeIcon />
                             Merge into…
                         </Button>
-                        <Button
-                            variant="outline"
-                            :disabled="!items || items.length > 0"
-                            @click="confirmingDelete = true"
-                        >
-                            <Trash2Icon />
-                            Delete
-                        </Button>
+                        <div class="flex items-center gap-1">
+                            <Button
+                                variant="outline"
+                                :disabled="!items || items.length > 0"
+                                @click="confirmingDelete = true"
+                            >
+                                <Trash2Icon />
+                                Delete
+                            </Button>
+                            <Popover v-if="items?.length">
+                                <PopoverTrigger as-child>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        aria-label="Why can't I delete it?"
+                                    >
+                                        <InfoIcon />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent class="w-64 text-sm">
+                                    Move or merge its items before deleting it.
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
-                    <p
-                        v-if="items?.length"
-                        class="text-muted-foreground text-xs"
-                    >
-                        Move or merge its items before deleting it.
-                    </p>
                 </div>
             </div>
 

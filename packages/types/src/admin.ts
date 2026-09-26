@@ -1,7 +1,7 @@
 import {
-    SERIES_TITLE_MAX_LENGTH,
     SeriesChoiceSchema,
     SeriesLanguageSchema,
+    SeriesTitleSchema,
 } from './catalog.js';
 import { SeriesKind } from './catalog-enums.js';
 import { PageQuerySchema } from './pagination.js';
@@ -30,7 +30,7 @@ export const SetVerifiedSchema = z.object({ verified: z.boolean() });
 
 const VolumeSchema = z.number().nonnegative().max(100_000).nullable();
 
-const ItemTitleSchema = z
+export const ItemTitleSchema = z
     .string()
     .trim()
     .min(1, 'Title is required')
@@ -43,11 +43,7 @@ export const UpdateCatalogItemSchema = z.object({
 });
 
 export const UpdateSeriesSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Series name is required')
-        .max(SERIES_TITLE_MAX_LENGTH),
+    title: SeriesTitleSchema,
     kind: z.enum(SeriesKind),
     language: SeriesLanguageSchema.nullable(),
 });

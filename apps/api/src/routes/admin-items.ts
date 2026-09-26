@@ -8,14 +8,15 @@ import {
 import {
     addedByUser,
     byAdded,
+    setVerified,
     totalCount,
-    verifiedBy,
     verifiedByUser,
     whereVerified,
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
 import {
-    itemDetails,
+    itemLinks,
+    kindInSeries,
     refreshSeriesCover,
     seriesForItem,
 } from '../lib/books.js';
@@ -95,10 +96,25 @@ const adminItems = new Hono<AppEnv>()
         const [[row], collectionCount] = await Promise.all([
             db()
                 .select({
-                    item: catalogItem,
+                    id: catalogItem.id,
+                    title: catalogItem.title,
+                    format: catalogItem.format,
+                    kind: catalogItem.kind,
+                    barcode: catalogItem.barcode,
+                    coverUrl: catalogItem.coverUrl,
+                    position: catalogItem.position,
+                    seriesId: catalogItem.seriesId,
                     seriesTitle: series.title,
                     addedBy: addedByUser.username,
+                    createdAt: catalogItem.createdAt,
                     verifiedBy: verifiedByUser.username,
+                    verifiedAt: catalogItem.verifiedAt,
+                    googleBooksFetchedAt: catalogItem.googleBooksFetchedAt,
+                    openLibraryFetchedAt: catalogItem.openLibraryFetchedAt,
+                    // Only read to build the links.
+                    metadata: catalogItem.metadata,
+                    externalSource: catalogItem.externalSource,
+                    externalId: catalogItem.externalId,
                 })
                 .from(catalogItem)
                 .leftJoin(series, eq(catalogItem.seriesId, series.id))
@@ -116,25 +132,8 @@ const adminItems = new Hono<AppEnv>()
         if (!row) {
             throw new HTTPException(404, { message: 'Item not found' });
         }
-        const { item, ...extra } = row;
-
-        return c.json({
-            id: item.id,
-            title: item.title,
-            format: item.format,
-            kind: item.kind,
-            barcode: item.barcode,
-            coverUrl: item.coverUrl,
-            position: item.position,
-            seriesId: item.seriesId,
-            createdAt: item.createdAt,
-            verifiedAt: item.verifiedAt,
-            googleBooksFetchedAt: item.googleBooksFetchedAt,
-            openLibraryFetchedAt: item.openLibraryFetchedAt,
-            ...extra,
-            collectionCount,
-            links: itemDetails(item).links,
-        });
+        const { metadata, externalSource, externalId, ...item } = row;
+        return c.json({ ...item, collectionCount, links: itemLinks(row) });
     })
     .put(
         '/:id',
@@ -151,8 +150,7 @@ const adminItems = new Hono<AppEnv>()
                     title,
                     seriesId: next?.id ?? null,
                     position: volume,
-                    // The series' kind wins, so its items all match.
-                    kind: next?.kind ?? item.kind,
+                    kind: kindInSeries(next, item.kind),
                     updatedAt: new Date(),
                 })
                 .where(eq(catalogItem.id, item.id));
@@ -167,12 +165,8 @@ const adminItems = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { verified } = c.req.valid('json');
-            const [updated] = await db()
-                .update(catalogItem)
-                .set(verifiedBy(verified, c.get('user').id))
-                .where(eq(catalogItem.id, id))
-                .returning({ id: catalogItem.id });
-            if (!updated) {
+            const by = verified ? c.get('user').id : null;
+            if (!(await setVerified(catalogItem, id, by))) {
                 throw new HTTPException(404, { message: 'Item not found' });
             }
             return c.body(null, 204);

@@ -3,6 +3,7 @@ import {
     asc,
     type Column,
     desc,
+    eq,
     isNotNull,
     isNull,
     type SQL,
@@ -10,6 +11,8 @@ import {
     sql,
 } from '@analog/db';
 import { AddedSort, VerifiedFilter } from '@analog/types';
+
+import { db } from './init.js';
 
 export const totalCount = sql<number>`count(*)::int`;
 
@@ -31,9 +34,26 @@ export function byAdded(createdAt: Column, sort: AddedSort): SQL {
     return sort === AddedSort.Oldest ? asc(createdAt) : desc(createdAt);
 }
 
-/** The columns to set when an admin verifies or unverifies a row. */
-export function verifiedBy(verified: boolean, userId: string) {
-    return verified
-        ? { verifiedAt: new Date(), verifiedByUserId: userId }
+/**
+ * The columns to set on a verified row: verified by this user now, or not
+ * verified when there's no user.
+ */
+export function verifiedColumns(byUserId: string | null) {
+    return byUserId
+        ? { verifiedAt: new Date(), verifiedByUserId: byUserId }
         : { verifiedAt: null, verifiedByUserId: null };
+}
+
+/** Verifies or unverifies an item or series. False when there's no such row. */
+export async function setVerified(
+    table: typeof schema.catalogItem | typeof schema.series,
+    id: string,
+    byUserId: string | null
+): Promise<boolean> {
+    const [updated] = await db()
+        .update(table)
+        .set(verifiedColumns(byUserId))
+        .where(eq(table.id, id))
+        .returning({ id: table.id });
+    return updated !== undefined;
 }

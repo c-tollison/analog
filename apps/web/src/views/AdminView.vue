@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AddedSort, DEFAULT_PAGE_SIZE, VerifiedFilter } from '@analog/types';
+import { AddedSort, VerifiedFilter } from '@analog/types';
 import AdminItemsTable from '@/components/admin/AdminItemsTable.vue';
 import AdminSeriesTable from '@/components/admin/AdminSeriesTable.vue';
 import SearchInput from '@/components/SearchInput.vue';
@@ -17,7 +17,11 @@ import {
     TabsList,
     TabsTrigger,
 } from '@/components/shadcn-components/tabs';
-import { useAdminItems, useAdminSeriesList } from '@/composables/useAdmin';
+import {
+    adminListQuery,
+    useAdminItems,
+    useAdminSeriesList,
+} from '@/composables/useAdmin';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 
 import { computed, ref, watch } from 'vue';
@@ -33,8 +37,8 @@ const STATUS_LABELS: Record<VerifiedFilter, string> = {
 };
 
 // The list state lives in the URL, so going back from a media or series page
-// returns to the same tab, filter, search and page. Status is only there when
-// someone picked one that differs from the default.
+// returns to the same tab, filter, search and page. Status is only there once
+// someone picks one, and then it stays until they pick another.
 const ListStateSchema = z.object({
     tab: z.enum(Tab).catch(Tab.Series),
     status: z.enum(VerifiedFilter).optional().catch(undefined),
@@ -68,7 +72,7 @@ function update(changes: Partial<ListState>) {
             String(next[key]),
         ])
     );
-    if (next.status && next.status !== defaultStatus(next.q)) {
+    if (next.status) {
         query.status = next.status;
     }
     router.replace({ query });
@@ -93,13 +97,11 @@ const page = computed({
 
 // Totals for the tab labels. Page one is the same request each table makes
 // for its first page, so it's usually already loaded.
-const firstPage = () => ({
-    q: state.value.q,
-    status: status.value,
-    sort: state.value.sort,
-    limit: DEFAULT_PAGE_SIZE,
-    offset: 0,
-});
+const firstPage = () =>
+    adminListQuery(
+        { q: state.value.q, status: status.value, sort: state.value.sort },
+        1
+    );
 const { data: itemsPage } = useAdminItems(firstPage);
 const { data: seriesPage } = useAdminSeriesList(firstPage);
 

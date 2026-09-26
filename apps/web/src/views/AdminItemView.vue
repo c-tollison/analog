@@ -18,6 +18,7 @@ import {
 import { useRefreshBook } from '@/composables/useCatalog';
 import { formatDate, timeAgo } from '@/lib/dates';
 import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
+import { goBackOr } from '@/lib/navigation';
 
 import { RefreshCwIcon, Trash2Icon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -79,17 +80,9 @@ const error = computed(
         )?.message ?? null
 );
 
-function goBack() {
-    if (window.history.state?.back) {
-        router.back();
-    } else {
-        router.replace({ name: 'admin' });
-    }
-}
-
 function onDelete() {
     remove.mutate(props.id, {
-        onSuccess: goBack,
+        onSuccess: () => goBackOr(router, { name: 'admin' }),
         onSettled: () => {
             confirmingDelete.value = false;
         },
@@ -147,11 +140,10 @@ function onDelete() {
                         </h1>
                         <div class="flex flex-wrap items-center gap-2 pt-1">
                             <Badge variant="secondary">
-                                {{
-                                    item.kind
-                                        ? SERIES_KIND_LABELS[item.kind]
-                                        : FORMAT_LABELS[item.format]
-                                }}
+                                {{ FORMAT_LABELS[item.format] }}
+                            </Badge>
+                            <Badge v-if="item.kind" variant="secondary">
+                                {{ SERIES_KIND_LABELS[item.kind] }}
                             </Badge>
                             <Badge v-if="item.verifiedAt">Verified</Badge>
                             <span

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
+import SaveButton from '@/components/SaveButton.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Checkbox } from '@/components/shadcn-components/checkbox';
@@ -11,7 +12,6 @@ import {
     FormMessage,
 } from '@/components/shadcn-components/form';
 import { Input } from '@/components/shadcn-components/input';
-import { Spinner } from '@/components/shadcn-components/spinner';
 import {
     Table,
     TableBody,
@@ -95,7 +95,7 @@ const counts = computed(() => {
 
 function problem(index: number): string | null {
     const volume = typed.value[index];
-    if (volume === null || volume === undefined) return 'No number';
+    if (volume === null || volume === undefined) return null;
     if ((counts.value.get(volume) ?? 0) > 1) return 'Duplicate';
     if (props.volumeCount !== null && volume > props.volumeCount) {
         return 'Above total';
@@ -267,14 +267,10 @@ function setAllVerified(checked: boolean | 'indeterminate') {
                 </TableEmpty>
             </TableBody>
         </Table>
-        <div v-if="items.length" class="flex items-center gap-3">
-            <Button type="submit" :disabled="isSubmitting">
-                <Spinner v-if="isSubmitting" />
-                Save
-            </Button>
-            <span v-if="saved" class="text-muted-foreground text-sm">
-                Saved
-            </span>
-        </div>
+        <SaveButton
+            v-if="items.length"
+            :pending="isSubmitting"
+            :saved="saved"
+        />
     </form>
 </template>

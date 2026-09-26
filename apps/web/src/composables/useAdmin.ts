@@ -1,11 +1,12 @@
 import type { InferResponseType } from '@analog/api/client';
-import type {
-    AddedSort,
-    MergeSeriesSchema,
-    SetSeriesItemsSchema,
-    UpdateCatalogItemSchema,
-    UpdateSeriesSchema,
-    VerifiedFilter,
+import {
+    type AdminListQuerySchema,
+    DEFAULT_PAGE_SIZE,
+    type MergeSeriesSchema,
+    type SetSeriesItemsSchema,
+    type SetVerifiedSchema,
+    type UpdateCatalogItemSchema,
+    type UpdateSeriesSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
@@ -20,13 +21,21 @@ import type { z } from 'zod';
 
 export const ADMIN_KEY = ['admin'] as const;
 
-export type AdminListQuery = {
-    q: string;
-    status: VerifiedFilter;
-    sort: AddedSort;
-    limit: number;
-    offset: number;
-};
+export type AdminListQuery = z.output<typeof AdminListQuerySchema>;
+
+export type AdminListFilters = Pick<AdminListQuery, 'q' | 'status' | 'sort'>;
+
+/** The query for one page of an admin table, counting pages from 1. */
+export function adminListQuery(
+    filters: AdminListFilters,
+    page: number
+): AdminListQuery {
+    return {
+        ...filters,
+        limit: DEFAULT_PAGE_SIZE,
+        offset: (page - 1) * DEFAULT_PAGE_SIZE,
+    };
+}
 
 export type AdminItemRow = InferResponseType<
     ApiClient['admin']['items']['$get'],
@@ -125,10 +134,7 @@ export function useSetItemVerified() {
         mutationFn: async ({
             itemId,
             verified,
-        }: {
-            itemId: string;
-            verified: boolean;
-        }) =>
+        }: z.input<typeof SetVerifiedSchema> & { itemId: string }) =>
             unwrap(
                 await api.admin.items[':id'].verified.$put({
                     param: { id: itemId },
@@ -227,10 +233,7 @@ export function useSetSeriesVerified() {
         mutationFn: async ({
             seriesId,
             verified,
-        }: {
-            seriesId: string;
-            verified: boolean;
-        }) =>
+        }: z.input<typeof SetVerifiedSchema> & { seriesId: string }) =>
             unwrap(
                 await api.admin.series[':id'].verified.$put({
                     param: { id: seriesId },

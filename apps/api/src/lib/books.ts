@@ -10,6 +10,7 @@ import {
     type SeriesLanguage,
 } from '@analog/types';
 
+import { verifiedColumns } from './admin.js';
 import { filledFacts, filledLinks } from './details.js';
 import { isGoogleBooksCover, lookupGoogleBooksIsbn } from './google-books.js';
 import { db, logger } from './init.js';
@@ -42,7 +43,7 @@ const BookMetadataSchema = z.object({
     genres: z.array(z.string()).catch([]),
 }) satisfies z.ZodType<BookDetails>;
 
-function readMetadata(item: CatalogItem): BookDetails {
+function readMetadata(item: Pick<CatalogItem, 'metadata'>): BookDetails {
     return BookMetadataSchema.parse(item.metadata);
 }
 
@@ -142,6 +143,7 @@ export async function findSimilarSeries(bookTitle: string) {
         .select({
             id: schema.series.id,
             title: column,
+            kind: schema.series.kind,
             language: schema.series.language,
         })
         .from(schema.series)
@@ -194,6 +196,35 @@ export function seriesForItem(
         toBookKind(item.kind),
         guessLanguage(readMetadata(item).languages)
     );
+}
+
+/**
+ * An item's kind once it's in a series. The series' kind wins, so all its
+ * items match.
+ */
+export function kindInSeries(
+    series: Pick<Series, 'kind'> | null,
+    itemKind: SeriesKind | null
+): SeriesKind | null {
+    return series?.kind ?? itemKind;
+}
+
+type Executor = Pick<ReturnType<typeof db>, 'update'>;
+
+/** Gives every item in a series the series' kind, after either one changes. */
+export async function matchSeriesKind(
+    seriesId: string,
+    executor: Executor = db()
+): Promise<void> {
+    const { catalogItem, series } = schema;
+    await executor
+        .update(catalogItem)
+        .set({
+            kind: sql`(select ${series.kind} from ${series}
+                where ${series.id} = ${seriesId})`,
+            updatedAt: new Date(),
+        })
+        .where(eq(catalogItem.seriesId, seriesId));
 }
 
 /**
@@ -562,8 +593,7 @@ export async function upsertBook(
         .set({
             seriesId: series?.id ?? null,
             position: volume,
-            // The series' kind wins, so its items all match.
-            kind: series?.kind ?? item.kind,
+            kind: kindInSeries(series, item.kind),
             updatedAt: new Date(),
         })
         .where(
@@ -595,7 +625,7 @@ async function unverifySeries(seriesId: string): Promise<void> {
     const { series } = schema;
     await db()
         .update(series)
-        .set({ verifiedAt: null, verifiedByUserId: null })
+        .set(verifiedColumns(null))
         .where(and(eq(series.id, seriesId), isNotNull(series.verifiedAt)));
 }
 
@@ -613,9 +643,14 @@ export async function refreshBook(itemId: string, onlyMissing = false) {
     if (!item) {
         throw new HTTPException(404, { message: 'Item not found' });
     }
-    if (item.format !== MediaFormat.Book || !item.barcode) {
+    if (item.format !== MediaFormat.Book) {
         throw new HTTPException(400, {
-            message: 'Only books with an ISBN can be refreshed',
+            message: "Refreshing isn't supported for this media yet",
+        });
+    }
+    if (!item.barcode) {
+        throw new HTTPException(400, {
+            message: 'This book has no ISBN to look up',
         });
     }
     if (item.verifiedAt) {
@@ -655,12 +690,30 @@ export function bookDetails(item: CatalogItem) {
         { label: 'Pages', value: meta.pageCount?.toString() },
         { label: 'ISBN', value: item.barcode },
     ];
+
+    return {
+        subtitle: meta.subtitle,
+        creators: meta.authors,
+        description: meta.description,
+        facts: filledFacts(facts),
+        links: bookLinks(item),
+    };
+}
+
+type LinkFields = Pick<
+    CatalogItem,
+    'format' | 'metadata' | 'externalSource' | 'externalId'
+>;
+
+/** Where else a book can be looked at: Goodreads and the source it came from. */
+function bookLinks(item: LinkFields) {
+    const goodreadsId = readMetadata(item).goodreadsId;
     const sourceId = item.externalId;
-    const links = [
+    return filledLinks([
         {
             label: 'Goodreads',
-            url: meta.goodreadsId
-                ? `https://www.goodreads.com/book/show/${meta.goodreadsId}`
+            url: goodreadsId
+                ? `https://www.goodreads.com/book/show/${goodreadsId}`
                 : null,
         },
         {
@@ -677,15 +730,12 @@ export function bookDetails(item: CatalogItem) {
                     ? `https://openlibrary.org/books/${sourceId}`
                     : null,
         },
-    ];
+    ]);
+}
 
-    return {
-        subtitle: meta.subtitle,
-        creators: meta.authors,
-        description: meta.description,
-        facts: filledFacts(facts),
-        links: filledLinks(links),
-    };
+/** An item's outside links, whatever kind of media it is. */
+export function itemLinks(item: LinkFields) {
+    return item.format === MediaFormat.Book ? bookLinks(item) : [];
 }
 
 type ItemDetails = ReturnType<typeof bookDetails>;

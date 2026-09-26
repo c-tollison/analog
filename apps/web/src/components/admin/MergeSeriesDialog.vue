@@ -25,7 +25,12 @@ import { MergeSeriesFormSchema } from '@/lib/admin-schemas';
 import { watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-const props = defineProps<{ seriesId: string; seriesTitle: string }>();
+const props = defineProps<{
+    seriesId: string;
+    seriesTitle: string;
+    // Already picked, when merging from the duplicate warning.
+    into: { id: string; title: string } | null;
+}>();
 
 const open = defineModel<boolean>('open', { required: true });
 
@@ -34,7 +39,7 @@ const merge = useMergeSeries();
 
 const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
     schema: MergeSeriesFormSchema,
-    initialValues: { into: null },
+    initialValues: { into: props.into },
     onSubmit: async ({ into }) => {
         const intoSeriesId = into?.id;
         if (!intoSeriesId) return 'Pick a series that already exists';
@@ -47,7 +52,7 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
 });
 
 watch(open, (isOpen) => {
-    if (isOpen) resetForm({ values: { into: null } });
+    if (isOpen) resetForm({ values: { into: props.into } });
 });
 </script>
 

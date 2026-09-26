@@ -20,13 +20,13 @@ import {
 
 import {
     byAdded,
+    setVerified,
     totalCount,
-    verifiedBy,
     verifiedByUser,
     whereVerified,
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
-import { refreshSeriesCover } from '../lib/books.js';
+import { matchSeriesKind, refreshSeriesCover } from '../lib/books.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -105,7 +105,22 @@ const adminSeries = new Hono<AppEnv>()
     })
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const [row] = await db()
-            .select({ found: series, verifiedBy: verifiedByUser.username })
+            .select({
+                id: series.id,
+                title: series.title,
+                kind: series.kind,
+                language: series.language,
+                coverUrl: series.coverUrl,
+                volumeCount: series.volumeCount,
+                createdAt: series.createdAt,
+                verifiedBy: verifiedByUser.username,
+                verifiedAt: series.verifiedAt,
+                // Only read to work out the AniList link.
+                detailsSource: series.detailsSource,
+                detailsId: series.detailsId,
+                details: series.details,
+                detailsFetchedAt: series.detailsFetchedAt,
+            })
             .from(series)
             .leftJoin(
                 verifiedByUser,
@@ -115,34 +130,26 @@ const adminSeries = new Hono<AppEnv>()
         if (!row) {
             throw new HTTPException(404, { message: 'Series not found' });
         }
-        const { found } = row;
         // Other series this one may duplicate, to merge.
         const sameTitle = await db()
             .select({ id: series.id, title: series.title })
             .from(series)
             .where(
                 and(
-                    ne(series.id, found.id),
-                    sql`lower(${series.title}) = lower(${found.title})`,
-                    sql`${series.language} is not distinct from ${found.language}`
+                    ne(series.id, row.id),
+                    sql`lower(${series.title}) = lower(${row.title})`,
+                    sql`${series.language} is not distinct from ${row.language}`
                 )
             );
-        const details = seriesDetails(found);
-
+        const { details, detailsFetchedAt, ...found } = row;
+        const { detailsSource, detailsId, detailsTitle, links } =
+            seriesDetails(row);
         return c.json({
-            id: found.id,
-            title: found.title,
-            kind: found.kind,
-            language: found.language,
-            coverUrl: found.coverUrl,
-            createdAt: found.createdAt,
-            verifiedAt: found.verifiedAt,
-            verifiedBy: row.verifiedBy,
-            detailsSource: details.detailsSource,
-            detailsId: details.detailsId,
-            detailsTitle: details.detailsTitle,
-            volumeCount: details.volumeCount,
-            links: details.links,
+            ...found,
+            detailsSource,
+            detailsId,
+            detailsTitle,
+            links,
             sameTitle,
         });
     })
@@ -180,12 +187,8 @@ const adminSeries = new Hono<AppEnv>()
                     .update(series)
                     .set({ title, kind, language, updatedAt: new Date() })
                     .where(eq(series.id, found.id));
-                // The series' kind wins, so its items all match.
                 if (kind !== found.kind) {
-                    await tx
-                        .update(catalogItem)
-                        .set({ kind, updatedAt: new Date() })
-                        .where(eq(catalogItem.seriesId, found.id));
+                    await matchSeriesKind(found.id, tx);
                 }
             });
             return c.body(null, 204);
@@ -247,12 +250,8 @@ const adminSeries = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { verified } = c.req.valid('json');
-            const [updated] = await db()
-                .update(series)
-                .set(verifiedBy(verified, c.get('user').id))
-                .where(eq(series.id, id))
-                .returning({ id: series.id });
-            if (!updated) {
+            const by = verified ? c.get('user').id : null;
+            if (!(await setVerified(series, id, by))) {
                 throw new HTTPException(404, { message: 'Series not found' });
             }
             return c.body(null, 204);
@@ -277,13 +276,10 @@ const adminSeries = new Hono<AppEnv>()
             await db().transaction(async (tx) => {
                 await tx
                     .update(catalogItem)
-                    .set({
-                        seriesId: into.id,
-                        kind: into.kind,
-                        updatedAt: new Date(),
-                    })
+                    .set({ seriesId: into.id, updatedAt: new Date() })
                     .where(eq(catalogItem.seriesId, id));
                 await tx.delete(series).where(eq(series.id, id));
+                await matchSeriesKind(into.id, tx);
             });
             await refreshSeriesCover(into.id);
             return c.body(null, 204);

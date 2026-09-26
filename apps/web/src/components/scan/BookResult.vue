@@ -119,7 +119,14 @@ const seriesOptions = computed(() => {
     const current = values.isSeries ? values.series : null;
     const options = [
         ...(lastSeries.value
-            ? [{ ...lastSeries.value, language: null, isLast: true }]
+            ? [
+                  {
+                      ...lastSeries.value,
+                      kind: null,
+                      language: null,
+                      isLast: true,
+                  },
+              ]
             : []),
         ...props.lookup.similarSeries.map((s) => ({ ...s, isLast: false })),
     ];
@@ -211,10 +218,10 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             @submit="submit"
         >
             <FormError :message="formError" />
-            <p v-if="lookup.savedSeries" class="text-sm">
-                {{ lookup.savedSeries.title }}
-                <template v-if="lookup.savedSeries.volume !== null">
-                    · Vol. {{ lookup.savedSeries.volume }}
+            <p v-if="lookup.savedSeriesTitle" class="text-sm">
+                {{ lookup.savedSeriesTitle }}
+                <template v-if="lookup.savedVolume !== null">
+                    · Vol. {{ lookup.savedVolume }}
                 </template>
             </p>
             <template v-else>
@@ -249,6 +256,9 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                                     ? `Use last series: ${option.title}`
                                     : option.title
                                 }}
+                                <template v-if="option.kind">
+                                    · {{ SERIES_KIND_LABELS[option.kind] }}
+                                </template>
                                 <template v-if="option.language">
                                     ·
                                     {{ SERIES_LANGUAGE_LABELS[option.language] }}

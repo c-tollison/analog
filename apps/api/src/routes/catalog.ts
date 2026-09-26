@@ -157,13 +157,9 @@ const catalog = new Hono<AppEnv>()
                     : null,
                 similarSeries,
                 inCollectionIds,
-                savedSeries: item.series
-                    ? {
-                          id: item.series.id,
-                          title: item.series.title,
-                          volume: item.position,
-                      }
-                    : null,
+                // Set by an earlier scan, so this one can't change them.
+                savedSeriesTitle: item.series?.title ?? null,
+                savedVolume: item.series ? item.position : null,
             });
         }
     );

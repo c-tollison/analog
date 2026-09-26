@@ -1,22 +1,16 @@
 import {
-    CATALOG_TITLE_MAX_LENGTH,
-    SERIES_TITLE_MAX_LENGTH,
+    ItemTitleSchema,
     SeriesKind,
     SeriesLanguageSchema,
+    SeriesTitleSchema,
 } from '@analog/types';
 
 import { SeriesPickSchema, VolumeField } from './catalog-schemas';
 import { z } from 'zod';
 
-const TitleField = z
-    .string()
-    .trim()
-    .min(1, 'Title is required')
-    .max(CATALOG_TITLE_MAX_LENGTH);
-
 export const AdminItemFormSchema = z
     .object({
-        title: TitleField,
+        title: ItemTitleSchema,
         isSeries: z.boolean(),
         series: SeriesPickSchema.nullish(),
         volume: VolumeField,
@@ -30,11 +24,7 @@ export const AdminItemFormSchema = z
 export const NO_LANGUAGE = 'none';
 
 export const AdminSeriesFormSchema = z.object({
-    title: z
-        .string()
-        .trim()
-        .min(1, 'Series name is required')
-        .max(SERIES_TITLE_MAX_LENGTH),
+    title: SeriesTitleSchema,
     kind: z.enum(SeriesKind),
     language: z
         .string()
@@ -46,7 +36,7 @@ export const SeriesItemsFormSchema = z.object({
     items: z.array(
         z.object({
             id: z.string(),
-            title: TitleField,
+            title: ItemTitleSchema,
             volume: VolumeField,
             verified: z.boolean(),
         })
