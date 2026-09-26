@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, schema, sql } from '@analog/db';
+import { and, desc, eq, isNotNull, isNull, schema, sql } from '@analog/db';
 import {
     DEFAULT_SERIES_LANGUAGE,
     ExternalSource,
@@ -538,7 +538,8 @@ export async function findOrCreateBook(isbn: string, userId: string) {
  * Returns the catalog item for an ISBN. The user's series and volume are
  * saved only when the item has no series yet and isn't verified, since Open
  * Library's series data is unreliable. After that, only admins change them.
- * A new series gets its language from the book's.
+ * A new series gets its language from the book's, and a verified series
+ * the item joins goes back to unverified.
  */
 export async function upsertBook(
     isbn: string,
@@ -578,9 +579,24 @@ export async function upsertBook(
     }
 
     if (updated.seriesId) {
-        await refreshSeriesCover(updated.seriesId);
+        await Promise.all([
+            refreshSeriesCover(updated.seriesId),
+            unverifySeries(updated.seriesId),
+        ]);
     }
     return updated;
+}
+
+/**
+ * Sends a series back to the admins' list, since a scan added an item they
+ * haven't checked belongs in it.
+ */
+async function unverifySeries(seriesId: string): Promise<void> {
+    const { series } = schema;
+    await db()
+        .update(series)
+        .set({ verifiedAt: null, verifiedByUserId: null })
+        .where(and(eq(series.id, seriesId), isNotNull(series.verifiedAt)));
 }
 
 /**
