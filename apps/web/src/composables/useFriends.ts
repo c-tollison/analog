@@ -47,6 +47,20 @@ export function useFriends(
     );
 }
 
+/**
+ * Friend requests sent to the signed-in user. Keyed under notifications so
+ * it reloads with them.
+ */
+export function useFriendRequests() {
+    return usePaginatedList(
+        () => [...NOTIFICATIONS_KEY, 'friend-requests'],
+        async (offset) =>
+            unwrap(
+                await api.friends.requests.received.$get({ query: { offset } })
+            )
+    );
+}
+
 /** Send a request, or accept theirs if they already sent one. */
 export function useSendFriendRequest() {
     const queryClient = useQueryClient();
