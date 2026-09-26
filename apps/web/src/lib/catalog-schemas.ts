@@ -28,21 +28,26 @@ export const SeriesPickSchema = z.object({
         ),
 });
 
+// Number inputs give strings; empty means no volume. Optional because the
+// form drops the value when the field is hidden.
+export const VolumeField = z
+    .unknown()
+    .optional()
+    .transform((value) =>
+        value === '' || value == null ? null : Number(value)
+    )
+    .pipe(
+        z
+            .number({ error: 'Enter a number' })
+            .nonnegative("Volume can't be negative")
+            .nullable()
+    );
+
 export const AddBookFormSchema = z
     .object({
         isSeries: z.boolean(),
         series: SeriesPickSchema.nullish(),
-        volume: z
-            .unknown()
-            .transform((value) =>
-                value === '' || value == null ? null : Number(value)
-            )
-            .pipe(
-                z
-                    .number({ error: 'Enter a number' })
-                    .nonnegative("Volume can't be negative")
-                    .nullable()
-            ),
+        volume: VolumeField,
     })
     .refine((values) => !values.isSeries || values.series != null, {
         message: 'Pick a series or type a new name',
