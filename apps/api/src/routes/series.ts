@@ -4,6 +4,7 @@ import {
     LinkDetailsSourceSchema,
     PageQuerySchema,
     SetVolumeCountSchema,
+    UserRole,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
@@ -24,6 +25,7 @@ import {
     unlinkDetailsSource,
 } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
+import { requireRole } from '../middleware/require-role.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
 
@@ -35,10 +37,11 @@ const DetailsSearchQuerySchema = z.object({
     q: z.string().trim().min(1).max(200),
 });
 
-// Series are shared like the rest of the catalog, so anyone can link one.
+// Series are shared by everyone, so only admins can change them.
 const series = new Hono<AppEnv>()
     .get(
         '/details-source/search',
+        requireRole(UserRole.Admin),
         schemaValidator('query', DetailsSearchQuerySchema),
         async (c) => {
             const { source, q } = c.req.valid('query');
@@ -47,6 +50,7 @@ const series = new Hono<AppEnv>()
     )
     .put(
         '/:id/details-source',
+        requireRole(UserRole.Admin),
         schemaValidator('param', IdParamSchema),
         schemaValidator('json', LinkDetailsSourceSchema),
         async (c) => {
@@ -59,6 +63,7 @@ const series = new Hono<AppEnv>()
     )
     .delete(
         '/:id/details-source',
+        requireRole(UserRole.Admin),
         schemaValidator('param', IdParamSchema),
         async (c) => {
             await unlinkDetailsSource(c.req.valid('param').id);
@@ -67,6 +72,7 @@ const series = new Hono<AppEnv>()
     )
     .put(
         '/:id/volume-count',
+        requireRole(UserRole.Admin),
         schemaValidator('param', IdParamSchema),
         schemaValidator('json', SetVolumeCountSchema),
         async (c) => {

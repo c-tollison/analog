@@ -87,6 +87,23 @@ export enum UserRole {
     Admin = 'admin',
 }
 
+// Higher roles can do everything lower ones can.
+const ROLE_RANK: Record<UserRole, number> = {
+    [UserRole.Member]: 0,
+    [UserRole.Admin]: 1,
+};
+
+const UserRoleSchema = z.enum(UserRole);
+
+/** Whether the user's role is `role` or above it. */
+export function hasRole(
+    user: { role?: string | null } | null | undefined,
+    role: UserRole
+): boolean {
+    const parsed = UserRoleSchema.safeParse(user?.role);
+    return parsed.success && ROLE_RANK[parsed.data] >= ROLE_RANK[role];
+}
+
 export const USER_FIELDS = {
     role: {
         type: [UserRole.Member, UserRole.Admin],

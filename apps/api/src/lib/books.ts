@@ -1,4 +1,4 @@
-import { and, desc, eq, schema, sql } from '@analog/db';
+import { and, desc, eq, isNull, schema, sql } from '@analog/db';
 import {
     ExternalSource,
     MediaFormat,
@@ -490,9 +490,9 @@ export async function findOrCreateBook(isbn: string, userId: string) {
 }
 
 /**
- * Sets the series and volume on the catalog item for an ISBN. They come from
- * the user and overwrite what's stored, since Open Library's series data is
- * unreliable.
+ * Returns the catalog item for an ISBN. The user's series and volume are
+ * saved only when the item has no series yet, since Open Library's series
+ * data is unreliable. Once it has one, only admins change it.
  */
 export async function upsertBook(
     isbn: string,
@@ -501,6 +501,9 @@ export async function upsertBook(
     userId: string
 ): Promise<CatalogItem> {
     const { item } = await findOrCreateBook(isbn, userId);
+    if (item.seriesId) {
+        return item;
+    }
     const kind = toBookKind(item.kind);
 
     const series = seriesChoice
@@ -514,18 +517,20 @@ export async function upsertBook(
             position: volume,
             updatedAt: new Date(),
         })
-        .where(eq(schema.catalogItem.id, item.id))
+        .where(
+            and(
+                eq(schema.catalogItem.id, item.id),
+                isNull(schema.catalogItem.seriesId)
+            )
+        )
         .returning();
     if (!updated) {
-        throw new Error(`Catalog item ${item.id} missing on update`);
+        return (await findBookByIsbn(isbn)) ?? item;
     }
 
-    const affected = new Set([item.seriesId, updated.seriesId]);
-    await Promise.all(
-        [...affected]
-            .filter((seriesId): seriesId is string => !!seriesId)
-            .map(refreshSeriesCover)
-    );
+    if (updated.seriesId) {
+        await refreshSeriesCover(updated.seriesId);
+    }
     return updated;
 }
 
