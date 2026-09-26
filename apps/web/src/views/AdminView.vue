@@ -33,10 +33,11 @@ const STATUS_LABELS: Record<VerifiedFilter, string> = {
 };
 
 // The list state lives in the URL, so going back from a media or series page
-// returns to the same tab, filter, search and page.
+// returns to the same tab, filter, search and page. Status is only there when
+// someone picked one that differs from the default.
 const ListStateSchema = z.object({
     tab: z.enum(Tab).catch(Tab.Series),
-    status: z.enum(VerifiedFilter).catch(VerifiedFilter.Unverified),
+    status: z.enum(VerifiedFilter).optional().catch(undefined),
     sort: z.enum(AddedSort).catch(AddedSort.Newest),
     q: z.string().catch(''),
     page: z.coerce.number().int().min(1).catch(1),
@@ -45,7 +46,13 @@ const ListStateSchema = z.object({
 type ListState = z.infer<typeof ListStateSchema>;
 
 const DEFAULTS = ListStateSchema.parse({});
-const KEYS = ['tab', 'status', 'sort', 'q', 'page'] as const;
+const KEYS = ['tab', 'sort', 'q', 'page'] as const;
+
+// The queue shows what's left to verify, and a search looks through
+// everything.
+function defaultStatus(q: string): VerifiedFilter {
+    return q ? VerifiedFilter.All : VerifiedFilter.Unverified;
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -61,6 +68,9 @@ function update(changes: Partial<ListState>) {
             String(next[key]),
         ])
     );
+    if (next.status && next.status !== defaultStatus(next.q)) {
+        query.status = next.status;
+    }
     router.replace({ query });
 }
 
@@ -69,7 +79,7 @@ const tab = computed({
     set: (value) => update({ tab: value, page: 1 }),
 });
 const status = computed({
-    get: () => state.value.status,
+    get: () => state.value.status ?? defaultStatus(state.value.q),
     set: (value) => update({ status: value, page: 1 }),
 });
 const sort = computed({
@@ -85,7 +95,7 @@ const page = computed({
 // for its first page, so it's usually already loaded.
 const firstPage = () => ({
     q: state.value.q,
-    status: state.value.status,
+    status: status.value,
     sort: state.value.sort,
     limit: DEFAULT_PAGE_SIZE,
     offset: 0,
