@@ -414,6 +414,7 @@ const collections = new Hono<AppEnv>()
                     id: found.id,
                     title: found.title,
                     kind: found.kind,
+                    language: found.language,
                     coverUrl: found.coverUrl,
                 },
                 ownedCount: counted?.ownedCount ?? 0,

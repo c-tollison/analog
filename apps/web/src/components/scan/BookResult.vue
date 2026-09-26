@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SERIES_LANGUAGE_LABELS } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SeriesPicker, {
@@ -117,7 +118,9 @@ function isSameSeries(a: SeriesPick, b: SeriesPick | null | undefined) {
 const seriesOptions = computed(() => {
     const current = values.isSeries ? values.series : null;
     const options = [
-        ...(lastSeries.value ? [{ ...lastSeries.value, isLast: true }] : []),
+        ...(lastSeries.value
+            ? [{ ...lastSeries.value, language: null, isLast: true }]
+            : []),
         ...props.lookup.similarSeries.map((s) => ({ ...s, isLast: false })),
     ];
     return options.filter(
@@ -191,6 +194,9 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                     <Badge variant="secondary">
                         {{ SERIES_KIND_LABELS[book.kind] }}
                     </Badge>
+                    <Badge v-if="book.languages.length" variant="secondary">
+                        {{ book.languages.join(', ') }}
+                    </Badge>
                     <Badge v-if="alreadyInCollection">
                         In {{ collectionName }}
                     </Badge>
@@ -243,6 +249,10 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                                     ? `Use last series: ${option.title}`
                                     : option.title
                                 }}
+                                <template v-if="option.language">
+                                    ·
+                                    {{ SERIES_LANGUAGE_LABELS[option.language] }}
+                                </template>
                             </span>
                         </Button>
                     </div>
@@ -277,10 +287,8 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                                 <span>{{ seriesNote.text }}</span>
                             </p>
                             <FormDescription>
-                                Include the edition, and the language if you
-                                know it, like "Fullmetal Alchemist (3-in-1
-                                Edition, English)". Each edition is its own
-                                series.
+                                Include the edition, like "Fullmetal Alchemist
+                                3-in-1 Edition". Each edition is its own series.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

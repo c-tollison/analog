@@ -5,6 +5,7 @@ import {
     DetailsSourceSchema,
     ExternalSource,
     type LinkDetailsSourceSchema,
+    SERIES_LANGUAGE_LABELS,
 } from '@analog/types';
 
 import { getManga, searchManga } from './anilist.js';
@@ -126,6 +127,11 @@ export function seriesDetails(series: Series) {
         description: details?.description ?? null,
         genres: details?.genres ?? [],
         facts: filledFacts([
+            {
+                label: 'Language',
+                value:
+                    series.language && SERIES_LANGUAGE_LABELS[series.language],
+            },
             { label: 'Status', value: details?.status },
             { label: 'Published', value: run },
             {

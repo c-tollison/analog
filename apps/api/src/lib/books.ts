@@ -1,9 +1,13 @@
 import { and, desc, eq, isNull, schema, sql } from '@analog/db';
 import {
+    DEFAULT_SERIES_LANGUAGE,
     ExternalSource,
     MediaFormat,
+    SERIES_LANGUAGE_LABELS,
+    SERIES_LANGUAGES,
     type SeriesChoiceSchema,
     SeriesKind,
+    type SeriesLanguage,
 } from '@analog/types';
 
 import { filledFacts, filledLinks } from './details.js';
@@ -46,6 +50,7 @@ export const seriesColumns = {
     id: schema.series.id,
     title: schema.series.title,
     kind: schema.series.kind,
+    language: schema.series.language,
     coverUrl: schema.series.coverUrl,
 };
 
@@ -82,6 +87,18 @@ export async function findBookByIsbn(isbn: string) {
         with: { series: true },
     });
     return item ?? null;
+}
+
+/**
+ * A book's language as a series language, from the language names its
+ * sources gave, like "English". English when none match.
+ */
+function guessLanguage(languages: string[]): SeriesLanguage {
+    return (
+        SERIES_LANGUAGES.find((code) =>
+            languages.includes(SERIES_LANGUAGE_LABELS[code])
+        ) ?? DEFAULT_SERIES_LANGUAGE
+    );
 }
 
 async function findSeriesByTitle(title: string): Promise<Series | null> {
@@ -122,7 +139,11 @@ export async function findSimilarSeries(bookTitle: string) {
         word_similarity(${title}, ${column})
     )`;
     return db()
-        .select({ id: schema.series.id, title: column })
+        .select({
+            id: schema.series.id,
+            title: column,
+            language: schema.series.language,
+        })
         .from(schema.series)
         .where(sql`${score} >= ${SERIES_MATCH_THRESHOLD}`)
         .orderBy(desc(score), desc(sql`similarity(${column}, ${title})`))
@@ -133,7 +154,8 @@ type SeriesChoice = z.output<typeof SeriesChoiceSchema>;
 
 async function resolveSeries(
     choice: SeriesChoice,
-    kind: BookLookup['kind']
+    kind: BookLookup['kind'],
+    language: SeriesLanguage
 ): Promise<Series> {
     if ('id' in choice) {
         const found = await db().query.series.findFirst({
@@ -151,7 +173,7 @@ async function resolveSeries(
     }
     const [created] = await db()
         .insert(schema.series)
-        .values({ title: choice.title, kind })
+        .values({ title: choice.title, kind, language })
         .returning();
     if (!created) {
         throw new Error('Failed to create series');
@@ -391,13 +413,21 @@ async function lookupBook(isbn: string, options: LookupOptions) {
     return lookup && { ...lookup, later };
 }
 
-/** Saves a lookup over a stored book. Series and volume aren't touched. */
+/**
+ * Saves a lookup over a stored book. Series and volume aren't touched, and a
+ * book in a series keeps the series' kind. Verified books aren't saved over.
+ */
 async function saveBook(itemId: string, lookup: Lookup) {
     const { book } = lookup;
+    const { catalogItem, series } = schema;
     const [updated] = await db()
-        .update(schema.catalogItem)
+        .update(catalogItem)
         .set({
-            kind: book.kind,
+            kind: sql`coalesce(
+                (select ${series.kind} from ${series}
+                    where ${series.id} = ${catalogItem.seriesId}),
+                ${book.kind}
+            )`,
             title: book.title,
             externalSource: book.source,
             externalId: book.sourceId,
@@ -409,7 +439,7 @@ async function saveBook(itemId: string, lookup: Lookup) {
             openLibraryFetchedAt: lookup.openLibraryFetchedAt ?? undefined,
             updatedAt: new Date(),
         })
-        .where(eq(schema.catalogItem.id, itemId))
+        .where(and(eq(catalogItem.id, itemId), isNull(catalogItem.verifiedAt)))
         .returning({
             id: schema.catalogItem.id,
             title: schema.catalogItem.title,
@@ -491,8 +521,9 @@ export async function findOrCreateBook(isbn: string, userId: string) {
 
 /**
  * Returns the catalog item for an ISBN. The user's series and volume are
- * saved only when the item has no series yet, since Open Library's series
- * data is unreliable. Once it has one, only admins change it.
+ * saved only when the item has no series yet and isn't verified, since Open
+ * Library's series data is unreliable. After that, only admins change them.
+ * A new series gets its language from the book's.
  */
 export async function upsertBook(
     isbn: string,
@@ -501,26 +532,33 @@ export async function upsertBook(
     userId: string
 ): Promise<CatalogItem> {
     const { item } = await findOrCreateBook(isbn, userId);
-    if (item.seriesId) {
+    if (item.seriesId || item.verifiedAt) {
         return item;
     }
-    const kind = toBookKind(item.kind);
 
     const series = seriesChoice
-        ? await resolveSeries(seriesChoice, kind)
+        ? await resolveSeries(
+              seriesChoice,
+              toBookKind(item.kind),
+              guessLanguage(readMetadata(item).languages)
+          )
         : null;
 
+    const { catalogItem } = schema;
     const [updated] = await db()
-        .update(schema.catalogItem)
+        .update(catalogItem)
         .set({
             seriesId: series?.id ?? null,
             position: volume,
+            // The series' kind wins, so its items all match.
+            kind: series?.kind ?? item.kind,
             updatedAt: new Date(),
         })
         .where(
             and(
-                eq(schema.catalogItem.id, item.id),
-                isNull(schema.catalogItem.seriesId)
+                eq(catalogItem.id, item.id),
+                isNull(catalogItem.seriesId),
+                isNull(catalogItem.verifiedAt)
             )
         )
         .returning();
@@ -537,8 +575,8 @@ export async function upsertBook(
 /**
  * Looks up a stored book again. What the lookup finds wins, and anything it
  * comes back without keeps its stored value. Series and volume stay as the
- * user set them. With `onlyMissing`, only sources that haven't answered for
- * this book are asked.
+ * user set them, and verified books are only edited by hand. With
+ * `onlyMissing`, only sources that haven't answered for this book are asked.
  */
 export async function refreshBook(itemId: string, onlyMissing = false) {
     const item = await db().query.catalogItem.findFirst({
@@ -551,6 +589,11 @@ export async function refreshBook(itemId: string, onlyMissing = false) {
     if (item.format !== MediaFormat.Book || !item.barcode) {
         throw new HTTPException(400, {
             message: 'Only books with an ISBN can be refreshed',
+        });
+    }
+    if (item.verifiedAt) {
+        throw new HTTPException(400, {
+            message: 'Verified items are only edited by hand',
         });
     }
     const lookup = await lookupBook(item.barcode, {
