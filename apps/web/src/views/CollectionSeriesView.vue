@@ -23,6 +23,7 @@ import {
     kindStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
+import { missingVolumes } from '@/lib/volumes';
 
 import { PlusIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -88,24 +89,11 @@ const hasDetails = computed(
             detail.value.facts.length > 0)
 );
 
-// Whole-numbered volumes up to the total that aren't here, as "4, 7–9".
 const missing = computed(() => {
     const total = detail.value?.volumeCount;
-    if (!detail.value || !total) return null;
-    const owned = new Set(detail.value.ownedPositions);
-    const ranges: string[] = [];
-    let start: number | null = null;
-    for (let volume = 1; volume <= total + 1; volume++) {
-        const isMissing = volume <= total && !owned.has(volume);
-        if (isMissing && start === null) {
-            start = volume;
-        } else if (!isMissing && start !== null) {
-            const end = volume - 1;
-            ranges.push(end === start ? `${start}` : `${start}–${end}`);
-            start = null;
-        }
-    }
-    return ranges.join(', ') || null;
+    return detail.value && total
+        ? missingVolumes(detail.value.ownedPositions, total)
+        : null;
 });
 
 const headerError = computed(
