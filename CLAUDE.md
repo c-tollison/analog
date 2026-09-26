@@ -56,6 +56,7 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 
 - Signed-in pages are children of the `/` route, which renders `AppLayout` and sets `meta.requiresAuth`. The shell components `AppLayout`, `AppTopNav` and `UserMenu` live in `src/components/layout/`.
 - Pages inside the layout must not set `min-h-svh`. The layout sets the height.
+- `AppLayout` sets the page width and padding in its `<main>`. A page inside it has a plain `div` root with its own spacing, like `flex flex-col gap-4`, and never its own `<main>`, `mx-auto`, width or padding. A narrow page can add `max-w-lg`.
 
 ### Data and state
 
