@@ -1,6 +1,7 @@
 import { and, asc, eq, ilike, ne, or, schema, sql } from '@analog/db';
 import {
     PageQuerySchema,
+    UpdatePreferencesSchema,
     USER_SEARCH_MIN_LENGTH,
     USERNAME_MAX_LENGTH,
 } from '@analog/types';
@@ -104,6 +105,16 @@ const users = new Hono<AppEnv>()
         });
         return c.body(null, 204);
     })
+    .patch(
+        '/me/preferences',
+        schemaValidator('json', UpdatePreferencesSchema),
+        async (c) => {
+            const values = c.req.valid('json');
+            const me = c.get('user').id;
+            await db().update(user).set(values).where(eq(user.id, me));
+            return c.json(values);
+        }
+    )
     .get('/:id/avatar', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');
         const [found] = await db()

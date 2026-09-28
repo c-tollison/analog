@@ -7,7 +7,9 @@ import {
 import { z } from 'zod';
 
 export const REVIEW_MAX_LENGTH = 2000;
-export const RATING_MAX = 5;
+// Ratings count half stars, so 7 means 3.5 stars.
+export const RATING_STARS = 5;
+export const RATING_MAX = RATING_STARS * 2;
 
 const profanityMatcher = new RegExpMatcher({
     ...englishDataset.build(),
@@ -22,8 +24,8 @@ export const ReviewSchema = z.object({
     rating: z
         .number()
         .int()
-        .min(1, `Rating must be 1 to ${RATING_MAX} stars`)
-        .max(RATING_MAX, `Rating must be 1 to ${RATING_MAX} stars`)
+        .min(1, `Rating must be 0.5 to ${RATING_STARS} stars`)
+        .max(RATING_MAX, `Rating must be 0.5 to ${RATING_STARS} stars`)
         .nullable(),
     review: z
         .string()

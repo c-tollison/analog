@@ -80,9 +80,14 @@ function othersReviewed(catalogItemId: string, me: string) {
     );
 }
 
-const completedCount = sql<number>`(
-    count(*) filter (where ${isCompleted})
-)::int`;
+/** Counts the joined progress rows that have `status`. */
+function statusCount(status: ProgressStatus) {
+    return sql<number>`(
+        count(*) filter (where ${progress.status} = ${status})
+    )::int`;
+}
+
+const completedCount = statusCount(ProgressStatus.Completed);
 
 const CollectionParamSchema = IdParamSchema;
 const ItemParamSchema = CollectionParamSchema.extend({
@@ -127,30 +132,53 @@ const ownerFirst = [
     asc(collectionMember.createdAt),
 ];
 
+/**
+ * Item totals for each collection in the outer query, read in one pass over
+ * its items: how many there are, this user's status counts and the formats.
+ */
+function itemStats(userId: string) {
+    return db()
+        .select({
+            itemCount: sql<number>`count(*)::int`.as('item_count'),
+            completedCount: completedCount.as('completed_count'),
+            inProgressCount: statusCount(ProgressStatus.InProgress).as(
+                'in_progress_count'
+            ),
+            plannedCount: statusCount(ProgressStatus.Planned).as(
+                'planned_count'
+            ),
+            formats: sql<MediaFormat[]>`coalesce(
+                json_agg(distinct ${catalogItem.format}), '[]'::json
+            )`.as('formats'),
+        })
+        .from(collectionItem)
+        .innerJoin(
+            catalogItem,
+            eq(collectionItem.catalogItemId, catalogItem.id)
+        )
+        .leftJoin(
+            progress,
+            and(
+                eq(progress.catalogItemId, collectionItem.catalogItemId),
+                eq(progress.userId, userId)
+            )
+        )
+        .where(eq(collectionItem.collectionId, collection.id))
+        .as('item_stats');
+}
+
 function collectionSummaries(userId: string, collectionId?: string) {
+    const stats = itemStats(userId);
     return db()
         .select({
             id: collection.id,
             name: collection.name,
             role: collectionMember.role,
-            itemCount: sql<number>`(
-                select count(*)::int from ${collectionItem}
-                where ${collectionItem.collectionId} = ${collection.id}
-            )`,
-            // How much of the collection this user has finished.
-            completedCount: sql<number>`(
-                select count(*)::int from ${collectionItem} ci
-                join ${progress} p on p.catalog_item_id = ci.catalog_item_id
-                    and p.user_id = ${userId}
-                where ci.collection_id = ${collection.id}
-                    and p.status = ${ProgressStatus.Completed}
-            )`,
-            formats: sql<MediaFormat[]>`(
-                select coalesce(json_agg(distinct c.format), '[]'::json)
-                from ${collectionItem} ci
-                join ${catalogItem} c on c.id = ci.catalog_item_id
-                where ci.collection_id = ${collection.id}
-            )`,
+            itemCount: stats.itemCount,
+            completedCount: stats.completedCount,
+            inProgressCount: stats.inProgressCount,
+            plannedCount: stats.plannedCount,
+            formats: stats.formats,
             memberCount: sql<number>`(
                 select count(*)::int from ${collectionMember} m
                 where m.collection_id = ${collection.id}
@@ -170,6 +198,7 @@ function collectionSummaries(userId: string, collectionId?: string) {
         })
         .from(collectionMember)
         .innerJoin(collection, eq(collectionMember.collectionId, collection.id))
+        .crossJoinLateral(stats)
         .where(
             and(
                 eq(collectionMember.userId, userId),

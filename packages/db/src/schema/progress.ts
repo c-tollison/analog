@@ -15,7 +15,7 @@ import {
 
 // One person's status, rating and review for a catalog item. It follows the
 // person across every collection the item is in. A null status keeps the
-// review around when someone un-marks an item.
+// review around when someone un-marks an item. Ratings count half stars.
 export const progress = appSchema.table(
     'progress',
     {
@@ -34,6 +34,6 @@ export const progress = appSchema.table(
     (table) => [
         primaryKey({ columns: [table.userId, table.catalogItemId] }),
         index('progress_catalog_item_id_idx').on(table.catalogItemId),
-        check('progress_rating_range', sql`${table.rating} between 1 and 5`),
+        check('progress_rating_range', sql`${table.rating} between 1 and 10`),
     ]
 );

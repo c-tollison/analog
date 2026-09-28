@@ -19,7 +19,7 @@ const props = defineProps<{
     catalogItemId: string;
     rating: number | null;
     review: string | null;
-    canCancel: boolean;
+    cancelText: string;
 }>();
 
 const emit = defineEmits<{ done: [] }>();
@@ -46,10 +46,21 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
         <FormError :message="formError" />
         <FormField name="rating">
             <FormItem>
-                <FormLabel>Your rating</FormLabel>
+                <div class="flex h-6 items-center justify-between">
+                    <FormLabel>Your rating</FormLabel>
+                    <Button
+                        v-if="values.rating !== null"
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        @click="setFieldValue('rating', null)"
+                    >
+                        Clear
+                    </Button>
+                </div>
                 <FormControl>
                     <StarRating
-                        class="-ml-1.5"
+                        class="-ml-1"
                         :model-value="values.rating"
                         @update:model-value="setFieldValue('rating', $event)"
                     />
@@ -70,19 +81,18 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 <FormMessage />
             </FormItem>
         </FormField>
-        <div class="flex gap-2">
-            <Button type="submit" :disabled="isSubmitting">
-                <Spinner v-if="isSubmitting" />
-                Save
-            </Button>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
-                v-if="canCancel"
                 type="button"
                 variant="ghost"
                 :disabled="isSubmitting"
                 @click="emit('done')"
             >
-                Cancel
+                {{ cancelText }}
+            </Button>
+            <Button type="submit" :disabled="isSubmitting">
+                <Spinner v-if="isSubmitting" />
+                Save
             </Button>
         </div>
     </form>

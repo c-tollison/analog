@@ -1,0 +1,24 @@
+<script lang="ts" setup>
+import { cn } from '@/lib/utils';
+
+import { reactiveOmit } from '@vueuse/core';
+import type { DrawerDescriptionProps } from 'reka-ui';
+import { DrawerDescription } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
+
+const props = defineProps<
+    DrawerDescriptionProps & { class?: HTMLAttributes['class'] }
+>();
+
+const delegatedProps = reactiveOmit(props, 'class');
+</script>
+
+<template>
+    <DrawerDescription
+        data-slot="drawer-description"
+        v-bind="delegatedProps"
+        :class="cn('text-muted-foreground text-xs/relaxed', props.class)"
+    >
+        <slot />
+    </DrawerDescription>
+</template>

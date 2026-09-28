@@ -1,0 +1,1 @@
+ALTER TABLE "app"."user" ADD COLUMN "show_collection_progress" boolean DEFAULT true NOT NULL;
