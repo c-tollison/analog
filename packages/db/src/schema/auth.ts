@@ -23,6 +23,9 @@ export const user = appSchema.table(
         image: text('image'),
         twoFactorEnabled: boolean('two_factor_enabled').default(true).notNull(),
         role: userRole('role').default(UserRole.Member).notNull(),
+        showCollectionProgress: boolean('show_collection_progress')
+            .default(true)
+            .notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at')
             .defaultNow()

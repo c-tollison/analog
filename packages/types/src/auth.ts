@@ -110,4 +110,13 @@ export const USER_FIELDS = {
         defaultValue: UserRole.Member,
         input: false as const,
     },
+    showCollectionProgress: {
+        type: 'boolean' as const,
+        defaultValue: true,
+        input: false as const,
+    },
 };
+
+export const UpdatePreferencesSchema = z.object({
+    showCollectionProgress: z.boolean(),
+});
