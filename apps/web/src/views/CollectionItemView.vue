@@ -5,7 +5,7 @@ import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
-import ReviewForm from '@/components/progress/ReviewForm.vue';
+import ReviewSheet from '@/components/progress/ReviewSheet.vue';
 import StarRating from '@/components/progress/StarRating.vue';
 import StatusPicker from '@/components/progress/StatusPicker.vue';
 import { Badge } from '@/components/shadcn-components/badge';
@@ -37,7 +37,7 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import { PencilIcon } from '@lucide/vue';
+import { PencilIcon, StarIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router';
 
@@ -94,7 +94,16 @@ const shownStatus = computed(() =>
 
 function onStatus(status: ProgressStatus | null) {
     if (!item.value) return;
-    setStatus({ catalogItemId: item.value.catalogItemId, status });
+    setStatus(
+        { catalogItemId: item.value.catalogItemId, status },
+        {
+            onSuccess: () => {
+                if (status === ProgressStatus.Completed && !hasReview.value) {
+                    isReviewOpen.value = true;
+                }
+            },
+        }
+    );
 }
 
 const isCompleted = computed(
@@ -103,7 +112,7 @@ const isCompleted = computed(
 const hasReview = computed(
     () => !!item.value && (item.value.rating !== null || !!item.value.review)
 );
-const isEditingReview = ref(false);
+const isReviewOpen = ref(false);
 
 const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
     item.value?.seriesId
@@ -219,37 +228,34 @@ const error = computed(
                         <div class="flex items-center justify-between">
                             <h2 class="font-semibold">Your review</h2>
                             <Button
-                                v-if="hasReview && !isEditingReview"
                                 variant="outline"
                                 size="sm"
-                                @click="isEditingReview = true"
+                                @click="isReviewOpen = true"
                             >
-                                <PencilIcon />
-                                Edit
+                                <PencilIcon v-if="hasReview" />
+                                <StarIcon v-else />
+                                {{ hasReview ? 'Edit' : 'Rate' }}
                             </Button>
                         </div>
-                        <ReviewForm
-                            v-if="isEditingReview || !hasReview"
-                            :catalog-item-id="item.catalogItemId"
-                            :rating="item.rating"
-                            :review="item.review"
-                            :can-cancel="hasReview"
-                            @done="isEditingReview = false"
+                        <StarRating
+                            v-if="item.rating !== null"
+                            readonly
+                            :model-value="item.rating"
                         />
-                        <template v-else>
-                            <StarRating
-                                v-if="item.rating !== null"
-                                readonly
-                                :model-value="item.rating"
-                            />
-                            <p
-                                v-if="item.review"
-                                class="text-sm whitespace-pre-line"
-                            >
-                                {{ item.review }}
-                            </p>
-                        </template>
+                        <p
+                            v-if="item.review"
+                            class="text-sm whitespace-pre-line"
+                        >
+                            {{ item.review }}
+                        </p>
                     </section>
+                    <ReviewSheet
+                        v-model:open="isReviewOpen"
+                        :catalog-item-id="item.catalogItemId"
+                        :title="item.title"
+                        :rating="item.rating"
+                        :review="item.review"
+                    />
                 </template>
             </TabsContent>
 
