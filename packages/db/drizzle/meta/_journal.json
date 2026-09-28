@@ -148,6 +148,13 @@
       "when": 1790519406382,
       "tag": "0020_tune_query_planner",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790614402825,
+      "tag": "0021_half_star_ratings",
+      "breakpoints": true
     }
   ]
 }
