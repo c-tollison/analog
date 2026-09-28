@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { InferResponseType } from '@analog/api/client';
 import CoverImage from '@/components/CoverImage.vue';
+import CollectionProgressBar from '@/components/collections/CollectionProgressBar.vue';
 import CreateCollectionDialog from '@/components/collections/CreateCollectionDialog.vue';
+import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import {
@@ -12,23 +14,27 @@ import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Item,
-    ItemActions,
     ItemContent,
     ItemDescription,
     ItemGroup,
     ItemTitle,
 } from '@/components/shadcn-components/item';
+import { Label } from '@/components/shadcn-components/label';
+import { Switch } from '@/components/shadcn-components/switch';
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import {
     useCollectionSearch,
     useCollections,
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
+import { useUpdatePreferences } from '@/composables/useUsers';
 import type { ApiClient } from '@/lib/api';
-import { formatsCompletedWord } from '@/lib/media-types';
+import { formatsCompletedWord, formatsStatusLabels } from '@/lib/media-types';
+import { useSessionStore } from '@/stores/session';
 
 import { PlusIcon, ScanBarcodeIcon } from '@lucide/vue';
-import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import { computed, ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
 const isCreateOpen = ref(false);
@@ -36,6 +42,20 @@ const query = ref('');
 const { trimmed: trimmedQuery, term, isTyping } = useSearchTerm(query);
 
 const collections = useCollections();
+
+const { session } = storeToRefs(useSessionStore());
+const preferences = useUpdatePreferences();
+
+// Follows the toggle while the save is in flight.
+const showProgress = computed(() =>
+    preferences.isPending.value && preferences.variables.value
+        ? preferences.variables.value.showCollectionProgress
+        : (session.value?.user.showCollectionProgress ?? true)
+);
+
+function setShowProgress(showCollectionProgress: boolean) {
+    preferences.mutate({ showCollectionProgress });
+}
 
 // Searches every collection; nothing loads until something is typed.
 const results = useCollectionSearch(term, { pending: isTyping });
@@ -78,9 +98,21 @@ function resultLink(result: SearchResult): RouteLocationRaw {
             </div>
         </div>
 
+        <FormError :message="preferences.error.value?.message ?? null" />
+
         <CreateCollectionDialog v-model:open="isCreateOpen" />
 
-        <SearchInput v-model="query" placeholder="Search all collections" />
+        <div class="flex items-center gap-4">
+            <SearchInput v-model="query" placeholder="Search all collections" />
+            <div class="flex shrink-0 items-center gap-2">
+                <Switch
+                    id="show-progress"
+                    :model-value="showProgress"
+                    @update:model-value="setShowProgress"
+                />
+                <Label for="show-progress">Progress</Label>
+            </div>
+        </div>
 
         <PagedList
             v-if="trimmedQuery"
@@ -134,42 +166,57 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                         class="has-[a:hover]:bg-muted relative"
                     >
                         <ItemContent class="min-w-0">
-                            <ItemTitle class="w-full">
-                                <RouterLink
-                                    :to="{
-                                        name: 'collection',
-                                        params: { id: c.id },
-                                    }"
-                                    class="truncate after:absolute after:inset-0"
+                            <div
+                                class="flex h-6 items-center justify-between gap-2"
+                            >
+                                <ItemTitle class="min-w-0">
+                                    <RouterLink
+                                        :to="{
+                                            name: 'collection',
+                                            params: { id: c.id },
+                                        }"
+                                        class="truncate after:absolute after:inset-0"
+                                    >
+                                        {{ c.name }}
+                                    </RouterLink>
+                                </ItemTitle>
+                                <AvatarGroup
+                                    v-if="c.memberCount > 1"
+                                    class="shrink-0"
                                 >
-                                    {{ c.name }}
-                                </RouterLink>
-                            </ItemTitle>
+                                    <UserAvatar
+                                        v-for="member in c.members"
+                                        :key="member.id"
+                                        :name="member.name"
+                                        :image="member.image"
+                                        size="sm"
+                                    />
+                                    <AvatarGroupCount
+                                        v-if="c.memberCount > c.members.length"
+                                    >
+                                        +{{ c.memberCount - c.members.length }}
+                                    </AvatarGroupCount>
+                                </AvatarGroup>
+                            </div>
                             <ItemDescription>
                                 {{ c.itemCount }}
                                 {{ c.itemCount === 1 ? 'item' : 'items' }}
-                                <template v-if="c.itemCount">
+                                <template v-if="c.itemCount && !showProgress">
                                     · {{ c.completedCount }}
                                     {{ formatsCompletedWord(c.formats) }}
                                 </template>
                             </ItemDescription>
+                            <CollectionProgressBar
+                                v-if="showProgress"
+                                class="mt-1"
+                                :class="{ invisible: !c.itemCount }"
+                                :total="c.itemCount"
+                                :completed="c.completedCount"
+                                :in-progress="c.inProgressCount"
+                                :planned="c.plannedCount"
+                                :labels="formatsStatusLabels(c.formats)"
+                            />
                         </ItemContent>
-                        <ItemActions v-if="c.memberCount > 1">
-                            <AvatarGroup>
-                                <UserAvatar
-                                    v-for="member in c.members"
-                                    :key="member.id"
-                                    :name="member.name"
-                                    :image="member.image"
-                                    size="sm"
-                                />
-                                <AvatarGroupCount
-                                    v-if="c.memberCount > c.members.length"
-                                >
-                                    +{{ c.memberCount - c.members.length }}
-                                </AvatarGroupCount>
-                            </AvatarGroup>
-                        </ItemActions>
                     </Item>
                 </ItemGroup>
             </template>

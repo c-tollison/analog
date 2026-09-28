@@ -1,4 +1,7 @@
-import type { UpdateProfileSchema } from '@analog/types';
+import type {
+    UpdatePreferencesSchema,
+    UpdateProfileSchema,
+} from '@analog/types';
 import { ApiError, api, unwrap } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { useSessionStore } from '@/stores/session';
@@ -57,6 +60,17 @@ export function useUpdateProfile() {
             }
             await sessionStore.load();
         },
+    });
+}
+
+/** Saves the signed-in user's display preferences, then reloads the session. */
+export function useUpdatePreferences() {
+    const sessionStore = useSessionStore();
+
+    return useMutation({
+        mutationFn: async (values: z.infer<typeof UpdatePreferencesSchema>) =>
+            unwrap(await api.users.me.preferences.$patch({ json: values })),
+        onSuccess: () => sessionStore.refresh(),
     });
 }
 
