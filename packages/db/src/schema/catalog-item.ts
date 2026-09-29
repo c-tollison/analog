@@ -1,4 +1,5 @@
 import { user } from './auth.js';
+import { catalogItemIsbn } from './catalog-item-isbn.js';
 import { collectionItem } from './collection-item.js';
 import { externalSource, mediaFormat, seriesKind } from './enums.js';
 import { appSchema, id, timestamps } from './primitives.js';
@@ -14,7 +15,8 @@ import {
     uuid,
 } from 'drizzle-orm/pg-core';
 
-// One physical product (what a barcode identifies), shared by all users.
+// One physical product, shared by all users. A book's ISBNs are in
+// catalog_item_isbn.
 export const catalogItem = appSchema.table(
     'catalog_item',
     {
@@ -27,8 +29,6 @@ export const catalogItem = appSchema.table(
         }),
         // Volume or season number within the series.
         position: numeric('position', { mode: 'number' }),
-        // ISBN-13 for books, UPC/EAN for discs.
-        barcode: text('barcode').unique(),
         externalSource: externalSource('external_source'),
         externalId: text('external_id'),
         coverUrl: text('cover_url'),
@@ -72,4 +72,5 @@ export const catalogItemRelations = relations(catalogItem, ({ one, many }) => ({
         references: [series.id],
     }),
     collectionItems: many(collectionItem),
+    isbns: many(catalogItemIsbn),
 }));

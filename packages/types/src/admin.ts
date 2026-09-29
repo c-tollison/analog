@@ -1,8 +1,4 @@
-import {
-    SeriesChoiceSchema,
-    SeriesLanguageSchema,
-    SeriesTitleSchema,
-} from './catalog.js';
+import { SeriesChoiceSchema, SeriesTitleSchema } from './catalog.js';
 import { SeriesKind } from './catalog-enums.js';
 import { PageQuerySchema } from './pagination.js';
 import { z } from 'zod';
@@ -42,10 +38,11 @@ export const UpdateCatalogItemSchema = z.object({
     volume: VolumeSchema,
 });
 
+export const MergeItemSchema = z.object({ intoItemId: z.uuid() });
+
 export const UpdateSeriesSchema = z.object({
     title: SeriesTitleSchema,
     kind: z.enum(SeriesKind),
-    language: SeriesLanguageSchema.nullable(),
 });
 
 export const MAX_SERIES_VOLUMES = 1000;

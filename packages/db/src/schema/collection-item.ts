@@ -1,6 +1,7 @@
 import { user } from './auth.js';
 import { catalogItem } from './catalog-item.js';
 import { collection } from './collection.js';
+import { collectionItemIsbn } from './collection-item-isbn.js';
 import { appSchema, id, timestamps } from './primitives.js';
 import { relations } from 'drizzle-orm';
 import { index, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
@@ -32,13 +33,17 @@ export const collectionItem = appSchema.table(
     ]
 );
 
-export const collectionItemRelations = relations(collectionItem, ({ one }) => ({
-    collection: one(collection, {
-        fields: [collectionItem.collectionId],
-        references: [collection.id],
-    }),
-    catalogItem: one(catalogItem, {
-        fields: [collectionItem.catalogItemId],
-        references: [catalogItem.id],
-    }),
-}));
+export const collectionItemRelations = relations(
+    collectionItem,
+    ({ one, many }) => ({
+        collection: one(collection, {
+            fields: [collectionItem.collectionId],
+            references: [collection.id],
+        }),
+        catalogItem: one(catalogItem, {
+            fields: [collectionItem.catalogItemId],
+            references: [catalogItem.id],
+        }),
+        ownedIsbns: many(collectionItemIsbn),
+    })
+);

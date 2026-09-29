@@ -4,8 +4,8 @@ import { z } from 'zod';
 
 export const SERIES_TITLE_MAX_LENGTH = 200;
 
-/** Languages a series can be in, as ISO 639-1 codes. */
-export const SERIES_LANGUAGES = [
+/** Languages titles can be shown in, as ISO 639-1 codes. */
+export const LANGUAGES = [
     'en',
     'ja',
     'ko',
@@ -17,13 +17,13 @@ export const SERIES_LANGUAGES = [
     'pt',
 ] as const;
 
-export type SeriesLanguage = (typeof SERIES_LANGUAGES)[number];
+export type Language = (typeof LANGUAGES)[number];
 
-export const SeriesLanguageSchema = z.enum(SERIES_LANGUAGES);
+export const LanguageSchema = z.enum(LANGUAGES);
 
-export const DEFAULT_SERIES_LANGUAGE: SeriesLanguage = 'en';
+export const DEFAULT_LANGUAGE: Language = 'en';
 
-export const SERIES_LANGUAGE_LABELS: Record<SeriesLanguage, string> = {
+export const LANGUAGE_LABELS: Record<Language, string> = {
     en: 'English',
     ja: 'Japanese',
     ko: 'Korean',
@@ -52,6 +52,8 @@ export const AddBookSchema = z.object({
     series: SeriesChoiceSchema.nullable(),
     volume: z.number().nonnegative().nullable(),
 });
+
+export const OwnedIsbnSchema = z.object({ isbn: IsbnSchema });
 
 export const CollectionNameSchema = z
     .string()
