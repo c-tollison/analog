@@ -27,7 +27,7 @@ export const user = appSchema.table(
             .default(true)
             .notNull(),
         // Private profiles show their collections to friends only.
-        isPublic: boolean('is_public').default(false).notNull(),
+        isPublic: boolean('is_public').default(true).notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at')
             .defaultNow()

@@ -176,6 +176,13 @@
       "when": 1790720795855,
       "tag": "0024_add_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790722363304,
+      "tag": "0025_public_profiles_by_default",
+      "breakpoints": true
     }
   ]
 }

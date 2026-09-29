@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import FormError from '@/components/FormError.vue';
 import { AvatarBadge } from '@/components/shadcn-components/avatar';
 import { Button } from '@/components/shadcn-components/button';
@@ -11,16 +12,18 @@ import {
 } from '@/components/shadcn-components/form';
 import { Input } from '@/components/shadcn-components/input';
 import { Label } from '@/components/shadcn-components/label';
+import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import { Switch } from '@/components/shadcn-components/switch';
 import AvatarDialog from '@/components/users/AvatarDialog.vue';
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import { useAppForm } from '@/composables/useAppForm';
-import { useUpdateProfile } from '@/composables/useUsers';
+import { useUpdatePreferences, useUpdateProfile } from '@/composables/useUsers';
 import { UpdateProfileSchema } from '@/lib/auth-schemas';
 import { vNoAutofill } from '@/lib/no-autofill';
 import { useSessionStore } from '@/stores/session';
 
-import { CameraIcon, CheckIcon, ExternalLinkIcon } from '@lucide/vue';
+import { ArrowLeftIcon, CameraIcon, CheckIcon } from '@lucide/vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 
@@ -30,6 +33,35 @@ const user = computed(() => session.value?.user);
 const update = useUpdateProfile();
 const saved = ref(false);
 const avatarOpen = ref(false);
+
+const preferences = useUpdatePreferences();
+const confirmingPublic = ref(false);
+
+// Follows the switch while the save is in flight.
+const isPublic = computed(
+    () =>
+        (preferences.isPending.value
+            ? preferences.variables.value?.isPublic
+            : undefined) ??
+        user.value?.isPublic ??
+        false
+);
+
+// Going public asks first; going private doesn't.
+function onPublicChange(value: boolean) {
+    if (value) {
+        confirmingPublic.value = true;
+    } else {
+        preferences.mutate({ isPublic: false });
+    }
+}
+
+function onConfirmPublic() {
+    preferences.mutate(
+        { isPublic: true },
+        { onSettled: () => (confirmingPublic.value = false) }
+    );
+}
 
 const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
     schema: UpdateProfileSchema,
@@ -49,6 +81,18 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
 
 <template>
     <div class="mx-auto flex w-full max-w-lg flex-col gap-6">
+        <!-- A link, not history back: the username may have just changed. -->
+        <div v-if="user?.username">
+            <Button variant="ghost" size="sm" class="-ml-2" as-child>
+                <RouterLink
+                    :to="{ name: 'user', params: { username: user.username } }"
+                >
+                    <ArrowLeftIcon />
+                    Profile
+                </RouterLink>
+            </Button>
+        </div>
+
         <div class="flex items-center gap-3">
             <Button
                 v-if="user"
@@ -66,16 +110,8 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
                 </UserAvatar>
             </Button>
             <h1 class="min-w-0 flex-1 truncate text-lg font-semibold">
-                Profile
+                Edit profile
             </h1>
-            <Button v-if="user?.username" variant="outline" size="sm" as-child>
-                <RouterLink
-                    :to="{ name: 'user', params: { username: user.username } }"
-                >
-                    <ExternalLinkIcon />
-                    View public page
-                </RouterLink>
-            </Button>
         </div>
 
         <form class="grid gap-4" novalidate @submit="submit">
@@ -138,6 +174,40 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
                 </span>
             </div>
         </form>
+
+        <Separator />
+
+        <div class="grid gap-2">
+            <FormError :message="preferences.error.value?.message ?? null" />
+            <div class="flex items-center justify-between gap-4">
+                <div class="grid gap-1">
+                    <Label for="public-profile">Public profile</Label>
+                    <p class="text-muted-foreground text-sm">
+                        {{
+                            isPublic
+                                ? 'Anyone on Analog can see your public collections.'
+                                : 'Only your friends can see your public collections.'
+                        }}
+                    </p>
+                </div>
+                <Switch
+                    id="public-profile"
+                    :model-value="isPublic"
+                    :disabled="preferences.isPending.value"
+                    @update:model-value="onPublicChange"
+                />
+            </div>
+        </div>
+
+        <ConfirmDialog
+            v-model:open="confirmingPublic"
+            title="Make your profile public?"
+            description="Anyone on Analog will be able to see your public collections."
+            confirm-text="Make public"
+            variant="default"
+            :pending="preferences.isPending.value"
+            @confirm="onConfirmPublic"
+        />
 
         <AvatarDialog
             v-if="user"

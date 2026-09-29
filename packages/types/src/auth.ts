@@ -117,7 +117,7 @@ export const USER_FIELDS = {
     },
     isPublic: {
         type: 'boolean' as const,
-        defaultValue: false,
+        defaultValue: true,
         input: false as const,
     },
 };

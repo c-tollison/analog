@@ -1,27 +1,16 @@
 <script setup lang="ts">
 import type { InferResponseType } from '@analog/api/client';
 import CoverImage from '@/components/CoverImage.vue';
-import CollectionProgressBar from '@/components/collections/CollectionProgressBar.vue';
+import CollectionRow from '@/components/collections/CollectionRow.vue';
 import CreateCollectionDialog from '@/components/collections/CreateCollectionDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
-import {
-    AvatarGroup,
-    AvatarGroupCount,
-} from '@/components/shadcn-components/avatar';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import {
-    Item,
-    ItemContent,
-    ItemDescription,
-    ItemGroup,
-    ItemTitle,
-} from '@/components/shadcn-components/item';
+import { ItemGroup } from '@/components/shadcn-components/item';
 import { Label } from '@/components/shadcn-components/label';
 import { Switch } from '@/components/shadcn-components/switch';
-import UserAvatar from '@/components/users/UserAvatar.vue';
 import {
     useCollectionSearch,
     useCollections,
@@ -29,7 +18,6 @@ import {
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useUpdatePreferences } from '@/composables/useUsers';
 import type { ApiClient } from '@/lib/api';
-import { formatsCompletedWord, formatsStatusLabels } from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
 import { useSessionStore } from '@/stores/session';
 
@@ -167,66 +155,13 @@ function resultLink(result: SearchResult): RouteLocationRaw {
         >
             <template #default="{ items }">
                 <ItemGroup class="grid sm:grid-cols-2">
-                    <Item
+                    <CollectionRow
                         v-for="(c, index) in items"
                         v-bind="staggerIn(index)"
                         :key="c.id"
-                        variant="outline"
-                        class="has-[a:hover]:bg-muted relative"
-                    >
-                        <ItemContent class="min-w-0">
-                            <div
-                                class="flex h-6 items-center justify-between gap-2"
-                            >
-                                <ItemTitle class="min-w-0">
-                                    <RouterLink
-                                        :to="{
-                                            name: 'collection',
-                                            params: { id: c.id },
-                                        }"
-                                        class="truncate after:absolute after:inset-0"
-                                    >
-                                        {{ c.name }}
-                                    </RouterLink>
-                                </ItemTitle>
-                                <AvatarGroup
-                                    v-if="c.memberCount > 1"
-                                    class="shrink-0"
-                                >
-                                    <UserAvatar
-                                        v-for="member in c.members"
-                                        :key="member.id"
-                                        :name="member.name"
-                                        :image="member.image"
-                                        size="sm"
-                                    />
-                                    <AvatarGroupCount
-                                        v-if="c.memberCount > c.members.length"
-                                    >
-                                        +{{ c.memberCount - c.members.length }}
-                                    </AvatarGroupCount>
-                                </AvatarGroup>
-                            </div>
-                            <ItemDescription>
-                                {{ c.itemCount }}
-                                {{ c.itemCount === 1 ? 'item' : 'items' }}
-                                <template v-if="c.itemCount && !showProgress">
-                                    · {{ c.completedCount }}
-                                    {{ formatsCompletedWord(c.formats) }}
-                                </template>
-                            </ItemDescription>
-                            <CollectionProgressBar
-                                v-if="showProgress"
-                                class="mt-1"
-                                :class="{ invisible: !c.itemCount }"
-                                :total="c.itemCount"
-                                :completed="c.completedCount"
-                                :in-progress="c.inProgressCount"
-                                :planned="c.plannedCount"
-                                :labels="formatsStatusLabels(c.formats)"
-                            />
-                        </ItemContent>
-                    </Item>
+                        :collection="c"
+                        :show-progress="showProgress"
+                    />
                 </ItemGroup>
             </template>
         </PagedList>

@@ -6,8 +6,10 @@ import FormError from '@/components/FormError.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { ItemGroup } from '@/components/shadcn-components/item';
+import { Label } from '@/components/shadcn-components/label';
 import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import { Switch } from '@/components/shadcn-components/switch';
 import {
     Tabs,
     TabsContent,
@@ -23,6 +25,7 @@ import {
     useDeleteCollection,
     useLeaveCollection,
     useRemoveMember,
+    useUpdateCollection,
 } from '@/composables/useCollections';
 import { useSessionStore } from '@/stores/session';
 
@@ -63,6 +66,42 @@ const cancelInvite = useCancelInvite();
 const removeMember = useRemoveMember();
 const leave = useLeaveCollection();
 const deleteCollection = useDeleteCollection();
+const update = useUpdateCollection();
+
+// Follows the switch while the save is in flight.
+const isPublic = computed(
+    () =>
+        (update.isPending.value
+            ? update.variables.value?.isPublic
+            : undefined) ??
+        collection.value?.isPublic ??
+        false
+);
+const isProfilePublic = computed(() => session.value?.user.isPublic ?? false);
+const whoCanSee = computed(() => {
+    if (!isPublic.value) return 'Only members can see it.';
+    return isProfilePublic.value
+        ? 'Anyone on Analog can see it.'
+        : 'Your friends can see it.';
+});
+
+const confirmingPublic = ref(false);
+
+// Going public asks first; going private doesn't.
+function onPublicChange(value: boolean) {
+    if (value) {
+        confirmingPublic.value = true;
+    } else {
+        update.mutate({ collectionId: props.id, isPublic: false });
+    }
+}
+
+function onConfirmPublic() {
+    update.mutate(
+        { collectionId: props.id, isPublic: true },
+        { onSettled: () => (confirmingPublic.value = false) }
+    );
+}
 
 const removing = ref<{ id: string; name: string } | null>(null);
 const confirmingRemove = computed({
@@ -107,7 +146,7 @@ const error = computed(
             loadError.value ??
             members.error.value ??
             invites.error.value ??
-            [cancelInvite, removeMember, leave, deleteCollection].find(
+            [cancelInvite, removeMember, leave, deleteCollection, update].find(
                 (m) => m.error.value
             )?.error.value
         )?.message ?? null
@@ -148,6 +187,38 @@ const error = computed(
                     <Spinner v-if="!loadError" class="size-6" />
                 </div>
                 <template v-else-if="isOwner">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="grid gap-1">
+                            <Label for="public-collection">
+                                Public collection
+                            </Label>
+                            <p class="text-muted-foreground text-sm">
+                                {{ whoCanSee }}
+                            </p>
+                        </div>
+                        <Switch
+                            id="public-collection"
+                            :model-value="isPublic"
+                            :disabled="update.isPending.value"
+                            @update:model-value="onPublicChange"
+                        />
+                    </div>
+                    <ConfirmDialog
+                        v-model:open="confirmingPublic"
+                        :title="`Make ${collection.name} public?`"
+                        :description="
+                            isProfilePublic
+                                ? 'Anyone on Analog will be able to see it.'
+                                : 'Your friends will be able to see it.'
+                        "
+                        confirm-text="Make public"
+                        variant="default"
+                        :pending="update.isPending.value"
+                        @confirm="onConfirmPublic"
+                    />
+
+                    <Separator />
+
                     <h2 class="font-medium">Delete collection</h2>
                     <div>
                         <ConfirmDialog
