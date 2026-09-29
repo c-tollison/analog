@@ -14,7 +14,8 @@ import { IsbnSchema, OwnedIsbnSchema, PageQuerySchema } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { itemDetails } from '../lib/books.js';
-import { requireMember } from '../lib/collections.js';
+import { requireMember, requireViewer } from '../lib/collections.js';
+import { visibleToVisitors } from '../lib/discovery.js';
 import { addEdition } from '../lib/editions.js';
 import { userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
@@ -30,8 +31,15 @@ import { z } from 'zod';
 // /collections/:id/items, in its own router so neither router's type gets
 // too deep for TypeScript.
 
-const { catalogItemIsbn, collectionItem, collectionItemIsbn, progress, user } =
-    schema;
+const {
+    catalogItem,
+    catalogItemIsbn,
+    collectionItem,
+    collectionItemIsbn,
+    progress,
+    series,
+    user,
+} = schema;
 
 const ItemParamSchema = IdParamSchema.extend({
     itemId: z.uuid('Invalid id'),
@@ -51,15 +59,28 @@ function othersReviewed(catalogItemId: string, me: string) {
     );
 }
 
-// The catalog item behind a collection entry, or a 404.
-async function requireEntry(collectionId: string, itemId: string) {
-    const found = await db().query.collectionItem.findFirst({
-        columns: { catalogItemId: true },
-        where: and(
-            eq(collectionItem.id, itemId),
-            eq(collectionItem.collectionId, collectionId)
-        ),
-    });
+// The catalog item behind a collection entry, or a 404. Visitors only get
+// entries they're allowed to see.
+async function requireEntry(
+    collectionId: string,
+    itemId: string,
+    isVisitor = false
+) {
+    const [found] = await db()
+        .select({ catalogItemId: collectionItem.catalogItemId })
+        .from(collectionItem)
+        .innerJoin(
+            catalogItem,
+            eq(catalogItem.id, collectionItem.catalogItemId)
+        )
+        .leftJoin(series, eq(series.id, catalogItem.seriesId))
+        .where(
+            and(
+                eq(collectionItem.id, itemId),
+                eq(collectionItem.collectionId, collectionId),
+                isVisitor ? visibleToVisitors() : undefined
+            )
+        );
     if (!found) {
         throw new HTTPException(404, { message: 'Item not found' });
     }
@@ -70,7 +91,9 @@ const collectionItems = new Hono<AppEnv>()
     .get('/:itemId', schemaValidator('param', ItemParamSchema), async (c) => {
         const { id, itemId } = c.req.valid('param');
         const me = c.get('user').id;
-        await requireMember(id, me);
+        const { role, progressUserId } = await requireViewer(id, me);
+        const isVisitor = !role;
+        await requireEntry(id, itemId, isVisitor);
 
         const found = await db().query.collectionItem.findFirst({
             columns: { id: true },
@@ -110,14 +133,20 @@ const collectionItems = new Hono<AppEnv>()
             throw new HTTPException(404, { message: 'Item not found' });
         }
         const item = found.catalogItem;
-        const ownedIsbns = found.ownedIsbns.map((row) => row.isbn);
+        // Visitors never see ISBNs an admin hasn't checked.
+        const isbns = isVisitor
+            ? item.isbns.filter((row) => !row.pending)
+            : item.isbns;
+        const ownedIsbns = found.ownedIsbns
+            .map((row) => row.isbn)
+            .filter((isbn) => isbns.some((row) => row.isbn === isbn));
         // The page shows the first edition added, or the item's main one.
         const edition =
-            item.isbns.find((row) => row.isbn === ownedIsbns[0]) ??
-            item.isbns.find((row) => row.main) ??
+            isbns.find((row) => row.isbn === ownedIsbns[0]) ??
+            isbns.find((row) => row.main) ??
             null;
-        // ISBNs an admin hasn't checked stay hidden, except owned ones.
-        const editions = item.isbns.filter(
+        // Members see unchecked ISBNs only when they own them.
+        const editions = isbns.filter(
             (row) => !row.pending || ownedIsbns.includes(row.isbn)
         );
 
@@ -132,7 +161,7 @@ const collectionItems = new Hono<AppEnv>()
                 .from(progress)
                 .where(
                     and(
-                        eq(progress.userId, me),
+                        eq(progress.userId, progressUserId),
                         eq(progress.catalogItemId, item.id)
                     )
                 ),
@@ -262,8 +291,8 @@ const collectionItems = new Hono<AppEnv>()
         async (c) => {
             const { id, itemId } = c.req.valid('param');
             const me = c.get('user').id;
-            await requireMember(id, me);
-            const found = await requireEntry(id, itemId);
+            const { role } = await requireViewer(id, me);
+            const found = await requireEntry(id, itemId, !role);
 
             const page = await paginate(c.req.valid('query'), (limit, offset) =>
                 db()

@@ -75,7 +75,15 @@ async function onSignOut() {
                 </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem @select="router.push({ name: 'profile' })">
+            <DropdownMenuItem
+                v-if="user?.username"
+                @select="
+                    router.push({
+                        name: 'user',
+                        params: { username: user.username },
+                    })
+                "
+            >
                 <UserIcon />
                 Profile
             </DropdownMenuItem>

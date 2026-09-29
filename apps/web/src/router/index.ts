@@ -121,10 +121,23 @@ export const router = createRouter({
                     component: () => import('@/views/NotificationsView.vue'),
                 },
                 {
+                    // Old links land on your own page.
                     path: 'profile',
                     name: 'profile',
-                    meta: { title: 'Profile' },
-                    component: () => import('@/views/ProfileView.vue'),
+                    component: () => import('@/views/UserView.vue'),
+                    beforeEnter: () => {
+                        const username =
+                            useSessionStore().session?.user.username;
+                        return username
+                            ? { name: 'user', params: { username } }
+                            : { name: 'home' };
+                    },
+                },
+                {
+                    path: 'profile/settings',
+                    name: 'profile-settings',
+                    meta: { title: 'Edit profile' },
+                    component: () => import('@/views/ProfileSettingsView.vue'),
                 },
                 {
                     path: 'admin',

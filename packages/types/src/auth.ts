@@ -115,8 +115,19 @@ export const USER_FIELDS = {
         defaultValue: true,
         input: false as const,
     },
+    isPublic: {
+        type: 'boolean' as const,
+        defaultValue: true,
+        input: false as const,
+    },
 };
 
-export const UpdatePreferencesSchema = z.object({
-    showCollectionProgress: z.boolean(),
-});
+export const UpdatePreferencesSchema = z
+    .object({
+        showCollectionProgress: z.boolean(),
+        isPublic: z.boolean(),
+    })
+    .partial()
+    .refine((values) => Object.keys(values).length > 0, {
+        message: 'Nothing to update',
+    });

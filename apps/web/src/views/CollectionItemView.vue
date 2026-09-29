@@ -30,6 +30,7 @@ import {
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import {
     useAddOwnedEdition,
+    useCollection,
     useCollectionItem,
     useCollectionItemReviews,
     useRemoveOwnedEdition,
@@ -64,6 +65,14 @@ const { data: item, error: loadError } = useCollectionItem(
     () => props.itemId
 );
 usePageTitle(() => item.value?.title);
+
+// Visitors get a read-only page with the owner's progress. Edit controls
+// wait for the role to load.
+const { data: collection } = useCollection(() => props.id);
+const isMember = computed(() => !!collection.value?.role);
+const ownerName = computed(() =>
+    collection.value?.role === null ? collection.value.ownerName : null
+);
 
 // The open tab lives in the URL so coming back from a profile lands on
 // Reviews.
@@ -233,14 +242,37 @@ const error = computed(
                                     }}
                                 </Badge>
                                 <StarRating
-                                    v-if="isCompleted && item.rating !== null"
+                                    v-if="
+                                        isMember &&
+                                        isCompleted &&
+                                        item.rating !== null
+                                    "
                                     readonly
                                     :model-value="item.rating"
                                 />
                             </div>
                         </div>
 
+                        <div
+                            v-if="ownerName && item.status"
+                            class="flex flex-wrap items-center gap-2 text-sm"
+                        >
+                            <span class="text-muted-foreground">
+                                {{ ownerName }}
+                            </span>
+                            <Badge variant="outline">
+                                {{ labels[item.status] }}
+                            </Badge>
+                            <StarRating
+                                v-if="isCompleted && item.rating !== null"
+                                readonly
+                                small
+                                :model-value="item.rating"
+                            />
+                        </div>
+
                         <StatusPicker
+                            v-if="isMember"
                             :labels="labels"
                             :model-value="shownStatus"
                             :disabled="isSettingStatus"
@@ -257,7 +289,7 @@ const error = computed(
             </TabsContent>
 
             <TabsContent value="editions" class="grid gap-3">
-                <div class="flex justify-end">
+                <div v-if="isMember" class="flex justify-end">
                     <Button
                         variant="outline"
                         size="sm"
@@ -274,7 +306,17 @@ const error = computed(
                         :edition="edition"
                         :fallback-title="item.title"
                     >
-                        <template v-if="item.ownedIsbns.includes(edition.isbn)">
+                        <Badge
+                            v-if="
+                                !isMember && item.ownedIsbns.includes(edition.isbn)
+                            "
+                            variant="secondary"
+                        >
+                            Owned
+                        </Badge>
+                        <template
+                            v-else-if="item.ownedIsbns.includes(edition.isbn)"
+                        >
                             <Badge variant="secondary">Yours</Badge>
                             <Button
                                 variant="ghost"
@@ -293,7 +335,7 @@ const error = computed(
                             </Button>
                         </template>
                         <Button
-                            v-else
+                            v-else-if="isMember"
                             variant="outline"
                             size="sm"
                             :disabled="isChangingOwned"
@@ -309,7 +351,8 @@ const error = computed(
             </TabsContent>
 
             <TabsContent value="reviews" class="grid gap-4">
-                <section v-if="isCompleted" class="grid gap-3">
+                <!-- A visitor finds the owner's review in the list below. -->
+                <section v-if="isMember && isCompleted" class="grid gap-3">
                     <div class="flex items-center justify-between">
                         <h2 class="font-semibold">Your review</h2>
                         <Button
@@ -331,7 +374,7 @@ const error = computed(
                         {{ item.review }}
                     </p>
                 </section>
-                <Separator v-if="isCompleted" />
+                <Separator v-if="isMember && isCompleted" />
                 <PagedList :list="reviews" empty-text="No reviews yet.">
                     <template #default="{ items: page }">
                         <ItemGroup class="grid gap-2 sm:grid-cols-2">
@@ -381,7 +424,7 @@ const error = computed(
         </Tabs>
 
         <AddEditionDialog
-            v-if="item"
+            v-if="item && isMember"
             v-model:open="isAddEditionOpen"
             :collection-id="id"
             :item-id="itemId"
@@ -389,7 +432,7 @@ const error = computed(
         />
 
         <ReviewSheet
-            v-if="item && isCompleted"
+            v-if="item && isMember && isCompleted"
             v-model:open="isReviewOpen"
             :catalog-item-id="item.catalogItemId"
             :title="item.title"

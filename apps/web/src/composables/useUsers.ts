@@ -6,6 +6,7 @@ import { ApiError, api, unwrap } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { useSessionStore } from '@/stores/session';
 
+import { COLLECTIONS_KEY } from './useCollections';
 import {
     type PaginatedListOptions,
     usePaginatedList,
@@ -43,10 +44,11 @@ export function useUser(username: MaybeRefOrGetter<string>) {
 }
 
 /**
- * Saves the signed-in user's name and username. Any auth change clears the
- * session and query cache, so this reloads the session before resolving.
+ * Saves the signed-in user's name and username, then reloads the session
+ * past its cookie cache and refetches pages that show the name.
  */
 export function useUpdateProfile() {
+    const queryClient = useQueryClient();
     const sessionStore = useSessionStore();
 
     return useMutation({
@@ -58,19 +60,31 @@ export function useUpdateProfile() {
                     error.status
                 );
             }
-            await sessionStore.load();
+            await sessionStore.refresh();
+            await Promise.all(
+                [USERS_KEY, COLLECTIONS_KEY].map((queryKey) =>
+                    queryClient.invalidateQueries({ queryKey })
+                )
+            );
         },
     });
 }
 
-/** Saves the signed-in user's display preferences, then reloads the session. */
+/**
+ * Saves the signed-in user's preferences, like showing progress or a public
+ * profile, then reloads the session.
+ */
 export function useUpdatePreferences() {
+    const queryClient = useQueryClient();
     const sessionStore = useSessionStore();
 
     return useMutation({
         mutationFn: async (values: z.infer<typeof UpdatePreferencesSchema>) =>
             unwrap(await api.users.me.preferences.$patch({ json: values })),
-        onSuccess: () => sessionStore.refresh(),
+        onSuccess: async () => {
+            await sessionStore.refresh();
+            await queryClient.invalidateQueries({ queryKey: USERS_KEY });
+        },
     });
 }
 

@@ -44,6 +44,12 @@ const { data: collection, error: collectionError } = useCollection(
     () => props.id
 );
 const collectionName = computed(() => collection.value?.name ?? null);
+// Visitors get a read-only page. Edit controls wait for the role to load.
+const isMember = computed(() => !!collection.value?.role);
+// A visitor sees the owner's progress, so say whose it is.
+const progressOwner = computed(() =>
+    collection.value?.role === null ? collection.value.ownerName : null
+);
 
 const volumes = useCollectionSeriesItems(
     () => props.id,
@@ -114,6 +120,7 @@ const headerError = computed(
                 text="Back to collection"
             />
             <Button
+                v-if="isMember"
                 variant="outline"
                 size="sm"
                 :disabled="!detail || !collectionName"
@@ -169,6 +176,9 @@ const headerError = computed(
                 >
                     <div class="flex justify-between text-xs">
                         <span>
+                            <template v-if="progressOwner">
+                                {{ progressOwner }} ·
+                            </template>
                             {{ detail.completedCount }} of
                             {{ detail.ownedCount }}
                             {{ completedWord(labels) }}
@@ -243,6 +253,7 @@ const headerError = computed(
                             />
                         </RouterLink>
                         <Button
+                            v-if="isMember"
                             variant="secondary"
                             size="icon"
                             class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"

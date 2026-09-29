@@ -41,6 +41,8 @@ export const CollectionNameSchema = z
 
 export const CreateCollectionSchema = z.object({ name: CollectionNameSchema });
 
+export const UpdateCollectionSchema = z.object({ isPublic: z.boolean() });
+
 export const MAX_BULK_ADD = 100;
 
 export const AddCatalogItemsSchema = z.object({

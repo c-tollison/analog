@@ -36,6 +36,7 @@ import { staggerIn } from '@/lib/motion';
 
 import { PlusIcon, SettingsIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import type { RouteLocationRaw } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
 
@@ -44,6 +45,22 @@ const { term, isTyping } = useSearchTerm(query);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 usePageTitle(() => collection.value?.name);
+
+// Visitors get a read-only page. Edit controls wait for the role to load.
+const isMember = computed(() => !!collection.value?.role);
+const isVisitor = computed(() => collection.value?.role === null);
+
+const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
+    collection.value && isVisitor.value
+        ? {
+              to: {
+                  name: 'user',
+                  params: { username: collection.value.ownerUsername },
+              },
+              text: `Back to ${collection.value.ownerName}`,
+          }
+        : { to: { name: 'collections' }, text: 'Collections' }
+);
 
 const SORT_LABELS: Record<CollectionSort, string> = {
     [CollectionSort.Name]: 'Name',
@@ -80,7 +97,9 @@ function onRemove() {
 const progress = computed(() => {
     const summary = collection.value;
     if (!summary || summary.itemCount === 0) return null;
-    return `${summary.completedCount} of ${summary.itemCount} ${formatsCompletedWord(summary.formats)}`;
+    const counts = `${summary.completedCount} of ${summary.itemCount} ${formatsCompletedWord(summary.formats)}`;
+    // A visitor sees the owner's progress, so say whose it is.
+    return isVisitor.value ? `${summary.ownerName} · ${counts}` : counts;
 });
 
 const headerError = computed(
@@ -91,8 +110,8 @@ const headerError = computed(
 <template>
     <div class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
-            <BackButton :to="{ name: 'collections' }" text="Collections" />
-            <Button size="sm" as-child>
+            <BackButton :to="back.to" :text="back.text" />
+            <Button v-if="isMember" size="sm" as-child>
                 <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
                     <PlusIcon />
                     {{ collection ? `Add to ${collection.name}` : 'Add' }}
@@ -111,7 +130,7 @@ const headerError = computed(
                 </p>
             </div>
             <Spinner v-else-if="!headerError" />
-            <Button v-if="collection" variant="ghost" size="sm" as-child>
+            <Button v-if="isMember" variant="ghost" size="sm" as-child>
                 <RouterLink
                     :to="{ name: 'collection-settings', params: { id } }"
                 >
@@ -152,7 +171,11 @@ const headerError = computed(
         <PagedList
             :list="entries"
             :empty-text="
-                query ? 'No matches.' : 'Nothing here yet. Scan something in.'
+                query
+                    ? 'No matches.'
+                    : isMember
+                      ? 'Nothing here yet. Scan something in.'
+                      : 'Nothing here yet.'
             "
         >
             <template #default="{ items }">
@@ -235,7 +258,7 @@ const headerError = computed(
                             />
                         </RouterLink>
                         <Button
-                            v-if="!entry.series"
+                            v-if="isMember && !entry.series"
                             variant="secondary"
                             size="icon"
                             class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"

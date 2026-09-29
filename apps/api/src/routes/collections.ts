@@ -5,6 +5,7 @@ import {
     eq,
     ilike,
     inArray,
+    isNotNull,
     isNull,
     notExists,
     or,
@@ -19,15 +20,23 @@ import {
     CreateCollectionSchema,
     type MediaFormat,
     PageQuerySchema,
-    ProgressStatus,
+    type ProgressStatus,
     type SeriesKind,
+    UpdateCollectionSchema,
     UserIdSchema,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { seriesColumns } from '../lib/books.js';
-import { requireMember } from '../lib/collections.js';
-import { discoverableItem } from '../lib/discovery.js';
+import {
+    canSeeCollection,
+    collectionSummaries,
+    completedCount,
+    myMember,
+    requireMember,
+    requireViewer,
+} from '../lib/collections.js';
+import { discoverableItem, visibleToVisitors } from '../lib/discovery.js';
 import { upsertBook } from '../lib/editions.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
@@ -61,7 +70,7 @@ const {
 } = schema;
 
 /** Join condition: `progress` is this user's row for the catalog item. */
-function myProgress(userId: string) {
+function progressOf(userId: string) {
     return and(
         eq(progress.catalogItemId, catalogItem.id),
         eq(progress.userId, userId)
@@ -69,15 +78,6 @@ function myProgress(userId: string) {
 }
 
 const myRating = whenCompleted<number>(progress.rating);
-
-/** Counts the joined progress rows that have `status`. */
-function statusCount(status: ProgressStatus) {
-    return sql<number>`(
-        count(*) filter (where ${progress.status} = ${status})
-    )::int`;
-}
-
-const completedCount = statusCount(ProgressStatus.Completed);
 
 const CollectionParamSchema = IdParamSchema;
 const MemberParamSchema = CollectionParamSchema.extend({
@@ -110,97 +110,18 @@ const itemColumns = {
     position: catalogItem.position,
 };
 
-const MEMBER_PREVIEW_COUNT = 3;
-
-type MemberPreview = Pick<typeof user.$inferSelect, 'id' | 'name' | 'image'>;
-
 const ownerFirst = [
     sql`${collectionMember.role} = ${CollectionRole.Owner} desc`,
     asc(collectionMember.createdAt),
 ];
 
-/**
- * Item totals for each collection in the outer query, read in one pass over
- * its items: how many there are, this user's status counts and the formats.
- */
-function itemStats(userId: string) {
-    return db()
-        .select({
-            itemCount: sql<number>`count(*)::int`.as('item_count'),
-            completedCount: completedCount.as('completed_count'),
-            inProgressCount: statusCount(ProgressStatus.InProgress).as(
-                'in_progress_count'
-            ),
-            plannedCount: statusCount(ProgressStatus.Planned).as(
-                'planned_count'
-            ),
-            formats: sql<MediaFormat[]>`coalesce(
-                json_agg(distinct ${catalogItem.format}), '[]'::json
-            )`.as('formats'),
-        })
-        .from(collectionItem)
-        .innerJoin(
-            catalogItem,
-            eq(collectionItem.catalogItemId, catalogItem.id)
-        )
-        .leftJoin(
-            progress,
-            and(
-                eq(progress.catalogItemId, collectionItem.catalogItemId),
-                eq(progress.userId, userId)
-            )
-        )
-        .where(eq(collectionItem.collectionId, collection.id))
-        .as('item_stats');
-}
-
-function collectionSummaries(userId: string, collectionId?: string) {
-    const stats = itemStats(userId);
-    return db()
-        .select({
-            id: collection.id,
-            name: collection.name,
-            role: collectionMember.role,
-            itemCount: stats.itemCount,
-            completedCount: stats.completedCount,
-            inProgressCount: stats.inProgressCount,
-            plannedCount: stats.plannedCount,
-            formats: stats.formats,
-            memberCount: sql<number>`(
-                select count(*)::int from ${collectionMember} m
-                where m.collection_id = ${collection.id}
-            )`,
-            // The first few members for avatars, owner first.
-            members: sql<MemberPreview[]>`(
-                select coalesce(json_agg(p), '[]'::json) from (
-                    select u.id, u.name, u.image
-                    from ${collectionMember} m
-                    join ${user} u on u.id = m.user_id
-                    where m.collection_id = ${collection.id}
-                    order by m.role = ${CollectionRole.Owner} desc,
-                        m.created_at, u.id
-                    limit ${MEMBER_PREVIEW_COUNT}
-                ) p
-            )`,
-        })
-        .from(collectionMember)
-        .innerJoin(collection, eq(collectionMember.collectionId, collection.id))
-        .crossJoinLateral(stats)
-        .where(
-            and(
-                eq(collectionMember.userId, userId),
-                collectionId ? eq(collection.id, collectionId) : undefined
-            )
-        )
-        .orderBy(sql`lower(${collection.name})`, asc(collection.id))
-        .$dynamic();
-}
-
 const collections = new Hono<AppEnv>()
     .get('/', schemaValidator('query', PageQuerySchema), async (c) => {
         const user = c.get('user');
         const page = await paginate(c.req.valid('query'), (limit, offset) =>
-            collectionSummaries(user.id).limit(limit).offset(offset)
+            collectionSummaries(user.id, isNotNull(myMember.userId))
+                .limit(limit)
+                .offset(offset)
         );
         return c.json(page);
     })
@@ -279,12 +200,31 @@ const collections = new Hono<AppEnv>()
     })
     .get('/:id', schemaValidator('param', CollectionParamSchema), async (c) => {
         const { id } = c.req.valid('param');
-        const [found] = await collectionSummaries(c.get('user').id, id);
+        const me = c.get('user').id;
+        const [found] = await collectionSummaries(
+            me,
+            and(eq(collection.id, id), canSeeCollection(me))
+        );
         if (!found) {
             throw new HTTPException(404, { message: 'Collection not found' });
         }
         return c.json(found);
     })
+    .patch(
+        '/:id',
+        schemaValidator('param', CollectionParamSchema),
+        schemaValidator('json', UpdateCollectionSchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            const values = c.req.valid('json');
+            await requireMember(id, c.get('user').id, CollectionRole.Owner);
+            await db()
+                .update(collection)
+                .set(values)
+                .where(eq(collection.id, id));
+            return c.json(values);
+        }
+    )
     .delete(
         '/:id',
         schemaValidator('param', CollectionParamSchema),
@@ -302,8 +242,11 @@ const collections = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { q, sort, ...pageQuery } = c.req.valid('query');
-            const me = c.get('user').id;
-            await requireMember(id, me);
+            const { role, progressUserId } = await requireViewer(
+                id,
+                c.get('user').id
+            );
+            const visible = role ? undefined : visibleToVisitors();
 
             const terms = searchTerms(q ?? '');
             if (terms.length) {
@@ -323,10 +266,11 @@ const collections = new Hono<AppEnv>()
                             eq(collectionItem.catalogItemId, catalogItem.id)
                         )
                         .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                        .leftJoin(progress, myProgress(me))
+                        .leftJoin(progress, progressOf(progressUserId))
                         .where(
                             and(
                                 eq(collectionItem.collectionId, id),
+                                visible,
                                 matchesAllTerms(terms, {
                                     columns: titles,
                                     position: catalogItem.position,
@@ -374,8 +318,8 @@ const collections = new Hono<AppEnv>()
                         eq(collectionItem.catalogItemId, catalogItem.id)
                     )
                     .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                    .leftJoin(progress, myProgress(me))
-                    .where(eq(collectionItem.collectionId, id))
+                    .leftJoin(progress, progressOf(progressUserId))
+                    .where(and(eq(collectionItem.collectionId, id), visible))
                     .groupBy(groupKey, series.id)
                     .orderBy(
                         ...(sort === CollectionSort.Newest
@@ -396,8 +340,10 @@ const collections = new Hono<AppEnv>()
         schemaValidator('param', SeriesParamSchema),
         async (c) => {
             const { id, seriesId } = c.req.valid('param');
-            const me = c.get('user').id;
-            await requireMember(id, me);
+            const { role, progressUserId } = await requireViewer(
+                id,
+                c.get('user').id
+            );
 
             const [found, [counted]] = await Promise.all([
                 db().query.series.findFirst({
@@ -418,15 +364,17 @@ const collections = new Hono<AppEnv>()
                         catalogItem,
                         eq(collectionItem.catalogItemId, catalogItem.id)
                     )
-                    .leftJoin(progress, myProgress(me))
+                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                    .leftJoin(progress, progressOf(progressUserId))
                     .where(
                         and(
                             eq(collectionItem.collectionId, id),
-                            eq(catalogItem.seriesId, seriesId)
+                            eq(catalogItem.seriesId, seriesId),
+                            role ? undefined : visibleToVisitors()
                         )
                     ),
             ]);
-            if (!found) {
+            if (!found || (!role && !found.verifiedAt)) {
                 throw new HTTPException(404, { message: 'Series not found' });
             }
 
@@ -450,8 +398,10 @@ const collections = new Hono<AppEnv>()
         schemaValidator('query', PageQuerySchema),
         async (c) => {
             const { id, seriesId } = c.req.valid('param');
-            const me = c.get('user').id;
-            await requireMember(id, me);
+            const { role, progressUserId } = await requireViewer(
+                id,
+                c.get('user').id
+            );
 
             const page = await paginate(c.req.valid('query'), (limit, offset) =>
                 db()
@@ -465,11 +415,13 @@ const collections = new Hono<AppEnv>()
                         catalogItem,
                         eq(collectionItem.catalogItemId, catalogItem.id)
                     )
-                    .leftJoin(progress, myProgress(me))
+                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                    .leftJoin(progress, progressOf(progressUserId))
                     .where(
                         and(
                             eq(collectionItem.collectionId, id),
-                            eq(catalogItem.seriesId, seriesId)
+                            eq(catalogItem.seriesId, seriesId),
+                            role ? undefined : visibleToVisitors()
                         )
                     )
                     .orderBy(

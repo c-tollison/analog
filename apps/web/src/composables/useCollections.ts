@@ -6,6 +6,7 @@ import {
     type CreateCollectionSchema,
     MAX_PAGE_SIZE,
     type OwnedIsbnSchema,
+    type UpdateCollectionSchema,
     type UserIdSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
@@ -39,6 +40,24 @@ export function useCollections(limit?: number) {
                     },
                 })
             )
+    );
+}
+
+/** The collections someone is in that the signed-in user can see. */
+export function useUserCollections(
+    username: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [...COLLECTIONS_KEY, 'user', toValue(username)],
+        async (offset) =>
+            unwrap(
+                await api.users[':username'].collections.$get({
+                    param: { username: toValue(username) },
+                    query: { offset },
+                })
+            ),
+        options
     );
 }
 
@@ -528,5 +547,27 @@ export function useAddBook() {
                     queryClient.invalidateQueries({ queryKey })
                 )
             ),
+    });
+}
+
+/** Makes a collection public or private. Owner only. */
+export function useUpdateCollection() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            collectionId,
+            ...json
+        }: { collectionId: string } & z.output<
+            typeof UpdateCollectionSchema
+        >) =>
+            unwrap(
+                await api.collections[':id'].$patch({
+                    param: { id: collectionId },
+                    json,
+                })
+            ),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
     });
 }
