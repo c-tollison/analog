@@ -1,13 +1,36 @@
-import { alias, and, eq, isNotNull, or, schema } from '@analog/db';
-import { CollectionRole } from '@analog/types';
+import {
+    alias,
+    and,
+    asc,
+    eq,
+    isNotNull,
+    or,
+    type SQL,
+    schema,
+    sql,
+} from '@analog/db';
+import {
+    CollectionRole,
+    type MediaFormat,
+    ProgressStatus,
+} from '@analog/types';
 
+import { visibleToVisitors } from './discovery.js';
 import { isFriendOf } from './friends.js';
 import { db } from './init.js';
 import { HTTPException } from 'hono/http-exception';
 
 type Role = (typeof schema.collectionMember.$inferSelect)['role'];
 
-const { collection, collectionMember, user } = schema;
+const {
+    catalogItem,
+    collection,
+    collectionItem,
+    collectionMember,
+    progress,
+    series,
+    user,
+} = schema;
 
 // Joined by collection queries that visitors can see: the owner's member
 // row, the owner, and the signed-in user's member row if they have one.
@@ -89,4 +112,105 @@ export async function requireViewer(collectionId: string, userId: string) {
         role: found.role,
         progressUserId: found.role ? userId : found.ownerId,
     };
+}
+
+/** Counts the joined progress rows that have `status`. */
+function statusCount(status: ProgressStatus) {
+    return sql<number>`(
+        count(*) filter (where ${progress.status} = ${status})
+    )::int`;
+}
+
+export const completedCount = statusCount(ProgressStatus.Completed);
+
+const MEMBER_PREVIEW_COUNT = 3;
+
+type MemberPreview = Pick<typeof user.$inferSelect, 'id' | 'name' | 'image'>;
+
+/**
+ * Item totals for each collection in the outer query, read in one pass over
+ * its items: how many there are, the status counts and the formats. Members
+ * get their own counts; visitors get the owner's and only what they can see.
+ */
+function itemStats() {
+    return db()
+        .select({
+            itemCount: sql<number>`count(*)::int`.as('item_count'),
+            completedCount: completedCount.as('completed_count'),
+            inProgressCount: statusCount(ProgressStatus.InProgress).as(
+                'in_progress_count'
+            ),
+            plannedCount: statusCount(ProgressStatus.Planned).as(
+                'planned_count'
+            ),
+            formats: sql<MediaFormat[]>`coalesce(
+                json_agg(distinct ${catalogItem.format}), '[]'::json
+            )`.as('formats'),
+        })
+        .from(collectionItem)
+        .innerJoin(
+            catalogItem,
+            eq(collectionItem.catalogItemId, catalogItem.id)
+        )
+        .leftJoin(series, eq(catalogItem.seriesId, series.id))
+        .leftJoin(
+            progress,
+            and(
+                eq(progress.catalogItemId, collectionItem.catalogItemId),
+                eq(
+                    progress.userId,
+                    sql`coalesce(${myMember.userId}, ${ownerMember.userId})`
+                )
+            )
+        )
+        .where(
+            and(
+                eq(collectionItem.collectionId, collection.id),
+                or(isNotNull(myMember.userId), visibleToVisitors())
+            )
+        )
+        .as('item_stats');
+}
+
+/** Collections that match `where`, as `userId` sees them. */
+export function collectionSummaries(userId: string, where: SQL | undefined) {
+    const stats = itemStats();
+    return db()
+        .select({
+            id: collection.id,
+            name: collection.name,
+            isPublic: collection.isPublic,
+            role: myMember.role,
+            ownerName: owner.name,
+            ownerUsername: owner.username,
+            itemCount: stats.itemCount,
+            completedCount: stats.completedCount,
+            inProgressCount: stats.inProgressCount,
+            plannedCount: stats.plannedCount,
+            formats: stats.formats,
+            memberCount: sql<number>`(
+                select count(*)::int from ${collectionMember} m
+                where m.collection_id = ${collection.id}
+            )`,
+            // The first few members for avatars, owner first.
+            members: sql<MemberPreview[]>`(
+                select coalesce(json_agg(p), '[]'::json) from (
+                    select u.id, u.name, u.image
+                    from ${collectionMember} m
+                    join ${user} u on u.id = m.user_id
+                    where m.collection_id = ${collection.id}
+                    order by m.role = ${CollectionRole.Owner} desc,
+                        m.created_at, u.id
+                    limit ${MEMBER_PREVIEW_COUNT}
+                ) p
+            )`,
+        })
+        .from(collection)
+        .innerJoin(ownerMember, isOwnerMember)
+        .innerJoin(owner, eq(owner.id, ownerMember.userId))
+        .leftJoin(myMember, isMyMember(userId))
+        .crossJoinLateral(stats)
+        .where(where)
+        .orderBy(sql`lower(${collection.name})`, asc(collection.id))
+        .$dynamic();
 }

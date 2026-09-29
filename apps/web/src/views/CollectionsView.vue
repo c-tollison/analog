@@ -48,10 +48,13 @@ const { session } = storeToRefs(useSessionStore());
 const preferences = useUpdatePreferences();
 
 // Follows the toggle while the save is in flight.
-const showProgress = computed(() =>
-    preferences.isPending.value && preferences.variables.value
-        ? preferences.variables.value.showCollectionProgress
-        : (session.value?.user.showCollectionProgress ?? true)
+const showProgress = computed(
+    () =>
+        (preferences.isPending.value
+            ? preferences.variables.value?.showCollectionProgress
+            : undefined) ??
+        session.value?.user.showCollectionProgress ??
+        true
 );
 
 function setShowProgress(showCollectionProgress: boolean) {
