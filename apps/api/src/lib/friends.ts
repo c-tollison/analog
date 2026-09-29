@@ -39,16 +39,22 @@ export async function areFriends(
     return found !== undefined;
 }
 
+/** `userId` and each row's `otherId` are friends. */
+export function isFriendOf(userId: string, otherId: Column): SQL {
+    const me = sql`${userId}::uuid`;
+    return sql`exists (
+        select 1 from ${friendship}
+        where ${friendship.userAId} = least(${me}, ${otherId})
+          and ${friendship.userBId} = greatest(${me}, ${otherId})
+    )`;
+}
+
 /** How `userId` relates to each row's `user.id`, for user lists. */
 export function relationshipTo(userId: string): SQL<Relationship> {
     const me = sql`${userId}::uuid`;
     return sql<Relationship>`case
         when ${user.id} = ${me} then ${Relationship.Self}
-        when exists (
-            select 1 from ${friendship}
-            where ${friendship.userAId} = least(${me}, ${user.id})
-              and ${friendship.userBId} = greatest(${me}, ${user.id})
-        ) then ${Relationship.Friends}
+        when ${isFriendOf(userId, user.id)} then ${Relationship.Friends}
         when exists (
             select 1 from ${friendRequest}
             where ${friendRequest.senderId} = ${me}

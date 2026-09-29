@@ -26,6 +26,8 @@ export const user = appSchema.table(
         showCollectionProgress: boolean('show_collection_progress')
             .default(true)
             .notNull(),
+        // Private profiles show their collections to friends only.
+        isPublic: boolean('is_public').default(false).notNull(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at')
             .defaultNow()
