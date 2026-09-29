@@ -6,7 +6,7 @@ import AppTopNav from './AppTopNav.vue';
 <template>
     <div class="min-h-svh w-full pt-14">
         <AppTopNav />
-        <main class="mx-auto w-full max-w-5xl p-4 pb-24 md:pb-4">
+        <main class="mx-auto w-full max-w-5xl p-4 pb-28 md:pb-4">
             <RouterView v-slot="{ Component }">
                 <Transition
                     mode="out-in"

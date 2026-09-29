@@ -22,7 +22,7 @@ const linkClass =
     <NavigationMenu
         :viewport="false"
         aria-label="Mobile"
-        class="bg-background fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border p-1 shadow-lg md:hidden"
+        class="bg-background fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border p-1 shadow-lg md:hidden"
     >
         <NavigationMenuList class="gap-1">
             <NavigationMenuItem v-for="link in navLinks" :key="link.name">
