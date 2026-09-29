@@ -35,12 +35,19 @@ const inputAttrs = computed(() => {
     return rest;
 });
 
+// `admin` picks from every series, for the admin dashboard.
+const props = defineProps<{ admin?: boolean }>();
+
 const model = defineModel<SeriesPick | null>({ default: null });
 
 const search = ref(model.value?.title ?? '');
 const { trimmed, term, isTyping } = useSearchTerm(search);
 
-const list = useSeriesSearch(term, { limit: PAGE_SIZE, pending: isTyping });
+const list = useSeriesSearch(term, {
+    limit: PAGE_SIZE,
+    pending: isTyping,
+    admin: props.admin,
+});
 
 const canCreate = computed(
     () =>

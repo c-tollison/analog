@@ -19,6 +19,7 @@ import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import type { IsbnLookup } from '@/composables/useCatalog';
+import type { CollectionSummary } from '@/composables/useCollections';
 import { useAddBook } from '@/composables/useCollections';
 import { AddBookFormSchema, SeriesPickSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
@@ -31,7 +32,7 @@ import { computed, ref } from 'vue';
 // Without a collection, only the book shows until one is picked.
 const props = defineProps<{
     lookup: IsbnLookup;
-    collection: { id: string; name: string } | null;
+    collection: Pick<CollectionSummary, 'id' | 'name'> | null;
 }>();
 
 const emit = defineEmits<{ done: []; added: [] }>();

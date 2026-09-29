@@ -13,6 +13,7 @@ import {
     AdminListQuerySchema,
     MAX_SERIES_VOLUMES,
     MergeSeriesSchema,
+    SeriesSearchQuerySchema,
     SetSeriesItemsSchema,
     SetVerifiedSchema,
     UpdateSeriesSchema,
@@ -34,7 +35,7 @@ import {
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
-import { matchesAllTerms, searchTerms } from '../lib/search.js';
+import { matchesAllTerms, searchSeries, searchTerms } from '../lib/search.js';
 import { seriesDetails, seriesLinks } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
@@ -106,6 +107,16 @@ const adminSeries = new Hono<AppEnv>()
         );
         return c.json(result);
     })
+    // Every series, verified or not, for the dashboard's series pickers.
+    // Registered before /:id, which would take "search" as an id.
+    .get(
+        '/search',
+        schemaValidator('query', SeriesSearchQuerySchema),
+        async (c) => {
+            const { q, ...page } = c.req.valid('query');
+            return c.json(await searchSeries(page, q, undefined));
+        }
+    )
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const [row] = await db()
             .select({

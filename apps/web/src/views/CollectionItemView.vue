@@ -5,6 +5,7 @@ import CoverImage from '@/components/CoverImage.vue';
 import AddEditionDialog from '@/components/collections/AddEditionDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import EditionItem from '@/components/media/EditionItem.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import ReviewSheet from '@/components/progress/ReviewSheet.vue';
 import StarRating from '@/components/progress/StarRating.vue';
@@ -13,9 +14,7 @@ import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Item,
-    ItemActions,
     ItemContent,
-    ItemDescription,
     ItemGroup,
     ItemMedia,
     ItemTitle,
@@ -36,7 +35,7 @@ import {
     useRemoveOwnedEdition,
 } from '@/composables/useCollections';
 import { useSetProgressStatus } from '@/composables/useProgress';
-import { editionSummary } from '@/lib/editions';
+import { isPendingFor } from '@/lib/editions';
 import {
     FORMAT_LABELS,
     formatStatusLabels,
@@ -141,14 +140,6 @@ const removeOwned = useRemoveOwnedEdition();
 const isChangingOwned = computed(
     () => addOwned.isPending.value || removeOwned.isPending.value
 );
-
-function isChanging(isbn: string) {
-    return (
-        (addOwned.isPending.value && addOwned.variables.value?.isbn === isbn) ||
-        (removeOwned.isPending.value &&
-            removeOwned.variables.value?.isbn === isbn)
-    );
-}
 
 function editionVariables(isbn: string) {
     return { collectionId: props.id, itemId: props.itemId, isbn };
@@ -271,61 +262,43 @@ const error = computed(
                     </Button>
                 </div>
                 <ItemGroup class="grid gap-2">
-                    <Item
+                    <EditionItem
                         v-for="edition in item.editions"
                         :key="edition.isbn"
-                        variant="outline"
-                        size="sm"
+                        :edition="edition"
+                        :fallback-title="item.title"
                     >
-                        <ItemMedia>
-                            <CoverImage
-                                size="sm"
-                                :src="edition.coverUrl"
-                                :alt="edition.title ?? item.title"
-                                class="aspect-2/3 w-10"
-                            />
-                        </ItemMedia>
-                        <ItemContent class="min-w-0">
-                            <ItemTitle class="line-clamp-2">
-                                {{ edition.title ?? item.title }}
-                            </ItemTitle>
-                            <ItemDescription>
-                                {{ editionSummary(edition) }}
-                            </ItemDescription>
-                        </ItemContent>
-                        <ItemActions>
-                            <template
-                                v-if="item.ownedIsbns.includes(edition.isbn)"
-                            >
-                                <Badge variant="secondary">Yours</Badge>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    :disabled="isChangingOwned"
-                                    @click="
-                                        removeOwned.mutate(
-                                            editionVariables(edition.isbn)
-                                        )
-                                    "
-                                >
-                                    <Spinner v-if="isChanging(edition.isbn)" />
-                                    Remove
-                                </Button>
-                            </template>
+                        <template v-if="item.ownedIsbns.includes(edition.isbn)">
+                            <Badge variant="secondary">Yours</Badge>
                             <Button
-                                v-else
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 :disabled="isChangingOwned"
                                 @click="
-                                    addOwned.mutate(editionVariables(edition.isbn))
+                                    removeOwned.mutate(
+                                        editionVariables(edition.isbn)
+                                    )
                                 "
                             >
-                                <Spinner v-if="isChanging(edition.isbn)" />
-                                I own this
+                                <Spinner
+                                    v-if="isPendingFor(removeOwned, edition.isbn)"
+                                />
+                                Remove
                             </Button>
-                        </ItemActions>
-                    </Item>
+                        </template>
+                        <Button
+                            v-else
+                            variant="outline"
+                            size="sm"
+                            :disabled="isChangingOwned"
+                            @click="addOwned.mutate(editionVariables(edition.isbn))"
+                        >
+                            <Spinner
+                                v-if="isPendingFor(addOwned, edition.isbn)"
+                            />
+                            I own this
+                        </Button>
+                    </EditionItem>
                 </ItemGroup>
             </TabsContent>
 

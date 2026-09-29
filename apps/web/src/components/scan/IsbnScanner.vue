@@ -14,6 +14,7 @@ import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { type IsbnLookup, useIsbnLookup } from '@/composables/useCatalog';
+import type { CollectionSummary } from '@/composables/useCollections';
 import { IsbnLookupFormSchema } from '@/lib/catalog-schemas';
 import { isbnFromBarcode } from '@/lib/isbn';
 import { vNoAutofill } from '@/lib/no-autofill';
@@ -34,7 +35,7 @@ import {
 
 const props = defineProps<{
     formats: BarcodeFormat[];
-    collection?: { id: string; name: string };
+    collection?: Pick<CollectionSummary, 'id' | 'name'>;
 }>();
 
 const lookupIsbn = useIsbnLookup();

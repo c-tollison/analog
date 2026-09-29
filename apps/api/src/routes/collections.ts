@@ -25,9 +25,10 @@ import {
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { seriesColumns, upsertBook } from '../lib/books.js';
+import { seriesColumns } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
 import { discoverableItem } from '../lib/discovery.js';
+import { upsertBook } from '../lib/editions.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';

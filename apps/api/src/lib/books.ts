@@ -1,29 +1,16 @@
-import {
-    and,
-    asc,
-    desc,
-    eq,
-    inArray,
-    isNotNull,
-    isNull,
-    ne,
-    notInArray,
-    schema,
-    sql,
-} from '@analog/db';
+import { and, desc, eq, isNull, schema, sql } from '@analog/db';
 import {
     ExternalSource,
+    languageName,
     MediaFormat,
     type SeriesChoiceSchema,
     SeriesKind,
 } from '@analog/types';
 
-import { verifiedColumns } from './admin.js';
 import { filledFacts, filledLinks } from './details.js';
 import { discoverableSeries } from './discovery.js';
 import { isGoogleBooksCover, lookupGoogleBooksIsbn } from './google-books.js';
 import { db, logger } from './init.js';
-import { languageName } from './languages.js';
 import {
     type BookDetails,
     type BookLookup,
@@ -119,15 +106,22 @@ export async function findBookByIsbn(isbn: string) {
     return { ...item, edition };
 }
 
-// A series with this title that the user can find.
+// Who is picking a series. An admin editing from the dashboard can pick
+// any series; everyone else only the ones they can find.
+type SeriesPicker = { userId: string; admin: boolean };
+
+function pickableSeries({ userId, admin }: SeriesPicker) {
+    return admin ? undefined : discoverableSeries(userId);
+}
+
 async function findSeriesByTitle(
     title: string,
-    userId: string
+    picker: SeriesPicker
 ): Promise<Series | null> {
     const found = await db().query.series.findFirst({
         where: and(
             sql`lower(${schema.series.title}) = lower(${title})`,
-            discoverableSeries(userId)
+            pickableSeries(picker)
         ),
     });
     return found ?? null;
@@ -141,7 +135,9 @@ export async function suggestSeries(
     if (item?.series) {
         return item.series;
     }
-    return book.series ? findSeriesByTitle(book.series, userId) : null;
+    return book.series
+        ? findSeriesByTitle(book.series, { userId, admin: false })
+        : null;
 }
 
 const SERIES_MATCH_LIMIT = 3;
@@ -185,11 +181,11 @@ type SeriesChoice = z.output<typeof SeriesChoiceSchema>;
 async function resolveSeries(
     choice: SeriesChoice,
     kind: BookLookup['kind'],
-    userId: string
+    picker: SeriesPicker
 ): Promise<Series> {
     if ('id' in choice) {
         const found = await db().query.series.findFirst({
-            where: eq(schema.series.id, choice.id),
+            where: and(eq(schema.series.id, choice.id), pickableSeries(picker)),
         });
         if (!found) {
             throw new HTTPException(404, { message: 'Series not found' });
@@ -197,13 +193,13 @@ async function resolveSeries(
         return found;
     }
 
-    const existing = await findSeriesByTitle(choice.title, userId);
+    const existing = await findSeriesByTitle(choice.title, picker);
     if (existing) {
         return existing;
     }
     const [created] = await db()
         .insert(schema.series)
-        .values({ title: choice.title, kind, createdByUserId: userId })
+        .values({ title: choice.title, kind, createdByUserId: picker.userId })
         .returning();
     if (!created) {
         throw new Error('Failed to create series');
@@ -213,15 +209,15 @@ async function resolveSeries(
 
 /**
  * The series a book goes in, creating it from a title when needed. A new
- * series takes the book's kind, and only this user can find it until an
+ * series takes the book's kind, and only its creator can find it until an
  * admin verifies it.
  */
 export function seriesForItem(
     choice: SeriesChoice,
     item: CatalogItem,
-    userId: string
+    picker: SeriesPicker
 ): Promise<Series> {
-    return resolveSeries(choice, toBookKind(item.kind), userId);
+    return resolveSeries(choice, toBookKind(item.kind), picker);
 }
 
 /**
@@ -235,7 +231,11 @@ export function kindInSeries(
     return series?.kind ?? itemKind;
 }
 
-type Executor = Pick<ReturnType<typeof db>, 'update'>;
+export type Transaction = Parameters<
+    Parameters<ReturnType<typeof db>['transaction']>[0]
+>[0];
+
+type Executor = Pick<Transaction, 'update'>;
 
 /** Gives every item in a series the series' kind, after either one changes. */
 export async function matchSeriesKind(
@@ -394,7 +394,7 @@ function merge(books: (BookLookup | null)[]): BookLookup | null {
 type OpenLibraryResult = NonNullable<Awaited<ReturnType<typeof lookupIsbn>>>;
 
 // Each source's time is set when it answered, whether or not it had the book.
-type Lookup = {
+export type Lookup = {
     book: BookLookup;
     googleBooksFetchedAt: Date | null;
     openLibraryFetchedAt: Date | null;
@@ -472,7 +472,7 @@ type LookupOptions = {
  * When Open Library is too slow, Google's data comes back without it, and
  * `later` has the full lookup to save once Open Library answers.
  */
-async function lookupBook(isbn: string, options: LookupOptions) {
+export async function lookupBook(isbn: string, options: LookupOptions) {
     const { stored, refresh } = options;
     const openLibrary = options.openLibrary ? lookupOpenLibrary(isbn) : null;
     const google = options.google ? await lookupGoogleBooks(isbn) : null;
@@ -556,7 +556,7 @@ async function saveBook(itemId: string, lookup: Lookup) {
 }
 
 // Saves a lookup that was still waiting on Open Library.
-async function saveLater(itemId: string, later: Promise<Lookup | null>) {
+export async function saveLater(itemId: string, later: Promise<Lookup | null>) {
     try {
         const lookup = await later;
         if (lookup) {
@@ -568,7 +568,7 @@ async function saveLater(itemId: string, later: Promise<Lookup | null>) {
 }
 
 /** What a book's own ISBN row says about its edition. */
-function isbnFacts(book: BookLookup) {
+export function isbnFacts(book: BookLookup) {
     return {
         title: book.title,
         coverUrl: book.coverUrl,
@@ -597,40 +597,57 @@ function bookValues(lookup: Lookup, userId: string) {
 }
 
 /**
- * Saves a looked-up book as a new catalog item, with its ISBN. Returns null
- * when another item already has the ISBN, since two scans can race.
+ * Adds a catalog item for a looked-up book, then runs `claim` to give it its
+ * ISBN. When the claim fails, the item is removed again and null comes back.
+ */
+export async function createItemClaimingIsbn(
+    tx: Transaction,
+    lookup: Lookup,
+    userId: string,
+    claim: (itemId: string) => Promise<boolean>
+): Promise<string | null> {
+    const { catalogItem } = schema;
+    const [created] = await tx
+        .insert(catalogItem)
+        .values(bookValues(lookup, userId))
+        .returning({ id: catalogItem.id });
+    if (!created) {
+        return null;
+    }
+    if (!(await claim(created.id))) {
+        await tx.delete(catalogItem).where(eq(catalogItem.id, created.id));
+        return null;
+    }
+    return created.id;
+}
+
+/**
+ * Saves a looked-up book as a new catalog item, with its ISBN as the main
+ * one. Returns null when another item already has the ISBN, since two scans
+ * can race.
  */
 async function insertBook(
     isbn: string,
     lookup: Lookup,
     userId: string
 ): Promise<string | null> {
-    const { catalogItem, catalogItemIsbn } = schema;
-    return db().transaction(async (tx) => {
-        const [created] = await tx
-            .insert(catalogItem)
-            .values(bookValues(lookup, userId))
-            .returning({ id: catalogItem.id });
-        if (!created) {
-            return null;
-        }
-        const [owned] = await tx
-            .insert(catalogItemIsbn)
-            .values({
-                isbn,
-                catalogItemId: created.id,
-                main: true,
-                ...isbnFacts(lookup.book),
-            })
-            // Another scan of the same ISBN got here first.
-            .onConflictDoNothing()
-            .returning({ isbn: catalogItemIsbn.isbn });
-        if (!owned) {
-            await tx.delete(catalogItem).where(eq(catalogItem.id, created.id));
-            return null;
-        }
-        return created.id;
-    });
+    const { catalogItemIsbn } = schema;
+    return db().transaction((tx) =>
+        createItemClaimingIsbn(tx, lookup, userId, async (itemId) => {
+            const [owned] = await tx
+                .insert(catalogItemIsbn)
+                .values({
+                    isbn,
+                    catalogItemId: itemId,
+                    main: true,
+                    ...isbnFacts(lookup.book),
+                })
+                // Another scan of the same ISBN got here first.
+                .onConflictDoNothing()
+                .returning({ isbn: catalogItemIsbn.isbn });
+            return !!owned;
+        })
+    );
 }
 
 /**
@@ -665,477 +682,6 @@ export async function findOrCreateBook(isbn: string, userId: string) {
         throw new Error(`Catalog item for ${isbn} missing after insert`);
     }
     return { item, fetched: book };
-}
-
-// The item already at this volume in a series, preferring a verified one.
-async function findVolume(
-    seriesId: string,
-    volume: number,
-    otherThan: string
-): Promise<CatalogItem | null> {
-    const { catalogItem } = schema;
-    const [found] = await db()
-        .select()
-        .from(catalogItem)
-        .where(
-            and(
-                eq(catalogItem.seriesId, seriesId),
-                eq(catalogItem.position, volume),
-                ne(catalogItem.id, otherThan)
-            )
-        )
-        .orderBy(
-            sql`${catalogItem.verifiedAt} asc nulls last`,
-            asc(catalogItem.createdAt)
-        )
-        .limit(1);
-    return found ?? null;
-}
-
-type Transaction = Parameters<
-    Parameters<ReturnType<typeof db>['transaction']>[0]
->[0];
-
-/**
- * Moves everything on one item onto another for the same volume: its ISBNs,
- * collection entries and progress. A collection that has both keeps one
- * entry, owning every edition, and a person with progress on both keeps the
- * other item's. Deletes the first item.
- */
-async function moveItemInto(
-    tx: Transaction,
-    fromId: string,
-    intoId: string,
-    { pending }: { pending: boolean }
-): Promise<void> {
-    const {
-        catalogItem,
-        catalogItemIsbn,
-        collectionItem,
-        collectionItemIsbn,
-        progress,
-    } = schema;
-    const entryColumns = {
-        id: collectionItem.id,
-        collectionId: collectionItem.collectionId,
-    };
-    const [fromEntries, intoEntries] = await Promise.all([
-        tx
-            .select(entryColumns)
-            .from(collectionItem)
-            .where(eq(collectionItem.catalogItemId, fromId)),
-        tx
-            .select(entryColumns)
-            .from(collectionItem)
-            .where(eq(collectionItem.catalogItemId, intoId)),
-    ]);
-    for (const entry of fromEntries) {
-        const kept = intoEntries.find(
-            (other) => other.collectionId === entry.collectionId
-        );
-        if (kept) {
-            await tx
-                .update(collectionItemIsbn)
-                .set({ collectionItemId: kept.id })
-                .where(eq(collectionItemIsbn.collectionItemId, entry.id));
-        }
-    }
-    await tx
-        .update(collectionItem)
-        .set({ catalogItemId: intoId, updatedAt: new Date() })
-        .where(
-            and(
-                eq(collectionItem.catalogItemId, fromId),
-                notInArray(
-                    collectionItem.collectionId,
-                    intoEntries.map((entry) => entry.collectionId)
-                )
-            )
-        );
-
-    const people = await tx
-        .select({ id: progress.userId })
-        .from(progress)
-        .where(eq(progress.catalogItemId, intoId));
-    await tx
-        .update(progress)
-        .set({ catalogItemId: intoId, updatedAt: new Date() })
-        .where(
-            and(
-                eq(progress.catalogItemId, fromId),
-                notInArray(
-                    progress.userId,
-                    people.map((row) => row.id)
-                )
-            )
-        );
-
-    await tx
-        .update(catalogItemIsbn)
-        .set({ catalogItemId: intoId, main: false, pending })
-        .where(eq(catalogItemIsbn.catalogItemId, fromId));
-    await tx.delete(catalogItem).where(eq(catalogItem.id, fromId));
-}
-
-/**
- * Moves a scanned book onto another item for the same volume. Its ISBN waits
- * on an admin there. Only an item with no series that isn't verified can
- * join, and false means someone else placed it first.
- */
-async function joinItem(fromId: string, intoId: string): Promise<boolean> {
-    const { catalogItem } = schema;
-    return db().transaction(async (tx) => {
-        // Locks the row, so a scan placing it at the same time waits.
-        const [joinable] = await tx
-            .update(catalogItem)
-            .set({ updatedAt: new Date() })
-            .where(
-                and(
-                    eq(catalogItem.id, fromId),
-                    isNull(catalogItem.seriesId),
-                    isNull(catalogItem.verifiedAt)
-                )
-            )
-            .returning({ id: catalogItem.id });
-        if (!joinable) {
-            return false;
-        }
-        await moveItemInto(tx, fromId, intoId, { pending: true });
-        return true;
-    });
-}
-
-/**
- * Merges an item into another for the same book, for when two scans made
- * separate items. The other item keeps its own details, series and volume,
- * and takes this one's series when it has none. Its ISBNs count as checked,
- * since an admin matched them.
- */
-export async function mergeItem(fromId: string, intoId: string): Promise<void> {
-    if (fromId === intoId) {
-        throw new HTTPException(400, {
-            message: "An item can't be merged into itself",
-        });
-    }
-    const { catalogItem } = schema;
-    const [from, into] = await Promise.all(
-        [fromId, intoId].map((id) =>
-            db().query.catalogItem.findFirst({ where: eq(catalogItem.id, id) })
-        )
-    );
-    if (!from || !into) {
-        throw new HTTPException(404, { message: 'Item not found' });
-    }
-    await db().transaction(async (tx) => {
-        if (!into.seriesId && from.seriesId) {
-            await tx
-                .update(catalogItem)
-                .set({
-                    seriesId: from.seriesId,
-                    position: from.position,
-                    kind: from.kind,
-                    updatedAt: new Date(),
-                })
-                .where(eq(catalogItem.id, into.id));
-        }
-        await moveItemInto(tx, from.id, into.id, { pending: false });
-    });
-    const seriesIds = new Set(
-        [from.seriesId, into.seriesId].filter((id) => id !== null)
-    );
-    await Promise.all([...seriesIds].map(refreshSeriesCover));
-}
-
-/**
- * Puts an ISBN on an item as another edition of it. A new ISBN is looked up
- * first, then joins like a scan picking this volume would, waiting on an
- * admin. False when the ISBN is already on another book with a series.
- */
-export async function addEdition(
-    itemId: string,
-    isbn: string,
-    userId: string
-): Promise<boolean> {
-    const { item } = await findOrCreateBook(isbn, userId);
-    return item.id === itemId || joinItem(item.id, itemId);
-}
-
-/**
- * Returns the catalog item for an ISBN. The user's series and volume are
- * saved only when the item has no series yet and isn't verified, since Open
- * Library's series data is unreliable. After that, only admins change them.
- *
- * When the series already has an item at that volume, the ISBN joins it as
- * another edition, waiting on an admin. Otherwise the item takes the spot.
- * A verified series the item joins goes back to unverified.
- */
-export async function upsertBook(
-    isbn: string,
-    seriesChoice: SeriesChoice | null,
-    volume: number | null,
-    userId: string
-): Promise<CatalogItem> {
-    const { item } = await findOrCreateBook(isbn, userId);
-    if (item.seriesId || item.verifiedAt) {
-        return item;
-    }
-
-    const series = seriesChoice
-        ? await seriesForItem(seriesChoice, item, userId)
-        : null;
-
-    const sameVolume =
-        series && volume !== null
-            ? await findVolume(series.id, volume, item.id)
-            : null;
-    if (sameVolume) {
-        const joined = await joinItem(item.id, sameVolume.id);
-        return joined ? sameVolume : ((await findBookByIsbn(isbn)) ?? item);
-    }
-
-    const { catalogItem } = schema;
-    const [updated] = await db()
-        .update(catalogItem)
-        .set({
-            seriesId: series?.id ?? null,
-            position: volume,
-            kind: kindInSeries(series, item.kind),
-            updatedAt: new Date(),
-        })
-        .where(
-            and(
-                eq(catalogItem.id, item.id),
-                isNull(catalogItem.seriesId),
-                isNull(catalogItem.verifiedAt)
-            )
-        )
-        .returning();
-    if (!updated) {
-        return (await findBookByIsbn(isbn)) ?? item;
-    }
-
-    if (updated.seriesId) {
-        await Promise.all([
-            refreshSeriesCover(updated.seriesId),
-            unverifySeries(updated.seriesId),
-        ]);
-    }
-    return updated;
-}
-
-/**
- * Sends a series back to the admins' list, since a scan added an item they
- * haven't checked belongs in it.
- */
-async function unverifySeries(seriesId: string): Promise<void> {
-    const { series } = schema;
-    await db()
-        .update(series)
-        .set(verifiedColumns(null))
-        .where(and(eq(series.id, seriesId), isNotNull(series.verifiedAt)));
-}
-
-/**
- * Makes a new item for one of an item's ISBNs, taking the collection entries
- * that own it. Their members' status and reviews move too, unless those
- * collections still have the old item. Null when the ISBN is gone.
- */
-async function moveIsbnToNewItem(
-    fromId: string,
-    isbn: string,
-    lookup: Lookup,
-    userId: string
-): Promise<string | null> {
-    const {
-        catalogItem,
-        catalogItemIsbn,
-        collectionItem,
-        collectionItemIsbn,
-        collectionMember,
-        progress,
-    } = schema;
-    return db().transaction(async (tx) => {
-        const [created] = await tx
-            .insert(catalogItem)
-            .values(bookValues(lookup, userId))
-            .returning({ id: catalogItem.id });
-        if (!created) {
-            return null;
-        }
-        const [moved] = await tx
-            .update(catalogItemIsbn)
-            .set({
-                catalogItemId: created.id,
-                main: true,
-                pending: false,
-                ...isbnFacts(lookup.book),
-            })
-            .where(
-                and(
-                    eq(catalogItemIsbn.isbn, isbn),
-                    eq(catalogItemIsbn.catalogItemId, fromId)
-                )
-            )
-            .returning({ isbn: catalogItemIsbn.isbn });
-        if (!moved) {
-            await tx.delete(catalogItem).where(eq(catalogItem.id, created.id));
-            return null;
-        }
-
-        const entries = await tx
-            .select({
-                id: collectionItem.id,
-                collectionId: collectionItem.collectionId,
-                addedByUserId: collectionItem.addedByUserId,
-            })
-            .from(collectionItemIsbn)
-            .innerJoin(
-                collectionItem,
-                eq(collectionItem.id, collectionItemIsbn.collectionItemId)
-            )
-            .where(
-                and(
-                    eq(collectionItemIsbn.isbn, isbn),
-                    eq(collectionItem.catalogItemId, fromId)
-                )
-            );
-        if (!entries.length) {
-            return created.id;
-        }
-        const otherEditions = await tx
-            .select({ entryId: collectionItemIsbn.collectionItemId })
-            .from(collectionItemIsbn)
-            .where(
-                and(
-                    inArray(
-                        collectionItemIsbn.collectionItemId,
-                        entries.map((entry) => entry.id)
-                    ),
-                    ne(collectionItemIsbn.isbn, isbn)
-                )
-            );
-        const ownsOthers = new Set(otherEditions.map((row) => row.entryId));
-        // An entry owning only this edition moves with it. One that also
-        // owns others stays, and a new entry in its collection takes this one.
-        const whole = entries.filter((entry) => !ownsOthers.has(entry.id));
-        const shared = entries.filter((entry) => ownsOthers.has(entry.id));
-        if (whole.length) {
-            await tx
-                .update(collectionItem)
-                .set({ catalogItemId: created.id, updatedAt: new Date() })
-                .where(
-                    inArray(
-                        collectionItem.id,
-                        whole.map((entry) => entry.id)
-                    )
-                );
-        }
-        if (shared.length) {
-            await tx.delete(collectionItemIsbn).where(
-                and(
-                    inArray(
-                        collectionItemIsbn.collectionItemId,
-                        shared.map((entry) => entry.id)
-                    ),
-                    eq(collectionItemIsbn.isbn, isbn)
-                )
-            );
-            const added = await tx
-                .insert(collectionItem)
-                .values(
-                    shared.map((entry) => ({
-                        collectionId: entry.collectionId,
-                        catalogItemId: created.id,
-                        addedByUserId: entry.addedByUserId,
-                    }))
-                )
-                .returning({ id: collectionItem.id });
-            await tx
-                .insert(collectionItemIsbn)
-                .values(
-                    added.map((entry) => ({ collectionItemId: entry.id, isbn }))
-                );
-        }
-        const owners = await tx
-            .selectDistinct({ id: collectionMember.userId })
-            .from(collectionMember)
-            .where(
-                inArray(
-                    collectionMember.collectionId,
-                    entries.map((entry) => entry.collectionId)
-                )
-            );
-        const stillOwners = await tx
-            .selectDistinct({ id: collectionMember.userId })
-            .from(collectionMember)
-            .innerJoin(
-                collectionItem,
-                eq(collectionItem.collectionId, collectionMember.collectionId)
-            )
-            .where(eq(collectionItem.catalogItemId, fromId));
-        const staying = new Set(stillOwners.map((row) => row.id));
-        const movers = owners
-            .map((row) => row.id)
-            .filter((id) => !staying.has(id));
-        if (movers.length) {
-            await tx
-                .update(progress)
-                .set({ catalogItemId: created.id, updatedAt: new Date() })
-                .where(
-                    and(
-                        eq(progress.catalogItemId, fromId),
-                        inArray(progress.userId, movers)
-                    )
-                );
-        }
-        return created.id;
-    });
-}
-
-/**
- * Makes one of an item's ISBNs its own item, for when a scan put it on the
- * wrong book. Returns the new item's id.
- */
-export async function splitOffIsbn(
-    itemId: string,
-    isbn: string,
-    userId: string
-): Promise<string> {
-    const found = await db().query.catalogItemIsbn.findFirst({
-        where: and(
-            eq(schema.catalogItemIsbn.isbn, isbn),
-            eq(schema.catalogItemIsbn.catalogItemId, itemId)
-        ),
-    });
-    if (!found) {
-        throw new HTTPException(404, { message: 'ISBN not found' });
-    }
-    if (found.main) {
-        throw new HTTPException(400, {
-            message: "This is the item's main ISBN",
-        });
-    }
-    const lookup = await lookupBook(isbn, {
-        stored: null,
-        google: true,
-        openLibrary: true,
-        refresh: true,
-    });
-    if (!lookup) {
-        throw new HTTPException(404, {
-            message: `No book found for ISBN ${isbn}`,
-        });
-    }
-    const created = await moveIsbnToNewItem(itemId, isbn, lookup, userId);
-    if (!created) {
-        throw new HTTPException(409, {
-            message: 'Another item already has this ISBN',
-        });
-    }
-    if (lookup.later) {
-        void saveLater(created, lookup.later);
-    }
-    return created;
 }
 
 /**

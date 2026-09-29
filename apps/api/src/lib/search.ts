@@ -1,6 +1,8 @@
 import {
     and,
+    asc,
     type Column,
+    desc,
     eq,
     ilike,
     inArray,
@@ -9,9 +11,11 @@ import {
     schema,
     sql,
 } from '@analog/db';
+import type { PageQuery } from '@analog/types';
 
+import { seriesColumns } from './books.js';
 import { db } from './init.js';
-import { likePattern } from './pagination.js';
+import { likePattern, paginate } from './pagination.js';
 
 const MAX_TERMS = 8;
 const NUMBER = /^\d+(\.\d+)?$/;
@@ -109,5 +113,33 @@ export function catalogItemsMatching(terms: string[]): SQL | undefined {
                 ? ids
                 : or(eq(catalogItem.position, number), ids);
         })
+    );
+}
+
+/**
+ * A page of series whose titles match `q`, closest first, limited by
+ * `where`. Numbers in `q` are ignored, since series titles rarely have them.
+ */
+export function searchSeries(
+    page: PageQuery,
+    q: string | undefined,
+    where: SQL | undefined
+) {
+    const title = schema.series.title;
+    const terms = withoutNumbers(searchTerms(q ?? ''));
+    return paginate(page, (limit, offset) =>
+        db()
+            .select(seriesColumns)
+            .from(schema.series)
+            .where(and(matchesAllTerms(terms, { columns: [title] }), where))
+            .orderBy(
+                ...(terms.length
+                    ? [desc(relevance(terms.join(' '), [title]))]
+                    : []),
+                sql`lower(${title})`,
+                asc(schema.series.id)
+            )
+            .limit(limit)
+            .offset(offset)
     );
 }

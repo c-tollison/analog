@@ -142,6 +142,12 @@ export function useCollectionSeriesItems(
     );
 }
 
+/** A collection as the list and detail routes return it. */
+export type CollectionSummary = InferResponseType<
+    ApiClient['collections'][':id']['$get'],
+    200
+>;
+
 export type CollectionItemDetail = InferResponseType<
     ApiClient['collections'][':id']['items'][':itemId']['$get'],
     200

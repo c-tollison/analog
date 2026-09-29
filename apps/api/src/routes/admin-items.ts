@@ -3,8 +3,6 @@ import {
     asc,
     eq,
     inArray,
-    isNotNull,
-    isNull,
     notInArray,
     or,
     type SQL,
@@ -25,16 +23,16 @@ import {
     setVerified,
     totalCount,
     verifiedByUser,
+    whereVerified,
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
 import {
     itemLinks,
     kindInSeries,
-    mergeItem,
     refreshSeriesCover,
     seriesForItem,
-    splitOffIsbn,
 } from '../lib/books.js';
+import { mergeItem, splitOffIsbn } from '../lib/editions.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -45,10 +43,9 @@ import { HTTPException } from 'hono/http-exception';
 
 const { catalogItem, catalogItemIsbn, collectionItem, series } = schema;
 
-const IsbnParamSchema = IdParamSchema.extend({ isbn: IsbnSchema });
+const ItemIsbnParamSchema = IdParamSchema.extend({ isbn: IsbnSchema });
 
-// Items with an ISBN a scan added that an admin hasn't checked.
-function withPendingIsbn() {
+function itemIdsWithPendingIsbn() {
     return db()
         .select({ id: catalogItemIsbn.catalogItemId })
         .from(catalogItemIsbn)
@@ -57,19 +54,17 @@ function withPendingIsbn() {
 
 // An item needs checking until it's verified and has no pending ISBNs.
 function whereItemVerified(status: VerifiedFilter): SQL | undefined {
+    const verified = whereVerified(catalogItem.verifiedAt, status);
     if (status === VerifiedFilter.Verified) {
         return and(
-            isNotNull(catalogItem.verifiedAt),
-            notInArray(catalogItem.id, withPendingIsbn())
+            verified,
+            notInArray(catalogItem.id, itemIdsWithPendingIsbn())
         );
     }
     if (status === VerifiedFilter.Unverified) {
-        return or(
-            isNull(catalogItem.verifiedAt),
-            inArray(catalogItem.id, withPendingIsbn())
-        );
+        return or(verified, inArray(catalogItem.id, itemIdsWithPendingIsbn()));
     }
-    return undefined;
+    return verified;
 }
 
 async function requireItem(id: string) {
@@ -206,7 +201,10 @@ const adminItems = new Hono<AppEnv>()
             const item = await requireItem(c.req.valid('param').id);
             const { title, series: choice, volume } = c.req.valid('json');
             const next = choice
-                ? await seriesForItem(choice, item, c.get('user').id)
+                ? await seriesForItem(choice, item, {
+                      userId: c.get('user').id,
+                      admin: true,
+                  })
                 : null;
 
             await db()
@@ -253,7 +251,7 @@ const adminItems = new Hono<AppEnv>()
     // Makes an ISBN a scan put on the wrong book its own item.
     .post(
         '/:id/isbns/:isbn/split',
-        schemaValidator('param', IsbnParamSchema),
+        schemaValidator('param', ItemIsbnParamSchema),
         async (c) => {
             const { id, isbn } = c.req.valid('param');
             const created = await splitOffIsbn(id, isbn, c.get('user').id);
@@ -262,7 +260,7 @@ const adminItems = new Hono<AppEnv>()
     )
     .put(
         '/:id/isbns/:isbn/approve',
-        schemaValidator('param', IsbnParamSchema),
+        schemaValidator('param', ItemIsbnParamSchema),
         async (c) => {
             const { id, isbn } = c.req.valid('param');
             const [approved] = await db()

@@ -1,24 +1,15 @@
-import { and, asc, desc, schema, sql } from '@analog/db';
 import {
     DetailsSourceSchema,
     LinkDetailsSourceSchema,
-    PageQuerySchema,
+    SeriesSearchQuerySchema,
     SetVolumeCountSchema,
     UserRole,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { seriesColumns } from '../lib/books.js';
 import { discoverableSeries } from '../lib/discovery.js';
-import { db } from '../lib/init.js';
-import { paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
-import {
-    matchesAllTerms,
-    relevance,
-    searchTerms,
-    withoutNumbers,
-} from '../lib/search.js';
+import { searchSeries } from '../lib/search.js';
 import {
     linkDetailsSource,
     searchDetailsSource,
@@ -30,9 +21,6 @@ import { requireRole } from '../middleware/require-role.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
 
-const SearchQuerySchema = PageQuerySchema.extend({
-    q: z.string().trim().max(200).optional(),
-});
 const DetailsSearchQuerySchema = z.object({
     source: DetailsSourceSchema,
     q: z.string().trim().min(1).max(200),
@@ -84,32 +72,12 @@ const series = new Hono<AppEnv>()
             return c.body(null, 204);
         }
     )
-    .get('/', schemaValidator('query', SearchQuerySchema), async (c) => {
+    // Series you can find: verified ones, and ones you created.
+    .get('/', schemaValidator('query', SeriesSearchQuerySchema), async (c) => {
         const { q, ...page } = c.req.valid('query');
-        const title = schema.series.title;
-        const terms = withoutNumbers(searchTerms(q ?? ''));
-
-        const result = await paginate(page, (limit, offset) =>
-            db()
-                .select(seriesColumns)
-                .from(schema.series)
-                .where(
-                    and(
-                        matchesAllTerms(terms, { columns: [title] }),
-                        discoverableSeries(c.get('user').id)
-                    )
-                )
-                .orderBy(
-                    ...(terms.length
-                        ? [desc(relevance(terms.join(' '), [title]))]
-                        : []),
-                    sql`lower(${title})`,
-                    asc(schema.series.id)
-                )
-                .limit(limit)
-                .offset(offset)
+        return c.json(
+            await searchSeries(page, q, discoverableSeries(c.get('user').id))
         );
-        return c.json(result);
     });
 
 export default series;

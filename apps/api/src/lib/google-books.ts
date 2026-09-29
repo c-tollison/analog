@@ -1,8 +1,12 @@
-import { ExternalSource, normalizeIsbn } from '@analog/types';
+import {
+    ExternalSource,
+    isoLanguage,
+    languageName,
+    normalizeIsbn,
+} from '@analog/types';
 
 import { plainText } from './details.js';
 import { config } from './init.js';
-import { isoLanguage, languageName } from './languages.js';
 import {
     type BookLookup,
     bookKind,

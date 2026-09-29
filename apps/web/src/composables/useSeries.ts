@@ -23,23 +23,33 @@ export type DetailsSearchResult = InferResponseType<
     200
 >[number];
 
-/** Series in the shared catalog matching `q`; nothing loads while it's empty. */
+/**
+ * Series whose titles match `q`; nothing loads while it's empty. Members only
+ * find verified series and their own. `admin` searches every series, for the
+ * admin dashboard.
+ */
 export function useSeriesSearch(
     q: MaybeRefOrGetter<string>,
-    { limit, ...options }: PaginatedListOptions & { limit?: number } = {}
+    {
+        limit,
+        admin = false,
+        ...options
+    }: PaginatedListOptions & { limit?: number; admin?: boolean } = {}
 ) {
     return usePaginatedList(
-        () => [...SERIES_KEY, 'search', toValue(q), limit],
-        async (offset) =>
-            unwrap(
-                await api.series.$get({
-                    query: {
-                        q: toValue(q),
-                        offset,
-                        ...(limit ? { limit: String(limit) } : {}),
-                    },
-                })
-            ),
+        () => [...SERIES_KEY, 'search', toValue(q), limit, admin],
+        async (offset) => {
+            const query = {
+                q: toValue(q),
+                offset,
+                ...(limit ? { limit: String(limit) } : {}),
+            };
+            return unwrap(
+                admin
+                    ? await api.admin.series.search.$get({ query })
+                    : await api.series.$get({ query })
+            );
+        },
         { enabled: () => toValue(q) !== '', ...options }
     );
 }

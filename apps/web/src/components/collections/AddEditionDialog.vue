@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import EditionItem from '@/components/media/EditionItem.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Dialog,
@@ -19,15 +19,7 @@ import {
     FormMessage,
 } from '@/components/shadcn-components/form';
 import { Input } from '@/components/shadcn-components/input';
-import {
-    Item,
-    ItemActions,
-    ItemContent,
-    ItemDescription,
-    ItemGroup,
-    ItemMedia,
-    ItemTitle,
-} from '@/components/shadcn-components/item';
+import { ItemGroup } from '@/components/shadcn-components/item';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import {
@@ -35,10 +27,10 @@ import {
     useUnownedEditions,
 } from '@/composables/useCollections';
 import { IsbnLookupFormSchema } from '@/lib/catalog-schemas';
-import { editionSummary } from '@/lib/editions';
+import { isPendingFor } from '@/lib/editions';
 import { vNoAutofill } from '@/lib/no-autofill';
 
-import { watch } from 'vue';
+import { computed, watch } from 'vue';
 
 const props = defineProps<{
     collectionId: string;
@@ -65,7 +57,13 @@ function addExisting(isbn: string) {
     });
 }
 
-const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
+const {
+    submit,
+    formError: typedError,
+    isSubmitting,
+    fieldProps,
+    resetForm,
+} = useAppForm({
     schema: IsbnLookupFormSchema,
     initialValues: { isbn: '' },
     onSubmit: async ({ isbn }) => {
@@ -79,9 +77,15 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
     },
 });
 
+// Adding from the list skips the form, so its errors come from the mutation.
+const error = computed(
+    () => typedError.value ?? addEdition.error.value?.message ?? null
+);
+
 watch(open, (isOpen) => {
     if (isOpen) {
         resetForm();
+        addEdition.reset();
     }
 });
 </script>
@@ -96,7 +100,7 @@ watch(open, (isOpen) => {
                 </DialogDescription>
             </DialogHeader>
             <form class="grid gap-4" novalidate @submit="submit">
-                <FormError :message="formError" />
+                <FormError :message="error" />
                 <!-- The field has focus when the dialog opens, so checking on
                      blur would flag it when you pick an edition below. -->
                 <FormField
@@ -131,46 +135,29 @@ watch(open, (isOpen) => {
                     <PagedList :list="editions" empty-text="No other editions.">
                         <template #default="{ items }">
                             <ItemGroup class="grid gap-2">
-                                <Item
+                                <EditionItem
                                     v-for="edition in items"
                                     :key="edition.isbn"
-                                    variant="outline"
-                                    size="sm"
+                                    :edition="edition"
+                                    :fallback-title="title"
                                 >
-                                    <ItemMedia>
-                                        <CoverImage
-                                            size="sm"
-                                            :src="edition.coverUrl"
-                                            :alt="edition.title ?? title"
-                                            class="aspect-2/3 w-8"
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        :disabled="addEdition.isPending.value"
+                                        @click="addExisting(edition.isbn)"
+                                    >
+                                        <Spinner
+                                            v-if="
+                                                isPendingFor(
+                                                    addEdition,
+                                                    edition.isbn
+                                                )
+                                            "
                                         />
-                                    </ItemMedia>
-                                    <ItemContent class="min-w-0">
-                                        <ItemTitle class="line-clamp-2">
-                                            {{ edition.title ?? title }}
-                                        </ItemTitle>
-                                        <ItemDescription>
-                                            {{ editionSummary(edition) }}
-                                        </ItemDescription>
-                                    </ItemContent>
-                                    <ItemActions>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            :disabled="addEdition.isPending.value"
-                                            @click="addExisting(edition.isbn)"
-                                        >
-                                            <Spinner
-                                                v-if="
-                                                    addEdition.isPending.value &&
-                                                    addEdition.variables.value
-                                                        ?.isbn === edition.isbn
-                                                "
-                                            />
-                                            Add
-                                        </Button>
-                                    </ItemActions>
-                                </Item>
+                                        Add
+                                    </Button>
+                                </EditionItem>
                             </ItemGroup>
                         </template>
                     </PagedList>

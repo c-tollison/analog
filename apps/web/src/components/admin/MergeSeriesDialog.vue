@@ -77,7 +77,7 @@ watch(open, (isOpen) => {
                     <FormItem>
                         <FormLabel>Merge into</FormLabel>
                         <FormControl>
-                            <SeriesPicker v-bind="componentField" />
+                            <SeriesPicker v-bind="componentField" admin />
                         </FormControl>
                         <FormMessage />
                     </FormItem>

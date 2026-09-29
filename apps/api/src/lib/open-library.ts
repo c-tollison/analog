@@ -1,6 +1,10 @@
-import { ExternalSource, SeriesKind } from '@analog/types';
+import {
+    ExternalSource,
+    isoLanguage,
+    languageName,
+    SeriesKind,
+} from '@analog/types';
 
-import { isoLanguage, languageName } from './languages.js';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
@@ -179,8 +183,13 @@ async function getWork(edition: Edition): Promise<z.infer<typeof WorkSchema>> {
 }
 
 // The code of an edition's first language.
+// The code in a language key, like "eng" in "/languages/eng".
+function keyCode(key: string): string | undefined {
+    return key.match(LANGUAGE_KEY)?.[1];
+}
+
 function languageCode(languages: Edition['languages']): string | null {
-    const code = languages?.[0]?.key.match(LANGUAGE_KEY)?.[1];
+    const code = languages?.[0] && keyCode(languages[0].key);
     return code ? isoLanguage(code) : null;
 }
 
@@ -277,9 +286,7 @@ async function getDetails(edition: Edition, isbn: string) {
         editionName: editionName(edition.edition_name),
         physicalFormat: edition.physical_format?.trim() || null,
         languages: (edition.languages ?? [])
-            .map((language) =>
-                languageName(language.key.match(LANGUAGE_KEY)?.[1])
-            )
+            .map((language) => languageName(keyCode(language.key)))
             .filter((name): name is string => !!name),
         goodreadsId: edition.identifiers?.goodreads?.[0] ?? null,
         genres,

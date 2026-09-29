@@ -13,8 +13,9 @@ import {
 import { IsbnSchema, OwnedIsbnSchema, PageQuerySchema } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { addEdition, itemDetails } from '../lib/books.js';
+import { itemDetails } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
+import { addEdition } from '../lib/editions.js';
 import { userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { paginate } from '../lib/pagination.js';
@@ -35,7 +36,7 @@ const { catalogItemIsbn, collectionItem, collectionItemIsbn, progress, user } =
 const ItemParamSchema = IdParamSchema.extend({
     itemId: z.uuid('Invalid id'),
 });
-const OwnedIsbnParamSchema = ItemParamSchema.extend({ isbn: IsbnSchema });
+const EntryIsbnParamSchema = ItemParamSchema.extend({ isbn: IsbnSchema });
 
 /**
  * Everyone else on the app who finished a catalog item and left a rating or
@@ -185,7 +186,7 @@ const collectionItems = new Hono<AppEnv>()
     )
     .delete(
         '/:itemId/isbns/:isbn',
-        schemaValidator('param', OwnedIsbnParamSchema),
+        schemaValidator('param', EntryIsbnParamSchema),
         async (c) => {
             const { id, itemId, isbn } = c.req.valid('param');
             await requireMember(id, c.get('user').id);

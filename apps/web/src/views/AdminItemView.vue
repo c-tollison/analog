@@ -6,18 +6,11 @@ import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
+import EditionItem from '@/components/media/EditionItem.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import {
-    Item,
-    ItemActions,
-    ItemContent,
-    ItemDescription,
-    ItemGroup,
-    ItemMedia,
-    ItemTitle,
-} from '@/components/shadcn-components/item';
+import { ItemGroup } from '@/components/shadcn-components/item';
 import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import {
@@ -29,7 +22,7 @@ import {
 } from '@/composables/useAdmin';
 import { useRefreshBook } from '@/composables/useCatalog';
 import { formatDate, timeAgo } from '@/lib/dates';
-import { editionSummary } from '@/lib/editions';
+import { isPendingFor } from '@/lib/editions';
 import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
 import { goBackOr } from '@/lib/navigation';
 
@@ -239,73 +232,49 @@ function onDelete() {
                 <section class="grid gap-3">
                     <h2 class="font-semibold">ISBNs</h2>
                     <ItemGroup class="gap-2">
-                        <Item
+                        <EditionItem
                             v-for="edition in item.isbns"
                             :key="edition.isbn"
-                            variant="outline"
-                            size="sm"
+                            :edition="edition"
+                            :fallback-title="edition.isbn"
                         >
-                            <ItemMedia>
-                                <CoverImage
-                                    size="sm"
-                                    :src="edition.coverUrl"
-                                    :alt="edition.title ?? edition.isbn"
-                                    class="aspect-2/3 w-8"
-                                />
-                            </ItemMedia>
-                            <ItemContent class="min-w-0">
-                                <ItemTitle class="line-clamp-2">
-                                    {{ edition.title ?? edition.isbn }}
-                                </ItemTitle>
-                                <ItemDescription>
-                                    {{ editionSummary(edition) }}
-                                </ItemDescription>
-                            </ItemContent>
-                            <ItemActions>
-                                <Badge v-if="edition.main" variant="secondary">
-                                    Main
-                                </Badge>
-                                <template v-else>
-                                    <template v-if="edition.pending">
-                                        <Badge variant="outline">Pending</Badge>
-                                        <Button
-                                            size="sm"
-                                            :disabled="approve.isPending.value"
-                                            @click="
-                                                approve.mutate({
-                                                    itemId: item.id,
-                                                    isbn: edition.isbn,
-                                                })
-                                            "
-                                        >
-                                            <Spinner
-                                                v-if="
-                                                    approve.isPending.value &&
-                                                    approve.variables.value
-                                                        ?.isbn === edition.isbn
-                                                "
-                                            />
-                                            Approve
-                                        </Button>
-                                    </template>
+                            <Badge v-if="edition.main" variant="secondary">
+                                Main
+                            </Badge>
+                            <template v-else>
+                                <template v-if="edition.pending">
+                                    <Badge variant="outline">Pending</Badge>
                                     <Button
-                                        variant="outline"
                                         size="sm"
-                                        :disabled="split.isPending.value"
-                                        @click="onSplit(edition.isbn)"
+                                        :disabled="approve.isPending.value"
+                                        @click="
+                                            approve.mutate({
+                                                itemId: item.id,
+                                                isbn: edition.isbn,
+                                            })
+                                        "
                                     >
                                         <Spinner
                                             v-if="
-                                                split.isPending.value &&
-                                                split.variables.value?.isbn ===
-                                                    edition.isbn
+                                                isPendingFor(approve, edition.isbn)
                                             "
                                         />
-                                        Split off
+                                        Approve
                                     </Button>
                                 </template>
-                            </ItemActions>
-                        </Item>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    :disabled="split.isPending.value"
+                                    @click="onSplit(edition.isbn)"
+                                >
+                                    <Spinner
+                                        v-if="isPendingFor(split, edition.isbn)"
+                                    />
+                                    Split off
+                                </Button>
+                            </template>
+                        </EditionItem>
                     </ItemGroup>
                 </section>
             </template>
