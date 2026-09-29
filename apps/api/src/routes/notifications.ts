@@ -79,7 +79,11 @@ const notifications = new Hono<AppEnv>()
             db().$count(friendRequest, eq(friendRequest.recipientId, me)),
             db().$count(collectionInvite, eq(collectionInvite.inviteeId, me)),
         ]);
-        return c.json({ count: requests + invites });
+        return c.json({
+            count: requests + invites,
+            friendRequests: requests,
+            collectionInvites: invites,
+        });
     });
 
 export default notifications;

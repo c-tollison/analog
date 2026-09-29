@@ -162,6 +162,13 @@
       "when": 1790698734711,
       "tag": "0022_add_catalog_item_isbn",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790705693100,
+      "tag": "0023_add_isbn_cover",
+      "breakpoints": true
     }
   ]
 }

@@ -17,24 +17,34 @@ const sources = computed(() =>
 );
 
 const failed = ref(false);
+const loaded = ref(false);
 watch(
     () => props.src,
     () => {
         failed.value = false;
+        loaded.value = false;
     }
 );
 </script>
 
+<!-- The muted box shows while the cover loads, then the cover fades in over
+it. -->
 <template>
-    <img
+    <div
         v-if="sources && !failed"
-        :src="sources.src"
-        :srcset="sources.srcset"
-        :alt="alt"
-        loading="lazy"
-        :class="cn('bg-muted rounded-sm object-cover', props.class)"
-        @error="failed = true"
-    />
+        :class="cn('bg-muted overflow-hidden rounded-sm', props.class)"
+    >
+        <img
+            :src="sources.src"
+            :srcset="sources.srcset"
+            :alt="alt"
+            loading="lazy"
+            class="size-full object-cover transition-opacity duration-500 ease-out"
+            :class="{ 'opacity-0': !loaded }"
+            @load="loaded = true"
+            @error="failed = true"
+        />
+    </div>
     <div
         v-else
         role="img"

@@ -1,18 +1,13 @@
 <script setup lang="ts">
-import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { useNotificationCount } from '@/composables/useNotifications';
 
+import NotificationCountBadge from './NotificationCountBadge.vue';
 import { BellIcon } from '@lucide/vue';
 import { computed } from 'vue';
 
-const MAX_SHOWN = 9;
-
 const { data } = useNotificationCount();
 const count = computed(() => data.value?.count ?? 0);
-const label = computed(() =>
-    count.value > MAX_SHOWN ? `${MAX_SHOWN}+` : String(count.value)
-);
 </script>
 
 <template>
@@ -29,12 +24,7 @@ const label = computed(() =>
             "
         >
             <BellIcon />
-            <Badge
-                v-if="count"
-                class="bg-destructive absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-white"
-            >
-                {{ label }}
-            </Badge>
+            <NotificationCountBadge class="-top-0.5 -right-0.5" />
         </RouterLink>
     </Button>
 </template>

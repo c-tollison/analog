@@ -17,12 +17,14 @@ import {
     useCollectionSeriesItems,
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
+import { usePageTitle } from '@/composables/usePageTitle';
 import {
     addMoreLabel,
     completedWord,
     kindStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 import { missingVolumes } from '@/lib/volumes';
 
 import { PlusIcon, XIcon } from '@lucide/vue';
@@ -36,6 +38,7 @@ const { data: detail, error: detailError } = useCollectionSeries(
     () => props.id,
     () => props.seriesId
 );
+usePageTitle(() => detail.value?.series.title);
 
 const { data: collection, error: collectionError } = useCollection(
     () => props.id
@@ -129,7 +132,10 @@ const headerError = computed(
             :series="detail.series"
         />
 
-        <div v-if="detail && labels" class="flex gap-4">
+        <div
+            v-if="detail && labels"
+            class="motion-safe:animate-in fade-in animation-duration-500 flex gap-4"
+        >
             <CoverImage
                 size="md"
                 :src="detail.series.coverUrl"
@@ -177,7 +183,7 @@ const headerError = computed(
         </div>
         <MediaDetails
             v-if="detail && hasDetails"
-            class="max-w-3xl"
+            class="motion-safe:animate-in fade-in animation-duration-500 max-w-3xl"
             :description="detail.description"
             :genres="detail.genres"
             :facts="detail.facts"
@@ -203,7 +209,8 @@ const headerError = computed(
             <template #default="{ items }">
                 <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <li
-                        v-for="item in items"
+                        v-for="(item, index) in items"
+                        v-bind="staggerIn(index)"
                         :key="item.id"
                         class="group relative"
                     >
@@ -218,7 +225,7 @@ const headerError = computed(
                                 size="md"
                                 :src="item.coverUrl"
                                 :alt="item.title"
-                                class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
+                                class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
                             />
                             <p class="text-xs font-medium">
                                 Vol. {{ item.position ?? '?' }}

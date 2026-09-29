@@ -52,6 +52,16 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 - Use Tailwind only. Don't write CSS by hand. Prefer theme tokens and the default scale over arbitrary values, so write `text-xs`, not `text-[11px]`.
 - Dark mode uses `useColorMode()` from `@vueuse/core`. Never add a second theme mechanism.
 
+### Motion
+
+- Animate with the `tw-animate-css` classes, like `animate-in fade-in slide-in-from-bottom-2`. Set timing with `animation-duration-*`, not `duration-*`, which also changes hover transitions.
+- Prefix `animate-in` with `motion-safe:` so reduced motion turns it off.
+- Page changes already animate in `App.vue` and `AppLayout`. Pages don't add their own.
+- Rows in a list use `v-bind="staggerIn(index)"` from `lib/motion.ts` so they fade in one after another.
+- Content that shows up after a spinner, like a detail header, fades in with `motion-safe:animate-in fade-in animation-duration-500`.
+- `CoverImage` fades covers in once they load. Clickable covers in a grid lift on hover with `transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md`.
+- Keep it subtle. Nothing loops, and nothing plays again while it's on screen.
+
 ### App shell
 
 - Signed-in pages are children of the `/` route, which renders `AppLayout` and sets `meta.requiresAuth`. The shell components `AppLayout`, `AppTopNav` and `UserMenu` live in `src/components/layout/`.

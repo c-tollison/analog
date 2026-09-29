@@ -23,7 +23,10 @@ defineSlots<{ default(props: { items: T[] }): unknown }>();
         >
             <Spinner class="size-6" />
         </div>
-        <Empty v-else-if="!list.isLoading && !list.error && !list.items.length">
+        <Empty
+            v-else-if="!list.isLoading && !list.error && !list.items.length"
+            class="motion-safe:animate-in fade-in animation-duration-500"
+        >
             <EmptyDescription>{{ emptyText }}</EmptyDescription>
         </Empty>
 

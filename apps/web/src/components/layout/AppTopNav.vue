@@ -6,36 +6,20 @@ import {
     NavigationMenuList,
 } from '@/components/shadcn-components/navigation-menu';
 
+import NotificationSummaryTooltip from './NotificationSummaryTooltip.vue';
 import NotificationsBell from './NotificationsBell.vue';
+import { isNavActive, navLinks } from './nav-links';
 import UserMenu from './UserMenu.vue';
-import { DiscAlbumIcon, LibraryBigIcon, UsersIcon } from '@lucide/vue';
+import { DiscAlbumIcon } from '@lucide/vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
-
-const links = [
-    {
-        name: 'collections',
-        label: 'Collections',
-        icon: LibraryBigIcon,
-        paths: ['/collections'],
-    },
-    {
-        name: 'friends',
-        label: 'Friends',
-        icon: UsersIcon,
-        paths: ['/friends', '/users'],
-    },
-] as const;
-
-// Nested pages (a collection, a person) keep their section highlighted.
-function isActive(paths: readonly string[]) {
-    return paths.some((path) => route.path.startsWith(path));
-}
 </script>
 
 <template>
-    <header class="bg-background fixed inset-x-0 top-0 z-50 h-14 border-b">
+    <header
+        class="bg-background fixed inset-x-0 top-0 z-50 h-14 border-b pr-(--scrollbar-width)"
+    >
         <div class="mx-auto flex h-full max-w-5xl items-center gap-2 px-4">
             <RouterLink
                 :to="{ name: 'home' }"
@@ -45,12 +29,15 @@ function isActive(paths: readonly string[]) {
                 <!-- TODO: swap for the Analog logo. -->
                 <DiscAlbumIcon class="size-6" />
             </RouterLink>
-            <NavigationMenu :viewport="false">
+            <NavigationMenu :viewport="false" class="hidden md:flex">
                 <NavigationMenuList class="gap-1">
-                    <NavigationMenuItem v-for="link in links" :key="link.name">
+                    <NavigationMenuItem
+                        v-for="link in navLinks"
+                        :key="link.name"
+                    >
                         <NavigationMenuLink
-                            :active="isActive(link.paths)"
-                            class="hover:border-border data-active:border-border border border-transparent py-1 font-medium hover:bg-transparent focus:bg-transparent"
+                            :active="isNavActive(route.path, link.paths)"
+                            class="hover:border-border data-active:border-border border border-transparent py-1 font-medium hover:bg-transparent focus:bg-transparent data-active:bg-transparent data-active:hover:bg-transparent data-active:focus:bg-transparent"
                             as-child
                         >
                             <RouterLink :to="{ name: link.name }">
@@ -62,7 +49,9 @@ function isActive(paths: readonly string[]) {
                 </NavigationMenuList>
             </NavigationMenu>
             <div class="flex-1" />
-            <NotificationsBell />
+            <NotificationSummaryTooltip side="bottom" desktop>
+                <NotificationsBell class="hidden md:inline-flex" />
+            </NotificationSummaryTooltip>
             <UserMenu />
         </div>
     </header>

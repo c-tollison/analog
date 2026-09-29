@@ -1,5 +1,6 @@
 import type { InferResponseType } from '@analog/api/client';
 import {
+    type AdminItemListQuerySchema,
     type AdminListQuerySchema,
     DEFAULT_PAGE_SIZE,
     type IsbnSchema,
@@ -18,6 +19,7 @@ import {
     useQuery,
     useQueryClient,
 } from '@tanstack/vue-query';
+import { useFileDialog } from '@vueuse/core';
 import { type MaybeRefOrGetter, toValue } from 'vue';
 import type { z } from 'zod';
 
@@ -26,6 +28,9 @@ export const ADMIN_KEY = ['admin'] as const;
 export type AdminListQuery = z.output<typeof AdminListQuerySchema>;
 
 export type AdminListFilters = Pick<AdminListQuery, 'q' | 'status' | 'sort'>;
+
+export type AdminItemListQuery = AdminListQuery &
+    Partial<Pick<z.output<typeof AdminItemListQuerySchema>, 'noCover'>>;
 
 /** The query for one page of an admin table, counting pages from 1. */
 export function adminListQuery(
@@ -88,15 +93,20 @@ function useInvalidateAll() {
     };
 }
 
-export function useAdminItems(query: MaybeRefOrGetter<AdminListQuery>) {
+export function useAdminItems(query: MaybeRefOrGetter<AdminItemListQuery>) {
     return useQuery({
         queryKey: () => [...ADMIN_KEY, 'items', 'list', toValue(query)],
-        queryFn: async () =>
-            unwrap(
+        queryFn: async () => {
+            const { noCover, ...rest } = toValue(query);
+            return unwrap(
                 await api.admin.items.$get({
-                    query: listQuery(toValue(query)),
+                    query: {
+                        ...listQuery(rest),
+                        ...(noCover ? { noCover: 'true' } : {}),
+                    },
                 })
-            ),
+            );
+        },
         placeholderData: keepPreviousData,
     });
 }
@@ -186,6 +196,45 @@ export function useSplitIsbn() {
             ),
         onSuccess: afterEdit,
     });
+}
+
+/**
+ * Uploads a cover for one of an item's ISBNs. `choose` opens the file picker,
+ * and the upload starts once an image is picked.
+ */
+export function useUploadCover() {
+    const { afterEdit } = useInvalidateAll();
+    const upload = useMutation({
+        mutationFn: async ({ itemId, isbn, file }: ItemIsbn & { file: File }) =>
+            unwrap(
+                await api.admin.items[':id'].isbns[':isbn'].cover.$put({
+                    param: { id: itemId, isbn },
+                    form: { file },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+
+    let chosen: ItemIsbn | undefined;
+    const picker = useFileDialog({
+        accept: 'image/*',
+        multiple: false,
+        reset: true,
+    });
+    picker.onChange((files) => {
+        const file = files?.[0];
+        if (file && chosen) {
+            upload.mutate({ ...chosen, file });
+        }
+    });
+
+    function choose(target: ItemIsbn) {
+        chosen = target;
+        upload.reset();
+        picker.open();
+    }
+
+    return { upload, choose };
 }
 
 export function useAdminSeriesList(query: MaybeRefOrGetter<AdminListQuery>) {

@@ -28,6 +28,7 @@ const IsbnParamSchema = z.object({ isbn: IsbnSchema });
 
 const {
     catalogItem,
+    catalogItemIsbnCover,
     collectionItem,
     collectionItemIsbn,
     collectionMember,
@@ -172,6 +173,25 @@ const catalog = new Hono<AppEnv>()
                 // Set by an earlier scan, so this one can't change them.
                 savedSeriesTitle: item.series?.title ?? null,
                 savedVolume: item.series ? item.position : null,
+            });
+        }
+    )
+    // A cover an admin uploaded. Its URL changes with each upload.
+    .get(
+        '/covers/:isbn',
+        schemaValidator('param', IsbnParamSchema),
+        async (c) => {
+            const { isbn } = c.req.valid('param');
+            const [found] = await db()
+                .select({ data: catalogItemIsbnCover.data })
+                .from(catalogItemIsbnCover)
+                .where(eq(catalogItemIsbnCover.isbn, isbn));
+            if (!found) {
+                throw new HTTPException(404, { message: 'Cover not found' });
+            }
+            return c.body(new Uint8Array(found.data), 200, {
+                'Content-Type': 'image/webp',
+                'Cache-Control': 'private, max-age=31536000, immutable',
             });
         }
     );

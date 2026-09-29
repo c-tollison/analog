@@ -38,6 +38,7 @@ import {
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { MEDIA_TYPES, type MediaTypeValue } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 
 import { PlusIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -127,7 +128,8 @@ const error = computed(
                     <template #default="{ items }">
                         <ItemGroup>
                             <Item
-                                v-for="item in items"
+                                v-for="(item, index) in items"
+                                v-bind="staggerIn(index)"
                                 :key="item.id"
                                 size="sm"
                             >

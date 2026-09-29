@@ -13,6 +13,7 @@ import {
     useInviteToCollection,
 } from '@/composables/useCollections';
 import { useSearchTerm } from '@/composables/useSearchTerm';
+import { staggerIn } from '@/lib/motion';
 
 import { computed, ref } from 'vue';
 
@@ -70,7 +71,8 @@ const error = computed(
             <template #default="{ items }">
                 <ItemGroup class="gap-2">
                     <UserItem
-                        v-for="friend in items"
+                        v-for="(friend, index) in items"
+                        v-bind="staggerIn(index)"
                         :key="friend.id"
                         :user="friend"
                     >

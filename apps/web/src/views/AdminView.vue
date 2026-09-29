@@ -28,7 +28,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { z } from 'zod';
 
-const Tab = { Series: 'series', Media: 'media' } as const;
+const Tab = { Series: 'series', Media: 'media', NoCover: 'no-cover' } as const;
 
 const STATUS_LABELS: Record<VerifiedFilter, string> = {
     [VerifiedFilter.Unverified]: 'To verify',
@@ -104,6 +104,18 @@ const firstPage = () =>
     );
 const { data: itemsPage } = useAdminItems(firstPage);
 const { data: seriesPage } = useAdminSeriesList(firstPage);
+// Missing covers have nothing to do with verifying, so this tab lists them all.
+const { data: noCoverPage } = useAdminItems(() => ({
+    ...adminListQuery(
+        {
+            q: state.value.q,
+            status: VerifiedFilter.All,
+            sort: state.value.sort,
+        },
+        1
+    ),
+    noCover: true,
+}));
 
 const search = ref(state.value.q);
 const { term } = useSearchTerm(search);
@@ -117,7 +129,7 @@ watch(term, (q) => {
         <h1 class="text-lg font-semibold">Admin dashboard</h1>
 
         <Tabs v-model="tab">
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <TabsList>
                     <TabsTrigger :value="Tab.Series">
                         Series
@@ -131,10 +143,16 @@ watch(term, (q) => {
                             {{ itemsPage.total }}
                         </Badge>
                     </TabsTrigger>
+                    <TabsTrigger :value="Tab.NoCover">
+                        No cover
+                        <Badge v-if="noCoverPage" variant="secondary">
+                            {{ noCoverPage.total }}
+                        </Badge>
+                    </TabsTrigger>
                 </TabsList>
                 <div class="flex flex-1 gap-2">
                     <SearchInput v-model="search" placeholder="Search titles" />
-                    <Select v-model="status">
+                    <Select v-if="tab !== Tab.NoCover" v-model="status">
                         <SelectTrigger
                             class="w-auto shrink-0"
                             aria-label="Show"
@@ -159,6 +177,15 @@ watch(term, (q) => {
                     v-model:sort="sort"
                     :q="state.q"
                     :status="status"
+                />
+            </TabsContent>
+            <TabsContent :value="Tab.NoCover">
+                <AdminItemsTable
+                    v-model:page="page"
+                    v-model:sort="sort"
+                    :q="state.q"
+                    :status="VerifiedFilter.All"
+                    no-cover
                 />
             </TabsContent>
             <TabsContent :value="Tab.Series">

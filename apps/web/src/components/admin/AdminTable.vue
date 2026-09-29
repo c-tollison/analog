@@ -87,6 +87,7 @@ const table = useVueTable({
                             <TableHead
                                 v-for="header in headerGroup.headers"
                                 :key="header.id"
+                                :class="header.column.columnDef.meta?.class"
                             >
                                 <FlexRender
                                     v-if="!header.isPlaceholder"
@@ -107,6 +108,7 @@ const table = useVueTable({
                                 <TableCell
                                     v-for="cell in row.getVisibleCells()"
                                     :key="cell.id"
+                                    :class="cell.column.columnDef.meta?.class"
                                 >
                                     <FlexRender
                                         :render="cell.column.columnDef.cell"

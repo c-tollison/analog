@@ -12,6 +12,7 @@ declare module 'vue-router' {
         requiresAuth?: boolean;
         guestOnly?: boolean;
         requiresRole?: UserRole;
+        title?: string;
     }
 }
 
@@ -42,11 +43,13 @@ export const router = createRouter({
                 {
                     path: 'scan',
                     name: 'scan',
+                    meta: { title: 'Scan' },
                     component: () => import('@/views/ScanView.vue'),
                 },
                 {
                     path: 'lookup',
                     name: 'lookup',
+                    meta: { title: 'Add media' },
                     component: () => import('@/views/LookupView.vue'),
                     beforeEnter: requireCollectionQuery,
                     props: (route) => ({
@@ -59,17 +62,20 @@ export const router = createRouter({
                 {
                     path: 'collections',
                     name: 'collections',
+                    meta: { title: 'Collections' },
                     component: () => import('@/views/CollectionsView.vue'),
                 },
                 {
                     path: 'collections/:id',
                     name: 'collection',
+                    meta: { title: 'Collection' },
                     component: () => import('@/views/CollectionView.vue'),
                     props: true,
                 },
                 {
                     path: 'collections/:id/settings',
                     name: 'collection-settings',
+                    meta: { title: 'Collection settings' },
                     component: () =>
                         import('@/views/CollectionSettingsView.vue'),
                     props: true,
@@ -77,60 +83,67 @@ export const router = createRouter({
                 {
                     path: 'collections/:id/settings/invite',
                     name: 'collection-invite',
+                    meta: { title: 'Invite friends' },
                     component: () => import('@/views/CollectionInviteView.vue'),
                     props: true,
                 },
                 {
                     path: 'collections/:id/series/:seriesId',
                     name: 'collection-series',
+                    meta: { title: 'Series' },
                     component: () => import('@/views/CollectionSeriesView.vue'),
                     props: true,
                 },
                 {
                     path: 'collections/:id/items/:itemId',
                     name: 'collection-item',
+                    meta: { title: 'Media' },
                     component: () => import('@/views/CollectionItemView.vue'),
                     props: true,
                 },
                 {
                     path: 'friends',
                     name: 'friends',
+                    meta: { title: 'Friends' },
                     component: () => import('@/views/FriendsView.vue'),
                 },
                 {
                     path: 'users/:username',
                     name: 'user',
+                    meta: { title: 'Profile' },
                     component: () => import('@/views/UserView.vue'),
                     props: true,
                 },
                 {
                     path: 'notifications',
                     name: 'notifications',
+                    meta: { title: 'Notifications' },
                     component: () => import('@/views/NotificationsView.vue'),
                 },
                 {
                     path: 'profile',
                     name: 'profile',
+                    meta: { title: 'Profile' },
                     component: () => import('@/views/ProfileView.vue'),
                 },
                 {
                     path: 'admin',
                     name: 'admin',
                     component: () => import('@/views/AdminView.vue'),
-                    meta: { requiresRole: UserRole.Admin },
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
                 },
                 {
                     path: 'admin/items/:id',
                     name: 'admin-item',
                     component: () => import('@/views/AdminItemView.vue'),
-                    meta: { requiresRole: UserRole.Admin },
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
                     props: true,
                 },
                 {
                     path: 'admin/series/:id',
                     name: 'admin-series',
                     component: () => import('@/views/AdminSeriesView.vue'),
-                    meta: { requiresRole: UserRole.Admin },
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
                     props: true,
                 },
             ],
@@ -139,38 +152,38 @@ export const router = createRouter({
             path: '/sign-in',
             name: 'sign-in',
             component: () => import('@/views/SignInView.vue'),
-            meta: { guestOnly: true },
+            meta: { title: 'Sign in', guestOnly: true },
         },
         {
             path: '/sign-up',
             name: 'sign-up',
             component: () => import('@/views/SignUpView.vue'),
-            meta: { guestOnly: true },
+            meta: { title: 'Sign up', guestOnly: true },
         },
         {
             path: '/verify-email',
             name: 'verify-email',
             component: () => import('@/views/VerifyEmailView.vue'),
-            meta: { guestOnly: true },
+            meta: { title: 'Verify email', guestOnly: true },
             beforeEnter: requireEmailQuery,
         },
         {
             path: '/two-factor',
             name: 'two-factor',
             component: () => import('@/views/TwoFactorView.vue'),
-            meta: { guestOnly: true },
+            meta: { title: 'Sign in', guestOnly: true },
         },
         {
             path: '/forgot-password',
             name: 'forgot-password',
             component: () => import('@/views/ForgotPasswordView.vue'),
-            meta: { guestOnly: true },
+            meta: { title: 'Forgot password', guestOnly: true },
         },
         {
             path: '/reset-password',
             name: 'reset-password',
             component: () => import('@/views/ResetPasswordView.vue'),
-            meta: { guestOnly: true },
+            meta: { title: 'Reset password', guestOnly: true },
             beforeEnter: requireEmailQuery,
         },
     ],

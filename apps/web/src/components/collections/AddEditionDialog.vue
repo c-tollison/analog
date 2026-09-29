@@ -96,7 +96,8 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Add an edition</DialogTitle>
                 <DialogDescription>
-                    An admin checks new editions before others see them.
+                    Own another edition of this? Enter its ISBN or pick one
+                    below.
                 </DialogDescription>
             </DialogHeader>
             <form class="grid gap-4" novalidate @submit="submit">

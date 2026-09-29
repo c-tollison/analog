@@ -17,7 +17,8 @@ export function useNotifications() {
 }
 
 /**
- * How many requests and invites are waiting, for the bell. Checks every 30
+ * How many requests and invites are waiting, in total and by kind, for the
+ * bell and the summary shown on first load. Checks every 30
  * seconds and when the tab regains focus.
  */
 export function useNotificationCount() {

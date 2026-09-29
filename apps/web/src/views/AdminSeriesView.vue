@@ -3,6 +3,7 @@ import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
 import AdminSeriesForm from '@/components/admin/AdminSeriesForm.vue';
 import MergeSeriesDialog from '@/components/admin/MergeSeriesDialog.vue';
 import SeriesItemsForm from '@/components/admin/SeriesItemsForm.vue';
+import VerifiedBy from '@/components/admin/VerifiedBy.vue';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
@@ -15,7 +16,6 @@ import {
     AlertDescription,
     AlertTitle,
 } from '@/components/shadcn-components/alert';
-import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Popover,
@@ -24,14 +24,14 @@ import {
 } from '@/components/shadcn-components/popover';
 import { Separator } from '@/components/shadcn-components/separator';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import WithTooltip from '@/components/WithTooltip.vue';
 import {
     useAdminSeries,
     useAdminSeriesItems,
     useDeleteAdminSeries,
     useSetSeriesVerified,
 } from '@/composables/useAdmin';
-import { timeAgo } from '@/lib/dates';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { usePageTitle } from '@/composables/usePageTitle';
 import { goBackOr } from '@/lib/navigation';
 
 import {
@@ -50,6 +50,7 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 
 const { data: series, error: seriesError } = useAdminSeries(() => props.id);
+usePageTitle(() => series.value?.title);
 const { data: items, error: itemsError } = useAdminSeriesItems(() => props.id);
 
 const setVerified = useSetSeriesVerified();
@@ -174,112 +175,121 @@ function onDelete() {
                     size="md"
                     :src="series.coverUrl"
                     :alt="series.title"
-                    class="h-36 w-24 shrink-0"
+                    class="h-24 w-16 shrink-0 sm:h-36 sm:w-24"
                 />
-                <div class="grid flex-1 content-start gap-2">
-                    <h1 class="text-lg font-semibold">{{ series.title }}</h1>
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary">
-                            {{ SERIES_KIND_LABELS[series.kind] }}
-                        </Badge>
-                        <Badge v-if="series.verifiedAt">Verified</Badge>
-                        <span
+                <div class="grid min-w-0 flex-1 content-start gap-4">
+                    <AdminSeriesForm :key="series.id" :series="series" />
+
+                    <div class="grid gap-2">
+                        <div class="flex flex-wrap gap-2">
+                            <Button
+                                :variant="
+                                    series.verifiedAt ? 'outline' : 'default'
+                                "
+                                :disabled="setVerified.isPending.value"
+                                @click="
+                                    setVerified.mutate({
+                                        seriesId: series.id,
+                                        verified: !series.verifiedAt,
+                                    })
+                                "
+                            >
+                                <Spinner v-if="setVerified.isPending.value" />
+                                {{ series.verifiedAt ? 'Unverify' : 'Verify' }}
+                            </Button>
+                            <Button variant="outline" @click="openMerge(null)">
+                                <MergeIcon />
+                                Merge into…
+                            </Button>
+                            <div class="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    :disabled="!items || items.length > 0"
+                                    @click="confirmingDelete = true"
+                                >
+                                    <Trash2Icon />
+                                    Delete
+                                </Button>
+                                <Popover v-if="items?.length">
+                                    <WithTooltip label="Why can't I delete it?">
+                                        <PopoverTrigger as-child>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-xs"
+                                                aria-label="Why can't I delete it?"
+                                            >
+                                                <InfoIcon />
+                                            </Button>
+                                        </PopoverTrigger>
+                                    </WithTooltip>
+                                    <PopoverContent class="w-64 text-sm">
+                                        Move or merge its items before deleting
+                                        it.
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                        <VerifiedBy
                             v-if="series.verifiedAt"
-                            class="text-muted-foreground text-xs"
-                        >
-                            by {{ series.verifiedBy ?? 'a deleted user' }},
-                            {{ timeAgo(series.verifiedAt) }}
-                        </span>
+                            :verified-at="series.verifiedAt"
+                            :verified-by="series.verifiedBy"
+                        />
                     </div>
-                    <div class="flex items-center gap-1.5 text-sm">
-                        <span v-if="series.volumeCount">
-                            {{ items?.length ?? 0 }} of
-                            {{ series.volumeCount }} volumes
-                        </span>
-                        <span v-else>{{ items?.length ?? 0 }} items</span>
-                        <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            aria-label="Edit total volumes"
-                            @click="isVolumeCountOpen = true"
-                        >
-                            <PencilIcon />
-                        </Button>
-                    </div>
-                    <div v-if="linkSource" class="flex flex-wrap gap-2">
-                        <template v-if="series.detailsSource">
-                            <ExternalLinks :links="series.links" />
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                @click="isLinkOpen = true"
-                            >
-                                <PencilIcon />
-                                Edit link
-                            </Button>
-                        </template>
-                        <Button
-                            v-else
-                            variant="outline"
-                            size="sm"
-                            @click="isLinkOpen = true"
-                        >
-                            <LinkIcon />
-                            Link {{ DETAILS_SOURCE_INFO[linkSource].label }}
-                        </Button>
-                    </div>
-                    <div class="flex flex-wrap gap-2 pt-1">
-                        <Button
-                            :variant="series.verifiedAt ? 'outline' : 'default'"
-                            :disabled="setVerified.isPending.value"
-                            @click="
-                                setVerified.mutate({
-                                    seriesId: series.id,
-                                    verified: !series.verifiedAt,
-                                })
-                            "
-                        >
-                            <Spinner v-if="setVerified.isPending.value" />
-                            {{ series.verifiedAt ? 'Unverify' : 'Verify' }}
-                        </Button>
-                        <Button variant="outline" @click="openMerge(null)">
-                            <MergeIcon />
-                            Merge into…
-                        </Button>
-                        <div class="flex items-center gap-1">
-                            <Button
-                                variant="outline"
-                                :disabled="!items || items.length > 0"
-                                @click="confirmingDelete = true"
-                            >
-                                <Trash2Icon />
-                                Delete
-                            </Button>
-                            <Popover v-if="items?.length">
-                                <PopoverTrigger as-child>
+
+                    <Separator />
+
+                    <dl
+                        class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-sm"
+                    >
+                        <dt class="text-muted-foreground">Volumes</dt>
+                        <dd class="flex items-center gap-1">
+                            <template v-if="series.volumeCount">
+                                {{ items?.length ?? 0 }} of
+                                {{ series.volumeCount }}
+                            </template>
+                            <template v-else>
+                                {{ items?.length ?? 0 }}
+                            </template>
+                            <WithTooltip label="Edit total volumes">
+                                <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    aria-label="Edit total volumes"
+                                    @click="isVolumeCountOpen = true"
+                                >
+                                    <PencilIcon />
+                                </Button>
+                            </WithTooltip>
+                        </dd>
+                        <template v-if="linkSource">
+                            <dt class="text-muted-foreground">Data source</dt>
+                            <dd class="flex flex-wrap items-center gap-2">
+                                <template v-if="series.detailsSource">
+                                    <ExternalLinks :links="series.links" />
                                     <Button
                                         variant="ghost"
-                                        size="icon-xs"
-                                        aria-label="Why can't I delete it?"
+                                        size="sm"
+                                        @click="isLinkOpen = true"
                                     >
-                                        <InfoIcon />
+                                        <PencilIcon />
+                                        Edit link
                                     </Button>
-                                </PopoverTrigger>
-                                <PopoverContent class="w-64 text-sm">
-                                    Move or merge its items before deleting it.
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    </div>
+                                </template>
+                                <Button
+                                    v-else
+                                    variant="outline"
+                                    size="sm"
+                                    @click="isLinkOpen = true"
+                                >
+                                    <LinkIcon />
+                                    Link
+                                    {{ DETAILS_SOURCE_INFO[linkSource].label }}
+                                </Button>
+                            </dd>
+                        </template>
+                    </dl>
                 </div>
             </div>
-
-            <Separator />
-
-            <section class="grid gap-3">
-                <h2 class="font-semibold">Edit</h2>
-                <AdminSeriesForm :key="series.id" :series="series" />
-            </section>
 
             <Separator />
 
@@ -295,6 +305,7 @@ function onDelete() {
                     v-else-if="items"
                     :key="itemsKey"
                     :series-id="series.id"
+                    :series-title="series.title"
                     :volume-count="series.volumeCount"
                     :items="items"
                 />

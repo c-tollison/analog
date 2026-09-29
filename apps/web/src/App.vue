@@ -1,9 +1,22 @@
 <script setup lang="ts">
+import { TooltipProvider } from '@/components/shadcn-components/tooltip';
+import { usePageTitle } from '@/composables/usePageTitle';
+
 import { useColorMode } from '@vueuse/core';
 
 useColorMode();
+usePageTitle();
 </script>
 
 <template>
-    <RouterView />
+    <TooltipProvider>
+        <RouterView v-slot="{ Component }">
+            <Transition
+                mode="out-in"
+                enter-active-class="motion-safe:animate-in fade-in animation-duration-300"
+            >
+                <component :is="Component" />
+            </Transition>
+        </RouterView>
+    </TooltipProvider>
 </template>
