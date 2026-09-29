@@ -1,4 +1,9 @@
-import { ExternalSource, SeriesKind } from '@analog/types';
+import {
+    ExternalSource,
+    isoLanguage,
+    languageName,
+    SeriesKind,
+} from '@analog/types';
 
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -66,7 +71,6 @@ export function isLatin(text: string): boolean {
     return !NON_LATIN.test(text);
 }
 const LANGUAGE_KEY = /^\/languages\/([a-z]{3})$/;
-const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
 
 const LIGHT_NOVEL_SUBJECTS = /light novel/i;
 const LIGHT_NOVEL_PUBLISHERS = /yen on|j-novel|airship/i;
@@ -178,6 +182,17 @@ async function getWork(edition: Edition): Promise<z.infer<typeof WorkSchema>> {
     return parsed.success ? parsed.data : {};
 }
 
+// The code of an edition's first language.
+// The code in a language key, like "eng" in "/languages/eng".
+function keyCode(key: string): string | undefined {
+    return key.match(LANGUAGE_KEY)?.[1];
+}
+
+function languageCode(languages: Edition['languages']): string | null {
+    const code = languages?.[0] && keyCode(languages[0].key);
+    return code ? isoLanguage(code) : null;
+}
+
 // Search results carry what's pooled across every edition of the book: the
 // year it first came out, and fuller subjects that name its characters.
 async function getSearchDoc(isbn: string) {
@@ -187,19 +202,6 @@ async function getSearchDoc(isbn: string) {
         )
     );
     return parsed.success ? (parsed.data.docs[0] ?? {}) : {};
-}
-
-function languageName(key: string): string | null {
-    const code = key.match(LANGUAGE_KEY)?.[1];
-    if (!code) {
-        return null;
-    }
-    try {
-        const name = languageNames.of(code);
-        return name && name !== code ? name : null;
-    } catch {
-        return null;
-    }
 }
 
 // Skip filler like "1 edition" that says nothing about the edition.
@@ -284,7 +286,7 @@ async function getDetails(edition: Edition, isbn: string) {
         editionName: editionName(edition.edition_name),
         physicalFormat: edition.physical_format?.trim() || null,
         languages: (edition.languages ?? [])
-            .map((language) => languageName(language.key))
+            .map((language) => languageName(keyCode(language.key)))
             .filter((name): name is string => !!name),
         goodreadsId: edition.identifiers?.goodreads?.[0] ?? null,
         genres,
@@ -385,6 +387,7 @@ export async function lookupIsbn(isbn: string) {
                 ? cleanSeriesName(rawSeries)
                 : seriesFromTitle(edition.title),
             volume: parseVolume(edition.title, rawSeries),
+            language: languageCode(edition.languages),
             coverUrl: coverId ? `${COVERS_URL}/b/id/${coverId}-L.jpg` : null,
             source: ExternalSource.OpenLibrary,
             sourceId: edition.key.replace('/books/', ''),

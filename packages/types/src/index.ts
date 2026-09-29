@@ -5,6 +5,7 @@ export * from './catalog.js';
 export * from './catalog-enums.js';
 export * from './config.js';
 export * from './isbn.js';
+export * from './languages.js';
 export * from './pagination.js';
 export * from './progress.js';
 export * from './social.js';

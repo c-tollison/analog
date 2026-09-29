@@ -1,4 +1,9 @@
-import { ExternalSource, normalizeIsbn } from '@analog/types';
+import {
+    ExternalSource,
+    isoLanguage,
+    languageName,
+    normalizeIsbn,
+} from '@analog/types';
 
 import { plainText } from './details.js';
 import { config } from './init.js';
@@ -14,7 +19,6 @@ import { z } from 'zod';
 
 const BASE_URL = 'https://www.googleapis.com/books/v1';
 const TIMEOUT_MS = 8_000;
-const languageNames = new Intl.DisplayNames(['en'], { type: 'language' });
 
 const VolumeSchema = z.object({
     id: z.string(),
@@ -90,18 +94,6 @@ function coverUrl(imageLinks: Record<string, string> | undefined) {
     return url?.replace(/^http:/, 'https:').replace('&edge=curl', '') ?? null;
 }
 
-function languageName(code: string | undefined): string | null {
-    if (!code) {
-        return null;
-    }
-    try {
-        const name = languageNames.of(code);
-        return name && name !== code ? name : null;
-    } catch {
-        return null;
-    }
-}
-
 // Categories are paths like "Comics & Graphic Novels / Manga / Fantasy". The
 // last part is the genre.
 function genres(categories: string[] | undefined): string[] {
@@ -159,6 +151,7 @@ export async function lookupGoogleBooksIsbn(
         // A numbered volume's title is often just the series name.
         series: seriesFromTitle(info.title) ?? (number ? info.title : null),
         volume: parseVolume(info.title, null) ?? number,
+        language: info.language ? isoLanguage(info.language) : null,
         coverUrl: coverUrl(info.imageLinks),
         source: ExternalSource.GoogleBooks,
         sourceId: volume.id,

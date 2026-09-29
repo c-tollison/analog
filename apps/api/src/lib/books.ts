@@ -1,17 +1,14 @@
-import { and, desc, eq, isNotNull, isNull, schema, sql } from '@analog/db';
+import { and, desc, eq, isNull, schema, sql } from '@analog/db';
 import {
-    DEFAULT_SERIES_LANGUAGE,
     ExternalSource,
+    languageName,
     MediaFormat,
-    SERIES_LANGUAGE_LABELS,
-    SERIES_LANGUAGES,
     type SeriesChoiceSchema,
     SeriesKind,
-    type SeriesLanguage,
 } from '@analog/types';
 
-import { verifiedColumns } from './admin.js';
 import { filledFacts, filledLinks } from './details.js';
+import { discoverableSeries } from './discovery.js';
 import { isGoogleBooksCover, lookupGoogleBooksIsbn } from './google-books.js';
 import { db, logger } from './init.js';
 import {
@@ -25,6 +22,10 @@ import { z } from 'zod';
 
 type CatalogItem = typeof schema.catalogItem.$inferSelect;
 type Series = typeof schema.series.$inferSelect;
+type Edition = Omit<
+    typeof schema.catalogItemIsbn.$inferSelect,
+    'catalogItemId' | 'createdAt'
+>;
 
 // What's stored in a book's `metadata`. Older rows may be missing fields.
 const BookMetadataSchema = z.object({
@@ -51,7 +52,6 @@ export const seriesColumns = {
     id: schema.series.id,
     title: schema.series.title,
     kind: schema.series.kind,
-    language: schema.series.language,
     coverUrl: schema.series.coverUrl,
 };
 
@@ -61,63 +61,83 @@ function toBookKind(kind: SeriesKind | null | undefined): BookLookup['kind'] {
         : SeriesKind.Book;
 }
 
+/**
+ * A stored book as a lookup, showing the edition with this ISBN when it has
+ * its own title, cover and publisher on file.
+ */
 export function toBookLookup(
     item: CatalogItem,
-    series: Series | null
+    series: Series | null,
+    isbn: string,
+    edition: Edition | null
 ): BookLookup {
+    const meta = readMetadata(item);
     return {
-        isbn: item.barcode ?? '',
-        title: item.title,
-        ...readMetadata(item),
+        ...meta,
+        isbn,
+        title: edition?.title ?? item.title,
+        publishers: edition?.publisher ? [edition.publisher] : meta.publishers,
+        physicalFormat: edition?.format ?? meta.physicalFormat,
         releaseDate: item.releaseDate,
         kind: toBookKind(item.kind),
         series: series?.title ?? null,
         volume: item.position,
-        coverUrl: item.coverUrl,
+        language: edition?.language ?? null,
+        coverUrl: edition?.coverUrl ?? item.coverUrl,
         source: item.externalSource ?? ExternalSource.OpenLibrary,
         sourceId: item.externalId ?? '',
     };
 }
 
+/** The item an ISBN belongs to, with that ISBN's own edition. */
 export async function findBookByIsbn(isbn: string) {
-    const item = await db().query.catalogItem.findFirst({
-        where: and(
-            eq(schema.catalogItem.barcode, isbn),
-            eq(schema.catalogItem.format, MediaFormat.Book)
-        ),
-        with: { series: true },
+    const found = await db().query.catalogItemIsbn.findFirst({
+        where: eq(schema.catalogItemIsbn.isbn, isbn),
+        with: {
+            catalogItem: {
+                with: { series: true },
+            },
+        },
     });
-    return item ?? null;
+    if (!found) {
+        return null;
+    }
+    const { catalogItem: item, catalogItemId, createdAt, ...edition } = found;
+    return { ...item, edition };
 }
 
-/**
- * A book's language as a series language, from the language names its
- * sources gave, like "English". English when none match.
- */
-function guessLanguage(languages: string[]): SeriesLanguage {
-    return (
-        SERIES_LANGUAGES.find((code) =>
-            languages.includes(SERIES_LANGUAGE_LABELS[code])
-        ) ?? DEFAULT_SERIES_LANGUAGE
-    );
+// Who is picking a series. An admin editing from the dashboard can pick
+// any series; everyone else only the ones they can find.
+type SeriesPicker = { userId: string; admin: boolean };
+
+function pickableSeries({ userId, admin }: SeriesPicker) {
+    return admin ? undefined : discoverableSeries(userId);
 }
 
-async function findSeriesByTitle(title: string): Promise<Series | null> {
+async function findSeriesByTitle(
+    title: string,
+    picker: SeriesPicker
+): Promise<Series | null> {
     const found = await db().query.series.findFirst({
-        where: (series, { sql }) =>
-            sql`lower(${series.title}) = lower(${title})`,
+        where: and(
+            sql`lower(${schema.series.title}) = lower(${title})`,
+            pickableSeries(picker)
+        ),
     });
     return found ?? null;
 }
 
 export async function suggestSeries(
     item: (CatalogItem & { series: Series | null }) | null,
-    book: BookLookup
+    book: BookLookup,
+    userId: string
 ): Promise<Series | null> {
     if (item?.series) {
         return item.series;
     }
-    return book.series ? findSeriesByTitle(book.series) : null;
+    return book.series
+        ? findSeriesByTitle(book.series, { userId, admin: false })
+        : null;
 }
 
 const SERIES_MATCH_LIMIT = 3;
@@ -132,7 +152,7 @@ const VOLUME_TEXT =
  * "Bleach Manga (English)". Checks both ways round, since either title can
  * carry words the other lacks.
  */
-export async function findSimilarSeries(bookTitle: string) {
+export async function findSimilarSeries(bookTitle: string, userId: string) {
     const title = bookTitle.replace(VOLUME_TEXT, '').trim() || bookTitle;
     const column = schema.series.title;
     const score = sql<number>`greatest(
@@ -144,10 +164,14 @@ export async function findSimilarSeries(bookTitle: string) {
             id: schema.series.id,
             title: column,
             kind: schema.series.kind,
-            language: schema.series.language,
         })
         .from(schema.series)
-        .where(sql`${score} >= ${SERIES_MATCH_THRESHOLD}`)
+        .where(
+            and(
+                sql`${score} >= ${SERIES_MATCH_THRESHOLD}`,
+                discoverableSeries(userId)
+            )
+        )
         .orderBy(desc(score), desc(sql`similarity(${column}, ${title})`))
         .limit(SERIES_MATCH_LIMIT);
 }
@@ -157,11 +181,11 @@ type SeriesChoice = z.output<typeof SeriesChoiceSchema>;
 async function resolveSeries(
     choice: SeriesChoice,
     kind: BookLookup['kind'],
-    language: SeriesLanguage
+    picker: SeriesPicker
 ): Promise<Series> {
     if ('id' in choice) {
         const found = await db().query.series.findFirst({
-            where: eq(schema.series.id, choice.id),
+            where: and(eq(schema.series.id, choice.id), pickableSeries(picker)),
         });
         if (!found) {
             throw new HTTPException(404, { message: 'Series not found' });
@@ -169,13 +193,13 @@ async function resolveSeries(
         return found;
     }
 
-    const existing = await findSeriesByTitle(choice.title);
+    const existing = await findSeriesByTitle(choice.title, picker);
     if (existing) {
         return existing;
     }
     const [created] = await db()
         .insert(schema.series)
-        .values({ title: choice.title, kind, language })
+        .values({ title: choice.title, kind, createdByUserId: picker.userId })
         .returning();
     if (!created) {
         throw new Error('Failed to create series');
@@ -185,17 +209,15 @@ async function resolveSeries(
 
 /**
  * The series a book goes in, creating it from a title when needed. A new
- * series takes the book's kind and language.
+ * series takes the book's kind, and only its creator can find it until an
+ * admin verifies it.
  */
 export function seriesForItem(
     choice: SeriesChoice,
-    item: CatalogItem
+    item: CatalogItem,
+    picker: SeriesPicker
 ): Promise<Series> {
-    return resolveSeries(
-        choice,
-        toBookKind(item.kind),
-        guessLanguage(readMetadata(item).languages)
-    );
+    return resolveSeries(choice, toBookKind(item.kind), picker);
 }
 
 /**
@@ -209,7 +231,11 @@ export function kindInSeries(
     return series?.kind ?? itemKind;
 }
 
-type Executor = Pick<ReturnType<typeof db>, 'update'>;
+export type Transaction = Parameters<
+    Parameters<ReturnType<typeof db>['transaction']>[0]
+>[0];
+
+type Executor = Pick<Transaction, 'update'>;
 
 /** Gives every item in a series the series' kind, after either one changes. */
 export async function matchSeriesKind(
@@ -249,6 +275,26 @@ export async function refreshSeriesCover(seriesId: string): Promise<void> {
         .where(
             and(eq(series.id, seriesId), sql`${series.externalSource} is null`)
         );
+}
+
+/**
+ * Moves every item in one series into another, then deletes the first. The
+ * other series keeps its own title, link and volume count.
+ */
+export async function mergeSeries(
+    fromId: string,
+    intoId: string
+): Promise<void> {
+    const { catalogItem, series } = schema;
+    await db().transaction(async (tx) => {
+        await tx
+            .update(catalogItem)
+            .set({ seriesId: intoId, updatedAt: new Date() })
+            .where(eq(catalogItem.seriesId, fromId));
+        await tx.delete(series).where(eq(series.id, fromId));
+        await matchSeriesKind(intoId, tx);
+    });
+    await refreshSeriesCover(intoId);
 }
 
 // Once Google has answered, how much longer a scan waits for Open Library
@@ -325,6 +371,7 @@ function fillIn(book: BookLookup, backup: BookLookup): BookLookup {
         editionName: book.editionName ?? backup.editionName,
         physicalFormat: book.physicalFormat ?? backup.physicalFormat,
         languages: either(book.languages, backup.languages),
+        language: book.language ?? backup.language,
         goodreadsId: book.goodreadsId ?? backup.goodreadsId,
         genres: either(book.genres, backup.genres),
         releaseDate: book.releaseDate ?? backup.releaseDate,
@@ -347,7 +394,7 @@ function merge(books: (BookLookup | null)[]): BookLookup | null {
 type OpenLibraryResult = NonNullable<Awaited<ReturnType<typeof lookupIsbn>>>;
 
 // Each source's time is set when it answered, whether or not it had the book.
-type Lookup = {
+export type Lookup = {
     book: BookLookup;
     googleBooksFetchedAt: Date | null;
     openLibraryFetchedAt: Date | null;
@@ -425,7 +472,7 @@ type LookupOptions = {
  * When Open Library is too slow, Google's data comes back without it, and
  * `later` has the full lookup to save once Open Library answers.
  */
-async function lookupBook(isbn: string, options: LookupOptions) {
+export async function lookupBook(isbn: string, options: LookupOptions) {
     const { stored, refresh } = options;
     const openLibrary = options.openLibrary ? lookupOpenLibrary(isbn) : null;
     const google = options.google ? await lookupGoogleBooks(isbn) : null;
@@ -460,12 +507,18 @@ async function lookupBook(isbn: string, options: LookupOptions) {
 }
 
 /**
- * Saves a lookup over a stored book. Series and volume aren't touched, and a
- * book in a series keeps the series' kind. Verified books aren't saved over.
+ * Saves a lookup over a stored book and its ISBN's edition. Series and volume
+ * aren't touched, and a book in a series keeps the series' kind. Verified
+ * books aren't saved over.
  */
 async function saveBook(itemId: string, lookup: Lookup) {
     const { book } = lookup;
-    const { catalogItem, series } = schema;
+    const { catalogItem, catalogItemIsbn, series } = schema;
+    // By ISBN alone: a scan may have joined it to another item since.
+    await db()
+        .update(catalogItemIsbn)
+        .set(isbnFacts(book))
+        .where(eq(catalogItemIsbn.isbn, book.isbn));
     const [updated] = await db()
         .update(catalogItem)
         .set({
@@ -503,7 +556,7 @@ async function saveBook(itemId: string, lookup: Lookup) {
 }
 
 // Saves a lookup that was still waiting on Open Library.
-async function saveLater(itemId: string, later: Promise<Lookup | null>) {
+export async function saveLater(itemId: string, later: Promise<Lookup | null>) {
     try {
         const lookup = await later;
         if (lookup) {
@@ -512,6 +565,89 @@ async function saveLater(itemId: string, later: Promise<Lookup | null>) {
     } catch (error) {
         logger().warn({ error, itemId }, 'Saving late book lookup failed');
     }
+}
+
+/** What a book's own ISBN row says about its edition. */
+export function isbnFacts(book: BookLookup) {
+    return {
+        title: book.title,
+        coverUrl: book.coverUrl,
+        publisher: book.publishers[0] ?? null,
+        language: book.language,
+        format: book.physicalFormat,
+    };
+}
+
+// A new catalog item for a looked-up book.
+function bookValues(lookup: Lookup, userId: string) {
+    const { book } = lookup;
+    return {
+        format: MediaFormat.Book,
+        kind: book.kind,
+        title: book.title,
+        externalSource: book.source,
+        externalId: book.sourceId,
+        coverUrl: book.coverUrl,
+        releaseDate: book.releaseDate,
+        metadata: { ...BookMetadataSchema.parse(book) },
+        googleBooksFetchedAt: lookup.googleBooksFetchedAt,
+        openLibraryFetchedAt: lookup.openLibraryFetchedAt,
+        createdByUserId: userId,
+    };
+}
+
+/**
+ * Adds a catalog item for a looked-up book, then runs `claim` to give it its
+ * ISBN. When the claim fails, the item is removed again and null comes back.
+ */
+export async function createItemClaimingIsbn(
+    tx: Transaction,
+    lookup: Lookup,
+    userId: string,
+    claim: (itemId: string) => Promise<boolean>
+): Promise<string | null> {
+    const { catalogItem } = schema;
+    const [created] = await tx
+        .insert(catalogItem)
+        .values(bookValues(lookup, userId))
+        .returning({ id: catalogItem.id });
+    if (!created) {
+        return null;
+    }
+    if (!(await claim(created.id))) {
+        await tx.delete(catalogItem).where(eq(catalogItem.id, created.id));
+        return null;
+    }
+    return created.id;
+}
+
+/**
+ * Saves a looked-up book as a new catalog item, with its ISBN as the main
+ * one. Returns null when another item already has the ISBN, since two scans
+ * can race.
+ */
+async function insertBook(
+    isbn: string,
+    lookup: Lookup,
+    userId: string
+): Promise<string | null> {
+    const { catalogItemIsbn } = schema;
+    return db().transaction((tx) =>
+        createItemClaimingIsbn(tx, lookup, userId, async (itemId) => {
+            const [owned] = await tx
+                .insert(catalogItemIsbn)
+                .values({
+                    isbn,
+                    catalogItemId: itemId,
+                    main: true,
+                    ...isbnFacts(lookup.book),
+                })
+                // Another scan of the same ISBN got here first.
+                .onConflictDoNothing()
+                .returning({ isbn: catalogItemIsbn.isbn });
+            return !!owned;
+        })
+    );
 }
 
 /**
@@ -537,96 +673,15 @@ export async function findOrCreateBook(isbn: string, userId: string) {
         });
     }
     const { book, later } = lookup;
-    const metadata = BookMetadataSchema.parse(book);
-    await db()
-        .insert(schema.catalogItem)
-        .values({
-            format: MediaFormat.Book,
-            kind: book.kind,
-            title: book.title,
-            barcode: isbn,
-            externalSource: book.source,
-            externalId: book.sourceId,
-            coverUrl: book.coverUrl,
-            releaseDate: book.releaseDate,
-            metadata: { ...metadata },
-            googleBooksFetchedAt: lookup.googleBooksFetchedAt,
-            openLibraryFetchedAt: lookup.openLibraryFetchedAt,
-            createdByUserId: userId,
-        })
-        .onConflictDoNothing({ target: schema.catalogItem.barcode });
+    const created = await insertBook(isbn, lookup, userId);
+    if (created && later) {
+        void saveLater(created, later);
+    }
     const item = await findBookByIsbn(isbn);
     if (!item) {
         throw new Error(`Catalog item for ${isbn} missing after insert`);
     }
-    if (later) {
-        void saveLater(item.id, later);
-    }
     return { item, fetched: book };
-}
-
-/**
- * Returns the catalog item for an ISBN. The user's series and volume are
- * saved only when the item has no series yet and isn't verified, since Open
- * Library's series data is unreliable. After that, only admins change them.
- * A new series gets its language from the book's, and a verified series
- * the item joins goes back to unverified.
- */
-export async function upsertBook(
-    isbn: string,
-    seriesChoice: SeriesChoice | null,
-    volume: number | null,
-    userId: string
-): Promise<CatalogItem> {
-    const { item } = await findOrCreateBook(isbn, userId);
-    if (item.seriesId || item.verifiedAt) {
-        return item;
-    }
-
-    const series = seriesChoice
-        ? await seriesForItem(seriesChoice, item)
-        : null;
-
-    const { catalogItem } = schema;
-    const [updated] = await db()
-        .update(catalogItem)
-        .set({
-            seriesId: series?.id ?? null,
-            position: volume,
-            kind: kindInSeries(series, item.kind),
-            updatedAt: new Date(),
-        })
-        .where(
-            and(
-                eq(catalogItem.id, item.id),
-                isNull(catalogItem.seriesId),
-                isNull(catalogItem.verifiedAt)
-            )
-        )
-        .returning();
-    if (!updated) {
-        return (await findBookByIsbn(isbn)) ?? item;
-    }
-
-    if (updated.seriesId) {
-        await Promise.all([
-            refreshSeriesCover(updated.seriesId),
-            unverifySeries(updated.seriesId),
-        ]);
-    }
-    return updated;
-}
-
-/**
- * Sends a series back to the admins' list, since a scan added an item they
- * haven't checked belongs in it.
- */
-async function unverifySeries(seriesId: string): Promise<void> {
-    const { series } = schema;
-    await db()
-        .update(series)
-        .set(verifiedColumns(null))
-        .where(and(eq(series.id, seriesId), isNotNull(series.verifiedAt)));
 }
 
 /**
@@ -638,7 +693,10 @@ async function unverifySeries(seriesId: string): Promise<void> {
 export async function refreshBook(itemId: string, onlyMissing = false) {
     const item = await db().query.catalogItem.findFirst({
         where: eq(schema.catalogItem.id, itemId),
-        with: { series: true },
+        with: {
+            series: true,
+            isbns: { where: (row, { eq }) => eq(row.main, true) },
+        },
     });
     if (!item) {
         throw new HTTPException(404, { message: 'Item not found' });
@@ -648,7 +706,8 @@ export async function refreshBook(itemId: string, onlyMissing = false) {
             message: "Refreshing isn't supported for this media yet",
         });
     }
-    if (!item.barcode) {
+    const [main] = item.isbns;
+    if (!main) {
         throw new HTTPException(400, {
             message: 'This book has no ISBN to look up',
         });
@@ -658,15 +717,15 @@ export async function refreshBook(itemId: string, onlyMissing = false) {
             message: 'Verified items are only edited by hand',
         });
     }
-    const lookup = await lookupBook(item.barcode, {
-        stored: toBookLookup(item, item.series),
+    const lookup = await lookupBook(main.isbn, {
+        stored: toBookLookup(item, item.series, main.isbn, main),
         google: !onlyMissing || !item.googleBooksFetchedAt,
         openLibrary: !onlyMissing || !item.openLibraryFetchedAt,
         refresh: true,
     });
     if (!lookup) {
         throw new HTTPException(404, {
-            message: `No book found for ISBN ${item.barcode}`,
+            message: `No book found for ISBN ${main.isbn}`,
         });
     }
     if (lookup.later) {
@@ -675,20 +734,37 @@ export async function refreshBook(itemId: string, onlyMissing = false) {
     return saveBook(item.id, lookup);
 }
 
-/** The book's details for its page, from what's stored. */
-export function bookDetails(item: CatalogItem) {
+/**
+ * The book's details for its page. Facts about the edition come from the one
+ * the page is for. Dates, pages and edition names are only on file for the
+ * item's main ISBN, so other editions leave them out.
+ */
+export function bookDetails(item: CatalogItem, edition: Edition | null) {
     const meta = readMetadata(item);
+    const isMain = !edition || edition.main;
+    const mainOnly = <T>(value: T) => (isMain ? value : null);
 
     const facts = [
         { label: 'Genres', value: meta.genres.join(', ') },
         { label: 'First published', value: meta.firstPublishYear?.toString() },
-        { label: 'This edition', value: meta.publishDate },
-        { label: 'Publisher', value: meta.publishers.join(', ') },
-        { label: 'Edition', value: meta.editionName },
-        { label: 'Format', value: meta.physicalFormat },
-        { label: 'Language', value: meta.languages.join(', ') },
-        { label: 'Pages', value: meta.pageCount?.toString() },
-        { label: 'ISBN', value: item.barcode },
+        { label: 'This edition', value: mainOnly(meta.publishDate) },
+        {
+            label: 'Publisher',
+            value: edition?.publisher ?? mainOnly(meta.publishers.join(', ')),
+        },
+        { label: 'Edition', value: mainOnly(meta.editionName) },
+        {
+            label: 'Format',
+            value: edition?.format ?? mainOnly(meta.physicalFormat),
+        },
+        {
+            label: 'Language',
+            value:
+                languageName(edition?.language) ??
+                mainOnly(meta.languages.join(', ')),
+        },
+        { label: 'Pages', value: mainOnly(meta.pageCount?.toString()) },
+        { label: 'ISBN', value: edition?.isbn },
     ];
 
     return {
@@ -696,7 +772,6 @@ export function bookDetails(item: CatalogItem) {
         creators: meta.authors,
         description: meta.description,
         facts: filledFacts(facts),
-        links: bookLinks(item),
     };
 }
 
@@ -705,7 +780,10 @@ type LinkFields = Pick<
     'format' | 'metadata' | 'externalSource' | 'externalId'
 >;
 
-/** Where else a book can be looked at: Goodreads and the source it came from. */
+/**
+ * Where else a book can be looked at: Goodreads and the source it came from.
+ * Only admin pages show these.
+ */
 function bookLinks(item: LinkFields) {
     const goodreadsId = readMetadata(item).goodreadsId;
     const sourceId = item.externalId;
@@ -745,10 +823,14 @@ const NO_DETAILS: ItemDetails = {
     creators: [],
     description: null,
     facts: [],
-    links: [],
 };
 
 /** What an item's page shows about it, whatever kind of media it is. */
-export function itemDetails(item: CatalogItem): ItemDetails {
-    return item.format === MediaFormat.Book ? bookDetails(item) : NO_DETAILS;
+export function itemDetails(
+    item: CatalogItem,
+    edition: Edition | null
+): ItemDetails {
+    return item.format === MediaFormat.Book
+        ? bookDetails(item, edition)
+        : NO_DETAILS;
 }

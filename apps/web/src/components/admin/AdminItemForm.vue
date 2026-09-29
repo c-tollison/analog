@@ -92,7 +92,7 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                 <FormItem>
                     <FormLabel>Series</FormLabel>
                     <FormControl>
-                        <SeriesPicker v-bind="componentField" />
+                        <SeriesPicker v-bind="componentField" admin />
                     </FormControl>
                     <FormMessage />
                 </FormItem>

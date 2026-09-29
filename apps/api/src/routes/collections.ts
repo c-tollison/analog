@@ -5,8 +5,7 @@ import {
     eq,
     ilike,
     inArray,
-    isNotNull,
-    ne,
+    isNull,
     notExists,
     or,
     schema,
@@ -26,13 +25,15 @@ import {
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { itemDetails, seriesColumns, upsertBook } from '../lib/books.js';
+import { seriesColumns } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
+import { discoverableItem } from '../lib/discovery.js';
+import { upsertBook } from '../lib/editions.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
-import { isCompleted, whenCompleted } from '../lib/progress.js';
+import { whenCompleted } from '../lib/progress.js';
 import {
     catalogItemsMatching,
     matchesAllTerms,
@@ -41,6 +42,7 @@ import {
 } from '../lib/search.js';
 import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
+import collectionItems from './collection-items.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -51,6 +53,7 @@ const {
     collectionItem,
     collectionInvite,
     catalogItem,
+    collectionItemIsbn,
     friendship,
     progress,
     series,
@@ -67,19 +70,6 @@ function myProgress(userId: string) {
 
 const myRating = whenCompleted<number>(progress.rating);
 
-/**
- * Everyone else on the app who finished a catalog item and left a rating or
- * review. Items are shared, so reviews are too.
- */
-function othersReviewed(catalogItemId: string, me: string) {
-    return and(
-        eq(progress.catalogItemId, catalogItemId),
-        ne(progress.userId, me),
-        isCompleted,
-        or(isNotNull(progress.rating), isNotNull(progress.review))
-    );
-}
-
 /** Counts the joined progress rows that have `status`. */
 function statusCount(status: ProgressStatus) {
     return sql<number>`(
@@ -90,9 +80,6 @@ function statusCount(status: ProgressStatus) {
 const completedCount = statusCount(ProgressStatus.Completed);
 
 const CollectionParamSchema = IdParamSchema;
-const ItemParamSchema = CollectionParamSchema.extend({
-    itemId: z.uuid('Invalid id'),
-});
 const MemberParamSchema = CollectionParamSchema.extend({
     userId: z.uuid('Invalid id'),
 });
@@ -448,7 +435,6 @@ const collections = new Hono<AppEnv>()
                     id: found.id,
                     title: found.title,
                     kind: found.kind,
-                    language: found.language,
                     coverUrl: found.coverUrl,
                 },
                 ownedCount: counted?.ownedCount ?? 0,
@@ -505,7 +491,8 @@ const collections = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { q, seriesId, ...pageQuery } = c.req.valid('query');
-            await requireMember(id, c.get('user').id);
+            const me = c.get('user').id;
+            await requireMember(id, me);
 
             const terms = searchTerms(q ?? '');
             const titles = [catalogItem.title, series.title];
@@ -530,10 +517,16 @@ const collections = new Hono<AppEnv>()
                     .leftJoin(series, eq(catalogItem.seriesId, series.id))
                     .where(
                         and(
+                            // Listing a series is for adding the rest of it,
+                            // so what the collection has is left out.
                             seriesId
-                                ? eq(catalogItem.seriesId, seriesId)
+                                ? and(
+                                      eq(catalogItem.seriesId, seriesId),
+                                      isNull(collectionItem.id)
+                                  )
                                 : undefined,
-                            catalogItemsMatching(terms)
+                            catalogItemsMatching(terms),
+                            discoverableItem(me)
                         )
                     )
                     .orderBy(
@@ -598,143 +591,41 @@ const collections = new Hono<AppEnv>()
 
             const item = await upsertBook(isbn, seriesChoice, volume, user.id);
 
-            const [added] = await db()
+            // A collection holds each volume once. Another edition of one it
+            // already has joins that entry.
+            await db()
                 .insert(collectionItem)
                 .values({
                     collectionId: id,
                     catalogItemId: item.id,
                     addedByUserId: user.id,
                 })
+                .onConflictDoNothing();
+            const entry = await db().query.collectionItem.findFirst({
+                columns: { id: true },
+                where: and(
+                    eq(collectionItem.collectionId, id),
+                    eq(collectionItem.catalogItemId, item.id)
+                ),
+            });
+            if (!entry) {
+                throw new Error(`Collection entry for ${item.id} missing`);
+            }
+            const [owned] = await db()
+                .insert(collectionItemIsbn)
+                .values({ collectionItemId: entry.id, isbn })
                 .onConflictDoNothing()
-                .returning({ id: collectionItem.id });
-            if (!added) {
+                .returning({ isbn: collectionItemIsbn.isbn });
+            if (!owned) {
                 throw new HTTPException(409, {
                     message: 'Already in this collection',
                 });
             }
 
-            return c.json({ id: added.id, seriesId: item.seriesId }, 201);
+            return c.json({ id: entry.id, seriesId: item.seriesId }, 201);
         }
     )
-    .get(
-        '/:id/items/:itemId',
-        schemaValidator('param', ItemParamSchema),
-        async (c) => {
-            const { id, itemId } = c.req.valid('param');
-            const me = c.get('user').id;
-            await requireMember(id, me);
-
-            const found = await db().query.collectionItem.findFirst({
-                columns: { id: true },
-                where: and(
-                    eq(collectionItem.id, itemId),
-                    eq(collectionItem.collectionId, id)
-                ),
-                with: { catalogItem: { with: { series: true } } },
-            });
-            if (!found) {
-                throw new HTTPException(404, { message: 'Item not found' });
-            }
-            const item = found.catalogItem;
-
-            const details = itemDetails(item);
-            const [[mine], [counted]] = await Promise.all([
-                db()
-                    .select({
-                        status: progress.status,
-                        rating: progress.rating,
-                        review: progress.review,
-                    })
-                    .from(progress)
-                    .where(
-                        and(
-                            eq(progress.userId, me),
-                            eq(progress.catalogItemId, item.id)
-                        )
-                    ),
-                db()
-                    .select({ reviewCount: sql<number>`count(*)::int` })
-                    .from(progress)
-                    .where(othersReviewed(item.id, me)),
-            ]);
-
-            return c.json({
-                id: found.id,
-                catalogItemId: item.id,
-                format: item.format,
-                kind: item.kind,
-                title: item.title,
-                coverUrl: item.coverUrl,
-                position: item.position,
-                seriesId: item.series?.id ?? null,
-                seriesTitle: item.series?.title ?? null,
-                ...details,
-                status: mine?.status ?? null,
-                rating: mine?.rating ?? null,
-                review: mine?.review ?? null,
-                reviewCount: counted?.reviewCount ?? 0,
-            });
-        }
-    )
-    .get(
-        '/:id/items/:itemId/reviews',
-        schemaValidator('param', ItemParamSchema),
-        schemaValidator('query', PageQuerySchema),
-        async (c) => {
-            const { id, itemId } = c.req.valid('param');
-            const me = c.get('user').id;
-            await requireMember(id, me);
-
-            const found = await db().query.collectionItem.findFirst({
-                columns: { catalogItemId: true },
-                where: and(
-                    eq(collectionItem.id, itemId),
-                    eq(collectionItem.collectionId, id)
-                ),
-            });
-            if (!found) {
-                throw new HTTPException(404, { message: 'Item not found' });
-            }
-
-            const page = await paginate(c.req.valid('query'), (limit, offset) =>
-                db()
-                    .select({
-                        ...userColumns,
-                        rating: progress.rating,
-                        review: progress.review,
-                    })
-                    .from(progress)
-                    .innerJoin(user, eq(user.id, progress.userId))
-                    .where(othersReviewed(found.catalogItemId, me))
-                    .orderBy(desc(progress.updatedAt), asc(user.id))
-                    .limit(limit)
-                    .offset(offset)
-            );
-            return c.json(page);
-        }
-    )
-    .delete(
-        '/:id/items/:itemId',
-        schemaValidator('param', ItemParamSchema),
-        async (c) => {
-            const { id, itemId } = c.req.valid('param');
-            await requireMember(id, c.get('user').id);
-
-            const [removed] = await db()
-                .delete(collectionItem)
-                .where(
-                    and(
-                        eq(collectionItem.id, itemId),
-                        eq(collectionItem.collectionId, id)
-                    )
-                )
-                .returning({ id: collectionItem.id });
-            if (!removed) {
-                throw new HTTPException(404, { message: 'Item not found' });
-            }
-            return c.body(null, 204);
-        }
-    )
+    .route('/:id/items', collectionItems)
     .get(
         '/:id/members',
         schemaValidator('param', CollectionParamSchema),

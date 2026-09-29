@@ -1,39 +1,14 @@
 import { ExternalSource, SeriesKind } from './catalog-enums.js';
 import { IsbnSchema } from './isbn.js';
+import { PageQuerySchema } from './pagination.js';
 import { z } from 'zod';
 
 export const SERIES_TITLE_MAX_LENGTH = 200;
 
-/** Languages a series can be in, as ISO 639-1 codes. */
-export const SERIES_LANGUAGES = [
-    'en',
-    'ja',
-    'ko',
-    'zh',
-    'fr',
-    'es',
-    'de',
-    'it',
-    'pt',
-] as const;
+export const SeriesSearchQuerySchema = PageQuerySchema.extend({
+    q: z.string().trim().max(200).optional(),
+});
 
-export type SeriesLanguage = (typeof SERIES_LANGUAGES)[number];
-
-export const SeriesLanguageSchema = z.enum(SERIES_LANGUAGES);
-
-export const DEFAULT_SERIES_LANGUAGE: SeriesLanguage = 'en';
-
-export const SERIES_LANGUAGE_LABELS: Record<SeriesLanguage, string> = {
-    en: 'English',
-    ja: 'Japanese',
-    ko: 'Korean',
-    zh: 'Chinese',
-    fr: 'French',
-    es: 'Spanish',
-    de: 'German',
-    it: 'Italian',
-    pt: 'Portuguese',
-};
 export const COLLECTION_NAME_MAX_LENGTH = 64;
 
 export const SeriesTitleSchema = z
@@ -52,6 +27,8 @@ export const AddBookSchema = z.object({
     series: SeriesChoiceSchema.nullable(),
     volume: z.number().nonnegative().nullable(),
 });
+
+export const OwnedIsbnSchema = z.object({ isbn: IsbnSchema });
 
 export const CollectionNameSchema = z
     .string()

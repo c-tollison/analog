@@ -155,6 +155,13 @@
       "when": 1790614402825,
       "tag": "0021_half_star_ratings",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790698734711,
+      "tag": "0022_add_catalog_item_isbn",
+      "breakpoints": true
     }
   ]
 }

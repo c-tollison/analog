@@ -37,6 +37,7 @@ import {
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import type { ApiClient } from '@/lib/api';
 import { AddCatalogItemsSchema } from '@/lib/catalog-schemas';
+import { addMoreLabel } from '@/lib/media-types';
 
 import { computed, ref, watch } from 'vue';
 
@@ -113,7 +114,7 @@ const emptyText = computed(() => {
     if (term.value) {
         return 'No titles match.';
     }
-    return 'Nothing in this series yet.';
+    return 'You already have everything in this series.';
 });
 
 watch(open, (isOpen) => {
@@ -130,7 +131,7 @@ watch(open, (isOpen) => {
         <DialogContent class="flex max-h-[85svh] flex-col sm:max-w-md">
             <DialogHeader>
                 <DialogTitle
-                    >{{ series ? 'Add to series' : 'Add media' }}</DialogTitle
+                    >{{ series ? addMoreLabel(series.kind) : 'Add media' }}</DialogTitle
                 >
                 <DialogDescription v-if="series">
                     Quickly add other parts of this series to

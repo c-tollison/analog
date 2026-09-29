@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { SERIES_LANGUAGE_LABELS } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import LoadMore from '@/components/lists/LoadMore.vue';
 import { Button } from '@/components/shadcn-components/button';
@@ -36,12 +35,19 @@ const inputAttrs = computed(() => {
     return rest;
 });
 
+// `admin` picks from every series, for the admin dashboard.
+const props = defineProps<{ admin?: boolean }>();
+
 const model = defineModel<SeriesPick | null>({ default: null });
 
 const search = ref(model.value?.title ?? '');
 const { trimmed, term, isTyping } = useSearchTerm(search);
 
-const list = useSeriesSearch(term, { limit: PAGE_SIZE, pending: isTyping });
+const list = useSeriesSearch(term, {
+    limit: PAGE_SIZE,
+    pending: isTyping,
+    admin: props.admin,
+});
 
 const canCreate = computed(
     () =>
@@ -146,9 +152,6 @@ function sameSeries(a: unknown, b: unknown) {
                         <span class="flex-1 truncate">{{ series.title }}</span>
                         <span class="text-muted-foreground">
                             {{ SERIES_KIND_LABELS[series.kind] }}
-                            <template v-if="series.language">
-                                · {{ SERIES_LANGUAGE_LABELS[series.language] }}
-                            </template>
                         </span>
                     </ComboboxItem>
                     <LoadMore

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, isNull, or, schema } from '@analog/db';
+import { and, asc, eq, inArray, isNull, or, schema } from '@analog/db';
 import { MediaFormat } from '@analog/types';
 
 import { refreshBook } from '../lib/books.js';
@@ -19,7 +19,7 @@ const PAUSE_MS = 1_500;
 const BUSY_PAUSE_MS = 60_000;
 const BUSY_TRIES = 3;
 
-const { catalogItem } = schema;
+const { catalogItem, catalogItemIsbn } = schema;
 
 async function main() {
     await init(loadConfig());
@@ -31,7 +31,14 @@ async function main() {
         .where(
             and(
                 eq(catalogItem.format, MediaFormat.Book),
-                isNotNull(catalogItem.barcode),
+                // Only books with a main ISBN can be looked up again.
+                inArray(
+                    catalogItem.id,
+                    db()
+                        .select({ id: catalogItemIsbn.catalogItemId })
+                        .from(catalogItemIsbn)
+                        .where(eq(catalogItemIsbn.main, true))
+                ),
                 isNull(catalogItem.verifiedAt),
                 or(
                     isNull(catalogItem.googleBooksFetchedAt),
