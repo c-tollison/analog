@@ -6,6 +6,7 @@ import {
     NavigationMenuList,
 } from '@/components/shadcn-components/navigation-menu';
 
+import NotificationSummaryTooltip from './NotificationSummaryTooltip.vue';
 import NotificationsBell from './NotificationsBell.vue';
 import { isNavActive, navLinks } from './nav-links';
 import UserMenu from './UserMenu.vue';
@@ -16,7 +17,9 @@ const route = useRoute();
 </script>
 
 <template>
-    <header class="bg-background fixed inset-x-0 top-0 z-50 h-14 border-b">
+    <header
+        class="bg-background fixed inset-x-0 top-0 z-50 h-14 border-b pr-(--scrollbar-width)"
+    >
         <div class="mx-auto flex h-full max-w-5xl items-center gap-2 px-4">
             <RouterLink
                 :to="{ name: 'home' }"
@@ -46,7 +49,9 @@ const route = useRoute();
                 </NavigationMenuList>
             </NavigationMenu>
             <div class="flex-1" />
-            <NotificationsBell class="hidden md:inline-flex" />
+            <NotificationSummaryTooltip side="bottom" desktop>
+                <NotificationsBell class="hidden md:inline-flex" />
+            </NotificationSummaryTooltip>
             <UserMenu />
         </div>
     </header>
