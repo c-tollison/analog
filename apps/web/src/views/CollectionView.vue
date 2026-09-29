@@ -32,6 +32,7 @@ import {
     kindStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 
 import { PlusIcon, SettingsIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -100,7 +101,10 @@ const headerError = computed(
         </div>
 
         <div class="flex min-h-7 items-center justify-between gap-2">
-            <div v-if="collection" class="grid">
+            <div
+                v-if="collection"
+                class="motion-safe:animate-in fade-in animation-duration-500 grid"
+            >
                 <h1 class="text-lg font-semibold">{{ collection.name }}</h1>
                 <p v-if="progress" class="text-muted-foreground text-xs">
                     {{ progress }}
@@ -154,7 +158,8 @@ const headerError = computed(
             <template #default="{ items }">
                 <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <li
-                        v-for="entry in items"
+                        v-for="(entry, index) in items"
+                        v-bind="staggerIn(index)"
                         :key="entry.id"
                         class="group relative"
                     >
@@ -170,7 +175,7 @@ const headerError = computed(
                                 size="md"
                                 :src="entry.series.coverUrl"
                                 :alt="entry.series.title"
-                                class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
+                                class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
                             />
                             <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.series.title }}
@@ -203,7 +208,7 @@ const headerError = computed(
                                 size="md"
                                 :src="entry.coverUrl"
                                 :alt="entry.title"
-                                class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
+                                class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
                             />
                             <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.title }}

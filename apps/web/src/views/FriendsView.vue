@@ -22,6 +22,7 @@ import {
 import { useNotificationCount } from '@/composables/useNotifications';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useUserSearch } from '@/composables/useUsers';
+import { staggerIn } from '@/lib/motion';
 
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -113,7 +114,8 @@ const results = useUserSearch(searchTerm, {
             <template #default="{ items }">
                 <ItemGroup class="gap-2">
                     <UserItem
-                        v-for="person in items"
+                        v-for="(person, index) in items"
+                        v-bind="staggerIn(index)"
                         :key="person.id"
                         :user="person"
                     >
@@ -149,7 +151,8 @@ const results = useUserSearch(searchTerm, {
                     <template #default="{ items }">
                         <ItemGroup class="gap-2">
                             <UserItem
-                                v-for="friend in items"
+                                v-for="(friend, index) in items"
+                                v-bind="staggerIn(index)"
                                 :key="friend.id"
                                 :user="friend"
                             />
@@ -164,7 +167,8 @@ const results = useUserSearch(searchTerm, {
                     <template #default="{ items }">
                         <ItemGroup class="gap-2">
                             <UserItem
-                                v-for="person in items"
+                                v-for="(person, index) in items"
+                                v-bind="staggerIn(index)"
                                 :key="person.id"
                                 :user="person"
                             >

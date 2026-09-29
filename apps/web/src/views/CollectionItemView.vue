@@ -170,7 +170,11 @@ const error = computed(
             <Spinner class="size-6" />
         </div>
 
-        <Tabs v-if="item && labels" v-model="tab" class="gap-4">
+        <Tabs
+            v-if="item && labels"
+            v-model="tab"
+            class="motion-safe:animate-in fade-in animation-duration-500 gap-4"
+        >
             <TabsList>
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger v-if="item.editions.length" value="editions">

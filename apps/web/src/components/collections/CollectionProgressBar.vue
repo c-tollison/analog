@@ -52,15 +52,19 @@ const segments = computed(() =>
     <div class="flex flex-col gap-1.5">
         <div
             aria-hidden="true"
-            class="flex h-1.5 w-full overflow-hidden rounded-full"
+            class="h-1.5 w-full overflow-hidden rounded-full"
         >
             <div
-                v-for="segment in segments"
-                :key="segment.key"
-                class="min-w-1 basis-0"
-                :class="segment.class"
-                :style="{ flexGrow: segment.count }"
-            />
+                class="motion-safe:animate-in slide-in-from-left-full animation-duration-700 flex size-full ease-out"
+            >
+                <div
+                    v-for="segment in segments"
+                    :key="segment.key"
+                    class="min-w-1 basis-0 transition-[flex-grow] duration-500 ease-out"
+                    :class="segment.class"
+                    :style="{ flexGrow: segment.count }"
+                />
+            </div>
         </div>
         <ul
             class="text-muted-foreground flex min-h-4 flex-wrap gap-x-3 gap-y-0.5 text-xs"

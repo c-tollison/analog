@@ -10,6 +10,13 @@ usePageTitle();
 
 <template>
     <TooltipProvider>
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+            <Transition
+                mode="out-in"
+                enter-active-class="motion-safe:animate-in fade-in animation-duration-300"
+            >
+                <component :is="Component" />
+            </Transition>
+        </RouterView>
     </TooltipProvider>
 </template>

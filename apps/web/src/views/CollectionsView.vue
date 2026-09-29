@@ -30,6 +30,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useUpdatePreferences } from '@/composables/useUsers';
 import type { ApiClient } from '@/lib/api';
 import { formatsCompletedWord, formatsStatusLabels } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 import { useSessionStore } from '@/stores/session';
 
 import { PlusIcon, ScanBarcodeIcon } from '@lucide/vue';
@@ -121,7 +122,11 @@ function resultLink(result: SearchResult): RouteLocationRaw {
         >
             <template #default="{ items }">
                 <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
-                    <li v-for="result in items" :key="result.id">
+                    <li
+                        v-for="(result, index) in items"
+                        v-bind="staggerIn(index)"
+                        :key="result.id"
+                    >
                         <RouterLink
                             :to="resultLink(result)"
                             class="group grid gap-1"
@@ -130,7 +135,7 @@ function resultLink(result: SearchResult): RouteLocationRaw {
                                 size="md"
                                 :src="result.coverUrl"
                                 :alt="result.title"
-                                class="aspect-2/3 w-full transition-opacity group-hover:opacity-90"
+                                class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
                             />
                             <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ result.title }}
@@ -160,7 +165,8 @@ function resultLink(result: SearchResult): RouteLocationRaw {
             <template #default="{ items }">
                 <ItemGroup class="grid sm:grid-cols-2">
                     <Item
-                        v-for="c in items"
+                        v-for="(c, index) in items"
+                        v-bind="staggerIn(index)"
                         :key="c.id"
                         variant="outline"
                         class="has-[a:hover]:bg-muted relative"

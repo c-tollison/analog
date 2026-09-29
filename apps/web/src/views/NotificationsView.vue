@@ -16,6 +16,7 @@ import {
     useNotifications,
 } from '@/composables/useNotifications';
 import type { ApiClient } from '@/lib/api';
+import { staggerIn } from '@/lib/motion';
 
 import { computed, ref } from 'vue';
 
@@ -75,7 +76,12 @@ function pendingFor(n: Notification) {
         <PagedList :list="notifications" empty-text="You're all caught up.">
             <template #default="{ items }">
                 <ItemGroup class="gap-2">
-                    <UserItem v-for="n in items" :key="rowKey(n)" :user="n">
+                    <UserItem
+                        v-for="(n, index) in items"
+                        v-bind="staggerIn(index)"
+                        :key="rowKey(n)"
+                        :user="n"
+                    >
                         <template #description>
                             <template
                                 v-if="n.kind === NotificationKind.FriendRequest"

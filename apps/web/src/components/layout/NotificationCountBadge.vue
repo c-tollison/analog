@@ -16,7 +16,7 @@ const label = computed(() =>
 <template>
     <Badge
         v-if="count"
-        class="bg-destructive absolute h-4 min-w-4 px-1 text-white"
+        class="bg-destructive motion-safe:animate-in zoom-in-50 fade-in absolute h-4 min-w-4 px-1 text-white"
     >
         {{ label }}
     </Badge>

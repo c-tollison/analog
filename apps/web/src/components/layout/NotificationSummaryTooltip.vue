@@ -13,12 +13,14 @@ import { useRoute } from 'vue-router';
 
 // Pops up once when the app loads to say how many friend requests and
 // collection invites are waiting. The top nav and the bottom nav each wrap
-// their bell in one, and only the one on screen opens.
+// their bell in one, and only the one on screen opens. It waits a moment
+// after load so it doesn't land on top of the page coming in.
 const props = defineProps<{
     side: 'top' | 'bottom';
     desktop: boolean;
 }>();
 
+const DELAY_MS = 1500;
 const SHOW_MS = 5000;
 
 const { data } = useNotificationCount();
@@ -26,9 +28,17 @@ const isDesktop = useMediaQuery('(min-width: 48rem)');
 const route = useRoute();
 
 const open = ref(false);
-const { start } = useTimeoutFn(() => (open.value = false), SHOW_MS, {
+const hide = useTimeoutFn(() => (open.value = false), SHOW_MS, {
     immediate: false,
 });
+const show = useTimeoutFn(
+    () => {
+        open.value = true;
+        hide.start();
+    },
+    DELAY_MS,
+    { immediate: false }
+);
 
 const friendRequests = computed(() => data.value?.friendRequests ?? 0);
 const collectionInvites = computed(() => data.value?.collectionInvites ?? 0);
@@ -46,8 +56,7 @@ watch(
             isDesktop.value === props.desktop &&
             route.name !== 'notifications'
         ) {
-            open.value = true;
-            start();
+            show.start();
         }
     },
     { immediate: true }
@@ -55,7 +64,10 @@ watch(
 
 watch(
     () => route.fullPath,
-    () => (open.value = false)
+    () => {
+        show.stop();
+        open.value = false;
+    }
 );
 
 function onUpdateOpen(value: boolean) {
@@ -74,7 +86,7 @@ function onUpdateOpen(value: boolean) {
             :side="side"
             :side-offset="6"
             variant="primary"
-            class="gap-3 text-sm font-medium"
+            class="animation-duration-500 gap-3 text-sm font-medium"
         >
             <span v-if="friendRequests" class="flex items-center gap-1">
                 <UserPlusIcon class="size-4" />
