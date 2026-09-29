@@ -34,6 +34,7 @@ import {
     useCollectionItemReviews,
     useRemoveOwnedEdition,
 } from '@/composables/useCollections';
+import { usePageTitle } from '@/composables/usePageTitle';
 import { useSetProgressStatus } from '@/composables/useProgress';
 import { isPendingFor } from '@/lib/editions';
 import {
@@ -62,6 +63,7 @@ const { data: item, error: loadError } = useCollectionItem(
     () => props.id,
     () => props.itemId
 );
+usePageTitle(() => item.value?.title);
 
 // The open tab lives in the URL so coming back from a profile lands on
 // Reviews.

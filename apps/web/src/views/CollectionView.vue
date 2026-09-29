@@ -22,6 +22,7 @@ import {
     useCollectionEntries,
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
+import { usePageTitle } from '@/composables/usePageTitle';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import {
     completedWord,
@@ -41,6 +42,7 @@ const query = ref('');
 const { term, isTyping } = useSearchTerm(query);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
+usePageTitle(() => collection.value?.name);
 
 const SORT_LABELS: Record<CollectionSort, string> = {
     [CollectionSort.Name]: 'Name',

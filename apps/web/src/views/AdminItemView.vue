@@ -23,6 +23,7 @@ import {
     useUploadCover,
 } from '@/composables/useAdmin';
 import { useRefreshBook } from '@/composables/useCatalog';
+import { usePageTitle } from '@/composables/usePageTitle';
 import { formatDate, timeAgo } from '@/lib/dates';
 import { isPendingFor } from '@/lib/editions';
 import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
@@ -37,6 +38,7 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 
 const { data: item, error: loadError } = useAdminItem(() => props.id);
+usePageTitle(() => item.value?.title);
 
 const setVerified = useSetItemVerified();
 const refresh = useRefreshBook();

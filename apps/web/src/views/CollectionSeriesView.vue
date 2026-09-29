@@ -17,6 +17,7 @@ import {
     useCollectionSeriesItems,
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
+import { usePageTitle } from '@/composables/usePageTitle';
 import {
     addMoreLabel,
     completedWord,
@@ -36,6 +37,7 @@ const { data: detail, error: detailError } = useCollectionSeries(
     () => props.id,
     () => props.seriesId
 );
+usePageTitle(() => detail.value?.series.title);
 
 const { data: collection, error: collectionError } = useCollection(
     () => props.id

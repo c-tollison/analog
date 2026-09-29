@@ -14,6 +14,7 @@ import {
     useRemoveFriend,
     useSendFriendRequest,
 } from '@/composables/useFriends';
+import { usePageTitle } from '@/composables/usePageTitle';
 import { useUser } from '@/composables/useUsers';
 
 import {
@@ -29,6 +30,7 @@ import { computed, ref } from 'vue';
 const props = defineProps<{ username: string }>();
 
 const { data: person, error: loadError } = useUser(() => props.username);
+usePageTitle(() => person.value?.name);
 const userId = computed(() => person.value?.id ?? '');
 const isFriend = computed(
     () => person.value?.relationship === Relationship.Friends

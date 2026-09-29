@@ -31,6 +31,7 @@ import {
     useDeleteAdminSeries,
     useSetSeriesVerified,
 } from '@/composables/useAdmin';
+import { usePageTitle } from '@/composables/usePageTitle';
 import { goBackOr } from '@/lib/navigation';
 
 import {
@@ -49,6 +50,7 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 
 const { data: series, error: seriesError } = useAdminSeries(() => props.id);
+usePageTitle(() => series.value?.title);
 const { data: items, error: itemsError } = useAdminSeriesItems(() => props.id);
 
 const setVerified = useSetSeriesVerified();
