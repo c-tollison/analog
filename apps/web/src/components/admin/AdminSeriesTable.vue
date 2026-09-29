@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import {
-    type AddedSort,
-    SERIES_LANGUAGE_LABELS,
-    type VerifiedFilter,
-} from '@analog/types';
+import type { AddedSort, VerifiedFilter } from '@analog/types';
 import AdminTable from '@/components/admin/AdminTable.vue';
 import {
     addedColumn,
@@ -43,14 +39,6 @@ const columns: ColumnDef<AdminSeriesRow>[] = [
         id: 'kind',
         header: 'Kind',
         cell: ({ row }) => SERIES_KIND_LABELS[row.original.kind],
-    },
-    {
-        id: 'language',
-        header: 'Language',
-        cell: ({ row }) =>
-            row.original.language
-                ? SERIES_LANGUAGE_LABELS[row.original.language]
-                : '—',
     },
     {
         id: 'items',

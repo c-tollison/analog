@@ -1,9 +1,4 @@
-import {
-    ItemTitleSchema,
-    SeriesKind,
-    SeriesLanguageSchema,
-    SeriesTitleSchema,
-} from '@analog/types';
+import { ItemTitleSchema, SeriesKind, SeriesTitleSchema } from '@analog/types';
 
 import { SeriesPickSchema, VolumeField } from './catalog-schemas';
 import { z } from 'zod';
@@ -20,16 +15,9 @@ export const AdminItemFormSchema = z
         path: ['series'],
     });
 
-// Select items can't be empty or null, so "Not set" has its own value.
-export const NO_LANGUAGE = 'none';
-
 export const AdminSeriesFormSchema = z.object({
     title: SeriesTitleSchema,
     kind: z.enum(SeriesKind),
-    language: z
-        .string()
-        .transform((value) => (value === NO_LANGUAGE ? null : value))
-        .pipe(SeriesLanguageSchema.nullable()),
 });
 
 export const SeriesItemsFormSchema = z.object({

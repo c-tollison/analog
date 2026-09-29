@@ -26,12 +26,16 @@ import {
     whereVerified,
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
-import { matchSeriesKind, refreshSeriesCover } from '../lib/books.js';
+import {
+    matchSeriesKind,
+    mergeSeries,
+    refreshSeriesCover,
+} from '../lib/books.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { matchesAllTerms, searchTerms } from '../lib/search.js';
-import { seriesDetails } from '../lib/series-details.js';
+import { seriesDetails, seriesLinks } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -79,7 +83,6 @@ const adminSeries = new Hono<AppEnv>()
                         id: series.id,
                         title: series.title,
                         kind: series.kind,
-                        language: series.language,
                         coverUrl: series.coverUrl,
                         itemCount: sql<number>`coalesce(${counts.itemCount}, 0)::int`,
                         volumeCount: series.volumeCount,
@@ -109,7 +112,6 @@ const adminSeries = new Hono<AppEnv>()
                 id: series.id,
                 title: series.title,
                 kind: series.kind,
-                language: series.language,
                 coverUrl: series.coverUrl,
                 volumeCount: series.volumeCount,
                 createdAt: series.createdAt,
@@ -137,19 +139,17 @@ const adminSeries = new Hono<AppEnv>()
             .where(
                 and(
                     ne(series.id, row.id),
-                    sql`lower(${series.title}) = lower(${row.title})`,
-                    sql`${series.language} is not distinct from ${row.language}`
+                    sql`lower(${series.title}) = lower(${row.title})`
                 )
             );
         const { details, detailsFetchedAt, ...found } = row;
-        const { detailsSource, detailsId, detailsTitle, links } =
-            seriesDetails(row);
+        const { detailsSource, detailsId, detailsTitle } = seriesDetails(row);
         return c.json({
             ...found,
             detailsSource,
             detailsId,
             detailsTitle,
-            links,
+            links: seriesLinks(row),
             sameTitle,
         });
     })
@@ -181,11 +181,11 @@ const adminSeries = new Hono<AppEnv>()
         schemaValidator('json', UpdateSeriesSchema),
         async (c) => {
             const found = await requireSeries(c.req.valid('param').id);
-            const { title, kind, language } = c.req.valid('json');
+            const { title, kind } = c.req.valid('json');
             await db().transaction(async (tx) => {
                 await tx
                     .update(series)
-                    .set({ title, kind, language, updatedAt: new Date() })
+                    .set({ title, kind, updatedAt: new Date() })
                     .where(eq(series.id, found.id));
                 if (kind !== found.kind) {
                     await matchSeriesKind(found.id, tx);
@@ -258,7 +258,7 @@ const adminSeries = new Hono<AppEnv>()
         }
     )
     // Moves every item into another series, then deletes this one. The other
-    // series keeps its own title, language, link and volume count.
+    // series keeps its own title, link and volume count.
     .post(
         '/:id/merge',
         schemaValidator('param', IdParamSchema),
@@ -273,15 +273,7 @@ const adminSeries = new Hono<AppEnv>()
             }
             await requireSeries(id);
             const into = await requireSeries(intoSeriesId);
-            await db().transaction(async (tx) => {
-                await tx
-                    .update(catalogItem)
-                    .set({ seriesId: into.id, updatedAt: new Date() })
-                    .where(eq(catalogItem.seriesId, id));
-                await tx.delete(series).where(eq(series.id, id));
-                await matchSeriesKind(into.id, tx);
-            });
-            await refreshSeriesCover(into.id);
+            await mergeSeries(id, into.id);
             return c.body(null, 204);
         }
     )

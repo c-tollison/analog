@@ -2,6 +2,7 @@
 import ExternalLinks from '@/components/media/ExternalLinks.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
+import type { AdminItem } from '@/composables/useAdmin';
 import type { CollectionItemDetail } from '@/composables/useCollections';
 
 import { computed, ref } from 'vue';
@@ -12,7 +13,7 @@ const props = defineProps<{
     description: CollectionItemDetail['description'];
     genres?: string[];
     facts: CollectionItemDetail['facts'];
-    links?: CollectionItemDetail['links'];
+    links?: AdminItem['links'];
 }>();
 
 const showFullDescription = ref(false);

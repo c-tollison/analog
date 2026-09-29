@@ -20,6 +20,7 @@ import { vNoAutofill } from '@/lib/no-autofill';
 
 import {
     CheckCircleIcon,
+    CircleAlertIcon,
     FlashlightIcon,
     FlashlightOffIcon,
     SwitchCameraIcon,
@@ -79,9 +80,7 @@ const {
 // Only the result shows until it's added or dismissed. The camera stays on
 // behind it so the next scan is instant, but scans are ignored until then.
 // It's never paused, because pausing turns the camera off.
-const showingResult = computed(
-    () => lookup.value !== null && !!props.collection
-);
+const showingResult = computed(() => lookup.value !== null);
 
 const RESCAN_COOLDOWN_MS = 3000;
 let lastScan: { isbn: string; at: number } | null = null;
@@ -190,25 +189,30 @@ function scanAnother() {
 </script>
 
 <template>
-    <BookResult
-        v-if="lookup && collection"
-        :key="`${lookup.book.isbn}:${collection.id}`"
-        :lookup="lookup"
-        :collection-id="collection.id"
-        :collection-name="collection.name"
-        @done="scanAnother"
-        @added="onAdded"
-    />
-    <template v-else>
-        <slot />
+    <!-- The pickers stay up until there's a collection to add to. -->
+    <slot v-if="!lookup || !collection" />
 
-        <Alert v-if="lastAdded && collection">
-            <CheckCircleIcon />
+    <template v-if="lookup">
+        <Alert v-if="!collection">
+            <CircleAlertIcon />
             <AlertDescription>
-                Added {{ lastAdded }} to {{ collection.name }}.
+                Choose a collection to add this to.
             </AlertDescription>
         </Alert>
+        <BookResult
+            :key="`${lookup.book.isbn}:${collection?.id}`"
+            :lookup="lookup"
+            :collection="collection ?? null"
+            @done="scanAnother"
+            @added="onAdded"
+        />
     </template>
+    <Alert v-else-if="lastAdded && collection">
+        <CheckCircleIcon />
+        <AlertDescription>
+            Added {{ lastAdded }} to {{ collection.name }}.
+        </AlertDescription>
+    </Alert>
 
     <div
         v-if="!cameraError"

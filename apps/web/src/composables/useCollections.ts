@@ -5,6 +5,7 @@ import {
     type CollectionSort,
     type CreateCollectionSchema,
     MAX_PAGE_SIZE,
+    type OwnedIsbnSchema,
     type UserIdSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
@@ -166,6 +167,70 @@ export function useCollectionItem(
     });
 }
 
+type OwnedEdition = z.input<typeof OwnedIsbnSchema> & {
+    collectionId: string;
+    itemId: string;
+};
+
+/** Marks another edition of an item as owned by a collection entry. */
+export function useAddOwnedEdition() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ collectionId, itemId, ...json }: OwnedEdition) =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].isbns.$post({
+                    param: { id: collectionId, itemId },
+                    json,
+                })
+            ),
+        onSuccess: (_data, { collectionId }) =>
+            queryClient.invalidateQueries({
+                queryKey: collectionKey(collectionId),
+            }),
+    });
+}
+
+/** Stops a collection entry owning one edition of an item. */
+export function useRemoveOwnedEdition() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ collectionId, itemId, isbn }: OwnedEdition) =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].isbns[
+                    ':isbn'
+                ].$delete({ param: { id: collectionId, itemId, isbn } })
+            ),
+        onSuccess: (_data, { collectionId }) =>
+            queryClient.invalidateQueries({
+                queryKey: collectionKey(collectionId),
+            }),
+    });
+}
+
+/** Editions of an item that a collection entry doesn't own yet. */
+export function useUnownedEditions(
+    id: MaybeRefOrGetter<string>,
+    itemId: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [
+            ...collectionKey(toValue(id)),
+            'item',
+            toValue(itemId),
+            'editions',
+        ],
+        async (offset) =>
+            unwrap(
+                await api.collections[':id'].items[':itemId'].editions.$get({
+                    param: { id: toValue(id), itemId: toValue(itemId) },
+                    query: { offset },
+                })
+            ),
+        options
+    );
+}
+
 /** Everyone else's reviews of an item, a page at a time. */
 export function useCollectionItemReviews(
     id: MaybeRefOrGetter<string>,
@@ -191,9 +256,9 @@ export function useCollectionItemReviews(
 }
 
 /**
- * Catalog items whose title matches `q`, or every item in `seriesId`,
- * flagged with whether the collection has them. Nothing loads until one of
- * the two is set.
+ * Catalog items whose title matches `q`, flagged with whether the collection
+ * has them, or the items in `seriesId` it doesn't have yet. Nothing loads
+ * until one of the two is set.
  */
 export function useCatalogItems(
     id: MaybeRefOrGetter<string>,

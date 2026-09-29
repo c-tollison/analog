@@ -2,6 +2,8 @@ import type { InferResponseType } from '@analog/api/client';
 import {
     type AdminListQuerySchema,
     DEFAULT_PAGE_SIZE,
+    type IsbnSchema,
+    type MergeItemSchema,
     type MergeSeriesSchema,
     type SetSeriesItemsSchema,
     type SetVerifiedSchema,
@@ -156,6 +158,36 @@ export function useDeleteAdminItem() {
     });
 }
 
+type ItemIsbn = { itemId: string; isbn: z.input<typeof IsbnSchema> };
+
+/** Marks an ISBN a scan added as checked. */
+export function useApproveIsbn() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({ itemId, isbn }: ItemIsbn) =>
+            unwrap(
+                await api.admin.items[':id'].isbns[':isbn'].approve.$put({
+                    param: { id: itemId, isbn },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
+/** Makes one of an item's ISBNs its own item. Returns the new item's id. */
+export function useSplitIsbn() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({ itemId, isbn }: ItemIsbn) =>
+            unwrap(
+                await api.admin.items[':id'].isbns[':isbn'].split.$post({
+                    param: { id: itemId, isbn },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
 export function useAdminSeriesList(query: MaybeRefOrGetter<AdminListQuery>) {
     return useQuery({
         queryKey: () => [...ADMIN_KEY, 'series', 'list', toValue(query)],
@@ -241,6 +273,23 @@ export function useSetSeriesVerified() {
                 })
             ),
         onSuccess: afterEdit,
+    });
+}
+
+export function useMergeItem() {
+    const { afterDelete } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({
+            itemId,
+            ...json
+        }: z.input<typeof MergeItemSchema> & { itemId: string }) =>
+            unwrap(
+                await api.admin.items[':id'].merge.$post({
+                    param: { id: itemId },
+                    json,
+                })
+            ),
+        onSuccess: afterDelete,
     });
 }
 

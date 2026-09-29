@@ -5,7 +5,6 @@ import CoverImage from '@/components/CoverImage.vue';
 import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
-import ExternalLinks from '@/components/media/ExternalLinks.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
 import { Badge } from '@/components/shadcn-components/badge';
@@ -19,6 +18,7 @@ import {
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import {
+    addMoreLabel,
     completedWord,
     kindStatusLabels,
     SERIES_KIND_LABELS,
@@ -117,7 +117,7 @@ const headerError = computed(
                 @click="isAddOpen = true"
             >
                 <PlusIcon />
-                Add to series
+                {{ detail ? addMoreLabel(detail.series.kind) : 'Add more' }}
             </Button>
         </div>
 
@@ -157,12 +157,6 @@ const headerError = computed(
                 <p v-if="missing" class="text-muted-foreground text-xs">
                     Missing {{ missing }}
                 </p>
-                <div
-                    v-if="detail.links.length"
-                    class="flex flex-wrap gap-2 pt-1"
-                >
-                    <ExternalLinks :links="detail.links" />
-                </div>
                 <div
                     v-if="detail.ownedCount"
                     class="grid gap-1.5 pt-1 sm:max-w-sm"

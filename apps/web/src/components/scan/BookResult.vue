@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { SERIES_LANGUAGE_LABELS } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SeriesPicker, {
@@ -29,10 +28,10 @@ import { HistoryIcon } from '@lucide/vue';
 import { StorageSerializers, useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
+// Without a collection, only the book shows until one is picked.
 const props = defineProps<{
     lookup: IsbnLookup;
-    collectionId: string;
-    collectionName: string;
+    collection: { id: string; name: string } | null;
 }>();
 
 const emit = defineEmits<{ done: []; added: [] }>();
@@ -42,7 +41,9 @@ const added = ref(false);
 
 const alreadyInCollection = computed(
     () =>
-        added.value || props.lookup.inCollectionIds.includes(props.collectionId)
+        added.value ||
+        (!!props.collection &&
+            props.lookup.inCollectionIds.includes(props.collection.id))
 );
 
 function initialSeries(): SeriesPick | null {
@@ -77,12 +78,16 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
             volume: props.lookup.book.volume ?? '',
         },
         onSubmit: async ({ isSeries, series, volume }) => {
+            const { collection } = props;
+            if (!collection) {
+                return undefined;
+            }
             if (!isSeries) {
                 series = null;
                 volume = null;
             }
             const saved = await addBook.mutateAsync({
-                collectionId: props.collectionId,
+                collectionId: collection.id,
                 isbn: book.value.isbn,
                 series: series
                     ? series.id
@@ -123,7 +128,6 @@ const seriesOptions = computed(() => {
                   {
                       ...lastSeries.value,
                       kind: null,
-                      language: null,
                       isLast: true,
                   },
               ]
@@ -204,15 +208,15 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                     <Badge v-if="book.languages.length" variant="secondary">
                         {{ book.languages.join(', ') }}
                     </Badge>
-                    <Badge v-if="alreadyInCollection">
-                        In {{ collectionName }}
+                    <Badge v-if="collection && alreadyInCollection">
+                        In {{ collection.name }}
                     </Badge>
                 </div>
             </div>
         </div>
 
         <form
-            v-if="!alreadyInCollection"
+            v-if="collection && !alreadyInCollection"
             class="grid gap-4"
             novalidate
             @submit="submit"
@@ -258,10 +262,6 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                                 }}
                                 <template v-if="option.kind">
                                     · {{ SERIES_KIND_LABELS[option.kind] }}
-                                </template>
-                                <template v-if="option.language">
-                                    ·
-                                    {{ SERIES_LANGUAGE_LABELS[option.language] }}
                                 </template>
                             </span>
                         </Button>
@@ -327,7 +327,7 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             </template>
             <Button type="submit" :disabled="isSubmitting">
                 <Spinner v-if="isSubmitting" />
-                Add to {{ collectionName }}
+                Add to {{ collection.name }}
             </Button>
         </form>
 

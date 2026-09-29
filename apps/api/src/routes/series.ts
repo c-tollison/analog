@@ -1,4 +1,4 @@
-import { asc, desc, schema, sql } from '@analog/db';
+import { and, asc, desc, schema, sql } from '@analog/db';
 import {
     DetailsSourceSchema,
     LinkDetailsSourceSchema,
@@ -9,6 +9,7 @@ import {
 
 import type { AppEnv } from '../lib/app-env.js';
 import { seriesColumns } from '../lib/books.js';
+import { discoverableSeries } from '../lib/discovery.js';
 import { db } from '../lib/init.js';
 import { paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -92,7 +93,12 @@ const series = new Hono<AppEnv>()
             db()
                 .select(seriesColumns)
                 .from(schema.series)
-                .where(matchesAllTerms(terms, { columns: [title] }))
+                .where(
+                    and(
+                        matchesAllTerms(terms, { columns: [title] }),
+                        discoverableSeries(c.get('user').id)
+                    )
+                )
                 .orderBy(
                     ...(terms.length
                         ? [desc(relevance(terms.join(' '), [title]))]

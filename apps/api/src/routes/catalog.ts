@@ -26,7 +26,13 @@ import { z } from 'zod';
 
 const IsbnParamSchema = z.object({ isbn: IsbnSchema });
 
-const { catalogItem, collectionItem, collectionMember, progress } = schema;
+const {
+    catalogItem,
+    collectionItem,
+    collectionItemIsbn,
+    collectionMember,
+    progress,
+} = schema;
 
 async function requireCatalogItem(id: string): Promise<void> {
     const found = await db().query.catalogItem.findFirst({
@@ -38,21 +44,26 @@ async function requireCatalogItem(id: string): Promise<void> {
     }
 }
 
-async function collectionsContaining(
-    catalogItemId: string | undefined,
+// The user's collections that own this edition. One that only has another
+// edition of the book can still add this one.
+async function collectionsOwning(
+    isbn: string,
     userId: string
 ): Promise<string[]> {
-    if (!catalogItemId) return [];
     const rows = await db()
         .select({ id: collectionItem.collectionId })
-        .from(collectionItem)
+        .from(collectionItemIsbn)
+        .innerJoin(
+            collectionItem,
+            eq(collectionItem.id, collectionItemIsbn.collectionItemId)
+        )
         .innerJoin(
             collectionMember,
             eq(collectionMember.collectionId, collectionItem.collectionId)
         )
         .where(
             and(
-                eq(collectionItem.catalogItemId, catalogItemId),
+                eq(collectionItemIsbn.isbn, isbn),
                 eq(collectionMember.userId, userId)
             )
         );
@@ -141,15 +152,16 @@ const catalog = new Hono<AppEnv>()
             const user = c.get('user');
 
             const { item, fetched } = await findOrCreateBook(isbn, user.id);
-            const book = fetched ?? toBookLookup(item, item.series);
+            const book =
+                fetched ?? toBookLookup(item, item.series, isbn, item.edition);
 
             const [suggested, inCollectionIds] = await Promise.all([
-                suggestSeries(item, book),
-                collectionsContaining(item.id, user.id),
+                suggestSeries(item, book, user.id),
+                collectionsOwning(isbn, user.id),
             ]);
             const similarSeries = suggested
                 ? []
-                : await findSimilarSeries(book.title);
+                : await findSimilarSeries(book.title, user.id);
             return c.json({
                 book,
                 suggestedSeries: suggested

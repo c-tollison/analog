@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { SERIES_LANGUAGE_LABELS, SERIES_LANGUAGES } from '@analog/types';
 import FormError from '@/components/FormError.vue';
 import SaveButton from '@/components/SaveButton.vue';
 import { Button } from '@/components/shadcn-components/button';
@@ -25,7 +24,7 @@ import {
 } from '@/components/shadcn-components/select';
 import { type AdminSeries, useUpdateAdminSeries } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
-import { AdminSeriesFormSchema, NO_LANGUAGE } from '@/lib/admin-schemas';
+import { AdminSeriesFormSchema } from '@/lib/admin-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
@@ -42,7 +41,6 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
     initialValues: {
         title: props.series.title,
         kind: props.series.kind,
-        language: props.series.language ?? NO_LANGUAGE,
     },
     onSubmit: async (values) => {
         saved.value = false;
@@ -105,35 +103,6 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                                 :value="value"
                             >
                                 {{ label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <FormField
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="language"
-            >
-                <FormItem>
-                    <FormLabel>Language</FormLabel>
-                    <Select v-bind="componentField">
-                        <FormControl>
-                            <SelectTrigger class="w-40">
-                                <SelectValue />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            <SelectItem :value="NO_LANGUAGE"
-                                >Not set</SelectItem
-                            >
-                            <SelectItem
-                                v-for="code in SERIES_LANGUAGES"
-                                :key="code"
-                                :value="code"
-                            >
-                                {{ SERIES_LANGUAGE_LABELS[code] }}
                             </SelectItem>
                         </SelectContent>
                     </Select>

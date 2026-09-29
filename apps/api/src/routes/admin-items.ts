@@ -1,8 +1,22 @@
-import { and, asc, eq, schema } from '@analog/db';
+import {
+    and,
+    asc,
+    eq,
+    inArray,
+    isNotNull,
+    isNull,
+    notInArray,
+    or,
+    type SQL,
+    schema,
+} from '@analog/db';
 import {
     AdminListQuerySchema,
+    IsbnSchema,
+    MergeItemSchema,
     SetVerifiedSchema,
     UpdateCatalogItemSchema,
+    VerifiedFilter,
 } from '@analog/types';
 
 import {
@@ -11,14 +25,15 @@ import {
     setVerified,
     totalCount,
     verifiedByUser,
-    whereVerified,
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
 import {
     itemLinks,
     kindInSeries,
+    mergeItem,
     refreshSeriesCover,
     seriesForItem,
+    splitOffIsbn,
 } from '../lib/books.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
@@ -28,7 +43,34 @@ import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 
-const { catalogItem, collectionItem, series } = schema;
+const { catalogItem, catalogItemIsbn, collectionItem, series } = schema;
+
+const IsbnParamSchema = IdParamSchema.extend({ isbn: IsbnSchema });
+
+// Items with an ISBN a scan added that an admin hasn't checked.
+function withPendingIsbn() {
+    return db()
+        .select({ id: catalogItemIsbn.catalogItemId })
+        .from(catalogItemIsbn)
+        .where(eq(catalogItemIsbn.pending, true));
+}
+
+// An item needs checking until it's verified and has no pending ISBNs.
+function whereItemVerified(status: VerifiedFilter): SQL | undefined {
+    if (status === VerifiedFilter.Verified) {
+        return and(
+            isNotNull(catalogItem.verifiedAt),
+            notInArray(catalogItem.id, withPendingIsbn())
+        );
+    }
+    if (status === VerifiedFilter.Unverified) {
+        return or(
+            isNull(catalogItem.verifiedAt),
+            inArray(catalogItem.id, withPendingIsbn())
+        );
+    }
+    return undefined;
+}
 
 async function requireItem(id: string) {
     const item = await db().query.catalogItem.findFirst({
@@ -49,7 +91,7 @@ const adminItems = new Hono<AppEnv>()
     .get('/', schemaValidator('query', AdminListQuerySchema), async (c) => {
         const { q, status, sort, ...page } = c.req.valid('query');
         const where = and(
-            whereVerified(catalogItem.verifiedAt, status),
+            whereItemVerified(status),
             catalogItemsMatching(searchTerms(q ?? ''))
         );
 
@@ -93,14 +135,13 @@ const adminItems = new Hono<AppEnv>()
     })
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');
-        const [[row], collectionCount] = await Promise.all([
+        const [[row], collectionCount, isbns] = await Promise.all([
             db()
                 .select({
                     id: catalogItem.id,
                     title: catalogItem.title,
                     format: catalogItem.format,
                     kind: catalogItem.kind,
-                    barcode: catalogItem.barcode,
                     coverUrl: catalogItem.coverUrl,
                     position: catalogItem.position,
                     seriesId: catalogItem.seriesId,
@@ -128,12 +169,34 @@ const adminItems = new Hono<AppEnv>()
                 )
                 .where(eq(catalogItem.id, id)),
             db().$count(collectionItem, eq(collectionItem.catalogItemId, id)),
+            db()
+                .select({
+                    isbn: catalogItemIsbn.isbn,
+                    title: catalogItemIsbn.title,
+                    coverUrl: catalogItemIsbn.coverUrl,
+                    publisher: catalogItemIsbn.publisher,
+                    language: catalogItemIsbn.language,
+                    format: catalogItemIsbn.format,
+                    main: catalogItemIsbn.main,
+                    pending: catalogItemIsbn.pending,
+                })
+                .from(catalogItemIsbn)
+                .where(eq(catalogItemIsbn.catalogItemId, id))
+                .orderBy(
+                    asc(catalogItemIsbn.createdAt),
+                    asc(catalogItemIsbn.isbn)
+                ),
         ]);
         if (!row) {
             throw new HTTPException(404, { message: 'Item not found' });
         }
         const { metadata, externalSource, externalId, ...item } = row;
-        return c.json({ ...item, collectionCount, links: itemLinks(row) });
+        return c.json({
+            ...item,
+            collectionCount,
+            isbns,
+            links: itemLinks(row),
+        });
     })
     .put(
         '/:id',
@@ -142,7 +205,9 @@ const adminItems = new Hono<AppEnv>()
         async (c) => {
             const item = await requireItem(c.req.valid('param').id);
             const { title, series: choice, volume } = c.req.valid('json');
-            const next = choice ? await seriesForItem(choice, item) : null;
+            const next = choice
+                ? await seriesForItem(choice, item, c.get('user').id)
+                : null;
 
             await db()
                 .update(catalogItem)
@@ -168,6 +233,50 @@ const adminItems = new Hono<AppEnv>()
             const by = verified ? c.get('user').id : null;
             if (!(await setVerified(catalogItem, id, by))) {
                 throw new HTTPException(404, { message: 'Item not found' });
+            }
+            return c.body(null, 204);
+        }
+    )
+    // Merges this item into another for the same book, the opposite of
+    // splitting an ISBN off.
+    .post(
+        '/:id/merge',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('json', MergeItemSchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            const { intoItemId } = c.req.valid('json');
+            await mergeItem(id, intoItemId);
+            return c.body(null, 204);
+        }
+    )
+    // Makes an ISBN a scan put on the wrong book its own item.
+    .post(
+        '/:id/isbns/:isbn/split',
+        schemaValidator('param', IsbnParamSchema),
+        async (c) => {
+            const { id, isbn } = c.req.valid('param');
+            const created = await splitOffIsbn(id, isbn, c.get('user').id);
+            return c.json({ id: created }, 201);
+        }
+    )
+    .put(
+        '/:id/isbns/:isbn/approve',
+        schemaValidator('param', IsbnParamSchema),
+        async (c) => {
+            const { id, isbn } = c.req.valid('param');
+            const [approved] = await db()
+                .update(catalogItemIsbn)
+                .set({ pending: false })
+                .where(
+                    and(
+                        eq(catalogItemIsbn.catalogItemId, id),
+                        eq(catalogItemIsbn.isbn, isbn)
+                    )
+                )
+                .returning({ isbn: catalogItemIsbn.isbn });
+            if (!approved) {
+                throw new HTTPException(404, { message: 'ISBN not found' });
             }
             return c.body(null, 204);
         }

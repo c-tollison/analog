@@ -5,7 +5,6 @@ import {
     DetailsSourceSchema,
     ExternalSource,
     type LinkDetailsSourceSchema,
-    SERIES_LANGUAGE_LABELS,
 } from '@analog/types';
 
 import { getManga, searchManga } from './anilist.js';
@@ -24,7 +23,6 @@ type Series = Pick<
     | 'details'
     | 'detailsFetchedAt'
     | 'volumeCount'
-    | 'language'
 >;
 
 // Linked details are refreshed this often, so ongoing series stay current.
@@ -138,11 +136,6 @@ export function seriesDetails(series: Series) {
         description: details?.description ?? null,
         genres: details?.genres ?? [],
         facts: filledFacts([
-            {
-                label: 'Language',
-                value:
-                    series.language && SERIES_LANGUAGE_LABELS[series.language],
-            },
             { label: 'Status', value: details?.status },
             { label: 'Published', value: run },
             {
@@ -150,8 +143,18 @@ export function seriesDetails(series: Series) {
                 value: details?.score ? `${details.score}%` : null,
             },
         ]),
-        links: filledLinks(label ? [{ label, url: details?.url }] : []),
     };
+}
+
+/** Where else a series can be looked at, for admins checking its data. */
+export function seriesLinks(series: Series) {
+    const source = linkedSource(series);
+    const details =
+        source && series.detailsId
+            ? SeriesDetailsSchema.parse(series.details)
+            : null;
+    const label = source ? DETAILS_SOURCE_INFO[source].label : null;
+    return filledLinks(label ? [{ label, url: details?.url }] : []);
 }
 
 export function searchDetailsSource(source: DetailsSource, q: string) {

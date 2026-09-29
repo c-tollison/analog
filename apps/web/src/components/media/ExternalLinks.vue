@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Button } from '@/components/shadcn-components/button';
-import type { CollectionItemDetail } from '@/composables/useCollections';
+import type { AdminItem } from '@/composables/useAdmin';
 
 import { ExternalLinkIcon } from '@lucide/vue';
 
-defineProps<{ links: CollectionItemDetail['links'] }>();
+defineProps<{ links: AdminItem['links'] }>();
 </script>
 
 <template>

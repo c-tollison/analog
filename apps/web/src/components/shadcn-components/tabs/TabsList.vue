@@ -16,7 +16,7 @@ const props = withDefaults(
         }
     >(),
     {
-        variant: 'default',
+        variant: 'line',
     }
 );
 

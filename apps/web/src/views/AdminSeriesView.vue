@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import {
-    DETAILS_SOURCE_INFO,
-    detailsSourceFor,
-    SERIES_LANGUAGE_LABELS,
-} from '@analog/types';
+import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
 import AdminSeriesForm from '@/components/admin/AdminSeriesForm.vue';
 import MergeSeriesDialog from '@/components/admin/MergeSeriesDialog.vue';
 import SeriesItemsForm from '@/components/admin/SeriesItemsForm.vue';
@@ -145,9 +141,7 @@ function onDelete() {
 
             <Alert v-if="series.sameTitle.length">
                 <CopyIcon />
-                <AlertTitle>
-                    Another series has this name and language
-                </AlertTitle>
+                <AlertTitle> Another series has this name </AlertTitle>
                 <AlertDescription class="grid gap-2">
                     <div
                         v-for="other in series.sameTitle"
@@ -187,9 +181,6 @@ function onDelete() {
                     <div class="flex flex-wrap items-center gap-1.5">
                         <Badge variant="secondary">
                             {{ SERIES_KIND_LABELS[series.kind] }}
-                        </Badge>
-                        <Badge v-if="series.language" variant="secondary">
-                            {{ SERIES_LANGUAGE_LABELS[series.language] }}
                         </Badge>
                         <Badge v-if="series.verifiedAt">Verified</Badge>
                         <span
