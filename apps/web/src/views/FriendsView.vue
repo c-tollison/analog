@@ -6,6 +6,12 @@ import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { ItemGroup } from '@/components/shadcn-components/item';
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/shadcn-components/tabs';
 import UserItem from '@/components/users/UserItem.vue';
 import {
     useAcceptFriendRequest,
@@ -13,16 +19,35 @@ import {
     useFriendRequests,
     useFriends,
 } from '@/composables/useFriends';
+import { useNotificationCount } from '@/composables/useNotifications';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useUserSearch } from '@/composables/useUsers';
 
 import { computed, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
+const TABS = ['friends', 'requests'] as const;
+type Tab = (typeof TABS)[number];
+
+function isTab(value: unknown): value is Tab {
+    return TABS.some((tab) => tab === value);
+}
 
 const RELATIONSHIP_LABELS: Partial<Record<Relationship, string>> = {
     [Relationship.Friends]: 'Friend',
     [Relationship.RequestSent]: 'Requested',
     [Relationship.RequestReceived]: 'Wants to be friends',
 };
+
+const route = useRoute();
+const router = useRouter();
+
+const tab = computed({
+    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'friends'),
+    set: (value) => {
+        router.replace({ query: { ...route.query, tab: value } });
+    },
+});
 
 const query = ref('');
 const { trimmed, term, isTyping } = useSearchTerm(query);
@@ -37,6 +62,7 @@ const searchTerm = computed(() =>
 
 const friends = useFriends('');
 const requests = useFriendRequests();
+const { data: counts } = useNotificationCount();
 
 const acceptRequest = useAcceptFriendRequest();
 const declineRequest = useDeclineFriendRequest();
@@ -104,16 +130,35 @@ const results = useUserSearch(searchTerm, {
             </template>
         </PagedList>
 
-        <template v-else>
-            <section
-                v-if="
-                    requests.isLoading ||
-                    requests.error ||
-                    requests.items.length
-                "
-                class="grid gap-2"
-            >
-                <h2 class="text-sm font-medium">Friend requests</h2>
+        <Tabs v-else v-model="tab">
+            <TabsList>
+                <TabsTrigger value="friends">Friends</TabsTrigger>
+                <TabsTrigger value="requests">
+                    Requests
+                    <Badge v-if="counts?.friendRequests" variant="secondary">
+                        {{ counts.friendRequests }}
+                    </Badge>
+                </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="friends" class="pt-2">
+                <PagedList
+                    :list="friends"
+                    empty-text="No friends yet. Search for someone to send a request."
+                >
+                    <template #default="{ items }">
+                        <ItemGroup class="gap-2">
+                            <UserItem
+                                v-for="friend in items"
+                                :key="friend.id"
+                                :user="friend"
+                            />
+                        </ItemGroup>
+                    </template>
+                </PagedList>
+            </TabsContent>
+
+            <TabsContent value="requests" class="grid gap-2 pt-2">
                 <FormError :message="answerError" />
                 <PagedList :list="requests" empty-text="No pending requests.">
                     <template #default="{ items }">
@@ -135,22 +180,7 @@ const results = useUserSearch(searchTerm, {
                         </ItemGroup>
                     </template>
                 </PagedList>
-            </section>
-
-            <PagedList
-                :list="friends"
-                empty-text="No friends yet. Search for someone to send a request."
-            >
-                <template #default="{ items }">
-                    <ItemGroup class="gap-2">
-                        <UserItem
-                            v-for="friend in items"
-                            :key="friend.id"
-                            :user="friend"
-                        />
-                    </ItemGroup>
-                </template>
-            </PagedList>
-        </template>
+            </TabsContent>
+        </Tabs>
     </div>
 </template>
