@@ -19,6 +19,7 @@ import {
     useDeleteAdminItem,
     useSetItemVerified,
     useSplitIsbn,
+    useUploadCover,
 } from '@/composables/useAdmin';
 import { useRefreshBook } from '@/composables/useCatalog';
 import { formatDate, timeAgo } from '@/lib/dates';
@@ -26,7 +27,7 @@ import { isPendingFor } from '@/lib/editions';
 import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
 import { goBackOr } from '@/lib/navigation';
 
-import { MergeIcon, RefreshCwIcon, Trash2Icon } from '@lucide/vue';
+import { MergeIcon, RefreshCwIcon, Trash2Icon, UploadIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -41,6 +42,7 @@ const refresh = useRefreshBook();
 const remove = useDeleteAdminItem();
 const split = useSplitIsbn();
 const approve = useApproveIsbn();
+const { upload: uploadCover, choose: chooseCover } = useUploadCover();
 
 const confirmingDelete = ref(false);
 const isMergeOpen = ref(false);
@@ -86,7 +88,8 @@ const error = computed(
             refresh.error.value ??
             remove.error.value ??
             split.error.value ??
-            approve.error.value
+            approve.error.value ??
+            uploadCover.error.value
         )?.message ?? null
 );
 
@@ -238,6 +241,23 @@ function onDelete() {
                             :edition="edition"
                             :fallback-title="edition.isbn"
                         >
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                :disabled="uploadCover.isPending.value"
+                                @click="
+                                    chooseCover({
+                                        itemId: item.id,
+                                        isbn: edition.isbn,
+                                    })
+                                "
+                            >
+                                <Spinner
+                                    v-if="isPendingFor(uploadCover, edition.isbn)"
+                                />
+                                <UploadIcon v-else />
+                                Upload cover
+                            </Button>
                             <Badge v-if="edition.main" variant="secondary">
                                 Main
                             </Badge>

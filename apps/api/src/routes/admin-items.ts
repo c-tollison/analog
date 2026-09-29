@@ -3,13 +3,14 @@ import {
     asc,
     eq,
     inArray,
+    isNull,
     notInArray,
     or,
     type SQL,
     schema,
 } from '@analog/db';
 import {
-    AdminListQuerySchema,
+    AdminItemListQuerySchema,
     IsbnSchema,
     MergeItemSchema,
     SetVerifiedSchema,
@@ -32,6 +33,7 @@ import {
     refreshSeriesCover,
     seriesForItem,
 } from '../lib/books.js';
+import { toCover, uploadedCoverUrl } from '../lib/covers.js';
 import { mergeItem, splitOffIsbn } from '../lib/editions.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
@@ -40,10 +42,20 @@ import { catalogItemsMatching, searchTerms } from '../lib/search.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { z } from 'zod';
 
-const { catalogItem, catalogItemIsbn, collectionItem, series } = schema;
+const {
+    catalogItem,
+    catalogItemIsbn,
+    catalogItemIsbnCover,
+    collectionItem,
+    series,
+} = schema;
 
 const ItemIsbnParamSchema = IdParamSchema.extend({ isbn: IsbnSchema });
+const CoverFormSchema = z.object({
+    file: z.instanceof(File, { message: 'Choose an image' }),
+});
 
 function itemIdsWithPendingIsbn() {
     return db()
@@ -83,10 +95,11 @@ async function refreshCovers(seriesIds: (string | null)[]) {
 }
 
 const adminItems = new Hono<AppEnv>()
-    .get('/', schemaValidator('query', AdminListQuerySchema), async (c) => {
-        const { q, status, sort, ...page } = c.req.valid('query');
+    .get('/', schemaValidator('query', AdminItemListQuerySchema), async (c) => {
+        const { q, status, sort, noCover, ...page } = c.req.valid('query');
         const where = and(
             whereItemVerified(status),
+            noCover ? isNull(catalogItem.coverUrl) : undefined,
             catalogItemsMatching(searchTerms(q ?? ''))
         );
 
@@ -101,12 +114,20 @@ const adminItems = new Hono<AppEnv>()
                         kind: catalogItem.kind,
                         position: catalogItem.position,
                         seriesTitle: series.title,
+                        mainIsbn: catalogItemIsbn.isbn,
                         addedBy: addedByUser.username,
                         createdAt: catalogItem.createdAt,
                         verifiedAt: catalogItem.verifiedAt,
                     })
                     .from(catalogItem)
                     .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                    .leftJoin(
+                        catalogItemIsbn,
+                        and(
+                            eq(catalogItemIsbn.catalogItemId, catalogItem.id),
+                            eq(catalogItemIsbn.main, true)
+                        )
+                    )
                     .leftJoin(
                         addedByUser,
                         eq(catalogItem.createdByUserId, addedByUser.id)
@@ -277,6 +298,55 @@ const adminItems = new Hono<AppEnv>()
                 throw new HTTPException(404, { message: 'ISBN not found' });
             }
             return c.body(null, 204);
+        }
+    )
+    // Replaces the edition's cover, and the item's too when it's the main
+    // ISBN. Book lookups never replace an uploaded cover.
+    .put(
+        '/:id/isbns/:isbn/cover',
+        schemaValidator('param', ItemIsbnParamSchema),
+        schemaValidator('form', CoverFormSchema),
+        async (c) => {
+            const { id, isbn } = c.req.valid('param');
+            const data = await toCover(
+                await c.req.valid('form').file.arrayBuffer()
+            );
+            const updatedAt = new Date();
+            const coverUrl = uploadedCoverUrl(isbn, updatedAt);
+
+            const seriesId = await db().transaction(async (tx) => {
+                const [edition] = await tx
+                    .update(catalogItemIsbn)
+                    .set({ coverUrl })
+                    .where(
+                        and(
+                            eq(catalogItemIsbn.catalogItemId, id),
+                            eq(catalogItemIsbn.isbn, isbn)
+                        )
+                    )
+                    .returning({ main: catalogItemIsbn.main });
+                if (!edition) {
+                    throw new HTTPException(404, { message: 'ISBN not found' });
+                }
+                await tx
+                    .insert(catalogItemIsbnCover)
+                    .values({ isbn, data, updatedAt })
+                    .onConflictDoUpdate({
+                        target: catalogItemIsbnCover.isbn,
+                        set: { data, updatedAt },
+                    });
+                if (!edition.main) {
+                    return null;
+                }
+                const [item] = await tx
+                    .update(catalogItem)
+                    .set({ coverUrl, updatedAt })
+                    .where(eq(catalogItem.id, id))
+                    .returning({ seriesId: catalogItem.seriesId });
+                return item?.seriesId ?? null;
+            });
+            await refreshCovers([seriesId]);
+            return c.json({ coverUrl });
         }
     )
     // Also takes it out of every collection, with everyone's progress and

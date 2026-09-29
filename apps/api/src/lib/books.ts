@@ -7,6 +7,7 @@ import {
     SeriesKind,
 } from '@analog/types';
 
+import { findUploadedCover } from './covers.js';
 import { filledFacts, filledLinks } from './details.js';
 import { discoverableSeries } from './discovery.js';
 import { isGoogleBooksCover, lookupGoogleBooksIsbn } from './google-books.js';
@@ -472,7 +473,7 @@ type LookupOptions = {
  * When Open Library is too slow, Google's data comes back without it, and
  * `later` has the full lookup to save once Open Library answers.
  */
-export async function lookupBook(isbn: string, options: LookupOptions) {
+async function lookupSources(isbn: string, options: LookupOptions) {
     const { stored, refresh } = options;
     const openLibrary = options.openLibrary ? lookupOpenLibrary(isbn) : null;
     const google = options.google ? await lookupGoogleBooks(isbn) : null;
@@ -504,6 +505,28 @@ export async function lookupBook(isbn: string, options: LookupOptions) {
     }
     const lookup = combine(stored, google, null);
     return lookup && { ...lookup, later };
+}
+
+/**
+ * Looks up an ISBN on the book sources. A cover an admin uploaded for it
+ * wins over theirs.
+ */
+export async function lookupBook(isbn: string, options: LookupOptions) {
+    const [lookup, uploaded] = await Promise.all([
+        lookupSources(isbn, options),
+        findUploadedCover(isbn),
+    ]);
+    if (!lookup || !uploaded) {
+        return lookup;
+    }
+    const withCover = (found: Lookup): Lookup => ({
+        ...found,
+        book: { ...found.book, coverUrl: uploaded },
+    });
+    return {
+        ...withCover(lookup),
+        later: lookup.later?.then((found) => found && withCover(found)) ?? null,
+    };
 }
 
 /**

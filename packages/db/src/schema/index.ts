@@ -1,6 +1,7 @@
 export * from './auth.js';
 export * from './catalog-item.js';
 export * from './catalog-item-isbn.js';
+export * from './catalog-item-isbn-cover.js';
 export * from './collection.js';
 export * from './collection-invite.js';
 export * from './collection-item.js';

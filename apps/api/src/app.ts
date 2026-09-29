@@ -20,6 +20,9 @@ import { requestId } from 'hono/request-id';
 import { secureHeaders } from 'hono/secure-headers';
 
 const MAX_BODY_BYTES = 1024 * 1024;
+// Cover uploads can be photos straight off a phone.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const COVER_UPLOAD_PATH = /^\/api\/admin\/items\/[^/]+\/isbns\/[^/]+\/cover$/;
 
 export function createApp(config: Config) {
     const app = new Hono();
@@ -27,7 +30,20 @@ export function createApp(config: Config) {
     app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
     app.use('*', cors(getCorsConfig(config.cors)));
-    app.use('*', bodyLimit({ maxSize: MAX_BODY_BYTES }));
+    const limitBody = bodyLimit({ maxSize: MAX_BODY_BYTES });
+    const limitUpload = bodyLimit({
+        maxSize: MAX_UPLOAD_BYTES,
+        onError: () => {
+            throw new HTTPException(413, {
+                message: 'That image is too big. The limit is 10 MB.',
+            });
+        },
+    });
+    app.use('*', (c, next) =>
+        COVER_UPLOAD_PATH.test(c.req.path)
+            ? limitUpload(c, next)
+            : limitBody(c, next)
+    );
     app.use('*', secureHeaders());
     app.use('*', requestId());
     app.use('*', createRequestLoggerMiddleware(logger()));

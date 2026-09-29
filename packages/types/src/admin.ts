@@ -22,6 +22,11 @@ export const AdminListQuerySchema = PageQuerySchema.extend({
     sort: z.enum(AddedSort).default(AddedSort.Newest),
 });
 
+export const AdminItemListQuerySchema = AdminListQuerySchema.extend({
+    // Only items with no cover.
+    noCover: z.stringbool().default(false),
+});
+
 export const SetVerifiedSchema = z.object({ verified: z.boolean() });
 
 const VolumeSchema = z.number().nonnegative().max(100_000).nullable();
