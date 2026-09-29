@@ -2,6 +2,7 @@
 import { MediaFormat } from '@analog/types';
 import AdminItemForm from '@/components/admin/AdminItemForm.vue';
 import MergeItemDialog from '@/components/admin/MergeItemDialog.vue';
+import VerifiedBy from '@/components/admin/VerifiedBy.vue';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
@@ -51,6 +52,15 @@ const facts = computed(() => {
     if (!item.value) return [];
     const { value } = item;
     const facts = [
+        { label: 'Format', value: FORMAT_LABELS[value.format] },
+        // In a series, the series picker shows the kind.
+        {
+            label: 'Kind',
+            value:
+                value.kind && !value.seriesId
+                    ? SERIES_KIND_LABELS[value.kind]
+                    : null,
+        },
         { label: 'Added by', value: value.addedBy },
         { label: 'Added', value: formatDate(value.createdAt) },
         { label: 'In collections', value: String(value.collectionCount) },
@@ -145,81 +155,60 @@ function onDelete() {
                     size="lg"
                     :src="item.coverUrl"
                     :alt="item.title"
-                    class="mx-auto aspect-2/3 w-40 sm:w-full"
+                    class="mx-auto aspect-2/3 w-32 sm:w-full"
                 />
 
                 <div class="grid min-w-0 content-start gap-4">
-                    <div class="grid gap-1">
-                        <RouterLink
-                            v-if="item.seriesId"
-                            :to="{
-                                name: 'admin-series',
-                                params: { id: item.seriesId },
-                            }"
-                            class="text-muted-foreground text-sm hover:underline"
-                        >
-                            {{ item.seriesTitle }}
-                            <template v-if="item.position !== null">
-                                · Vol. {{ item.position }}
-                            </template>
-                        </RouterLink>
-                        <h1 class="text-2xl font-semibold text-balance">
-                            {{ item.title }}
-                        </h1>
-                        <div class="flex flex-wrap items-center gap-2 pt-1">
-                            <Badge variant="secondary">
-                                {{ FORMAT_LABELS[item.format] }}
-                            </Badge>
-                            <Badge v-if="item.kind" variant="secondary">
-                                {{ SERIES_KIND_LABELS[item.kind] }}
-                            </Badge>
-                            <Badge v-if="item.verifiedAt">Verified</Badge>
-                            <span
-                                v-if="item.verifiedAt"
-                                class="text-muted-foreground text-xs"
-                            >
-                                by {{ item.verifiedBy ?? 'a deleted user' }},
-                                {{ timeAgo(item.verifiedAt) }}
-                            </span>
-                        </div>
-                    </div>
+                    <AdminItemForm :key="item.id" :item="item" />
 
-                    <div class="flex flex-wrap gap-2">
-                        <Button
-                            :variant="item.verifiedAt ? 'outline' : 'default'"
-                            :disabled="setVerified.isPending.value"
-                            @click="
+                    <div class="grid gap-2">
+                        <div class="flex flex-wrap gap-2">
+                            <Button
+                                :variant="item.verifiedAt ? 'outline' : 'default'"
+                                :disabled="setVerified.isPending.value"
+                                @click="
                                 setVerified.mutate({
                                     itemId: item.id,
                                     verified: !item.verifiedAt,
                                 })
                             "
-                        >
-                            <Spinner v-if="setVerified.isPending.value" />
-                            {{ item.verifiedAt ? 'Unverify' : 'Verify' }}
-                        </Button>
-                        <Button
-                            v-if="canRefresh"
-                            variant="outline"
-                            :disabled="refresh.isPending.value"
-                            @click="refresh.mutate({ catalogItemId: item.id })"
-                        >
-                            <Spinner v-if="refresh.isPending.value" />
-                            <RefreshCwIcon v-else />
-                            Refresh details
-                        </Button>
-                        <Button variant="outline" @click="isMergeOpen = true">
-                            <MergeIcon />
-                            Merge into…
-                        </Button>
-                        <Button
-                            variant="outline"
-                            @click="confirmingDelete = true"
-                        >
-                            <Trash2Icon />
-                            Delete
-                        </Button>
+                            >
+                                <Spinner v-if="setVerified.isPending.value" />
+                                {{ item.verifiedAt ? 'Unverify' : 'Verify' }}
+                            </Button>
+                            <Button
+                                v-if="canRefresh"
+                                variant="outline"
+                                :disabled="refresh.isPending.value"
+                                @click="refresh.mutate({ catalogItemId: item.id })"
+                            >
+                                <Spinner v-if="refresh.isPending.value" />
+                                <RefreshCwIcon v-else />
+                                Refresh details
+                            </Button>
+                            <Button
+                                variant="outline"
+                                @click="isMergeOpen = true"
+                            >
+                                <MergeIcon />
+                                Merge into…
+                            </Button>
+                            <Button
+                                variant="outline"
+                                @click="confirmingDelete = true"
+                            >
+                                <Trash2Icon />
+                                Delete
+                            </Button>
+                        </div>
+                        <VerifiedBy
+                            v-if="item.verifiedAt"
+                            :verified-at="item.verifiedAt"
+                            :verified-by="item.verifiedBy"
+                        />
                     </div>
+
+                    <Separator />
 
                     <MediaDetails
                         :description="null"
@@ -298,13 +287,6 @@ function onDelete() {
                     </ItemGroup>
                 </section>
             </template>
-
-            <Separator />
-
-            <section class="grid gap-3">
-                <h2 class="font-semibold">Edit</h2>
-                <AdminItemForm :key="item.id" :item="item" />
-            </section>
         </template>
     </div>
 </template>

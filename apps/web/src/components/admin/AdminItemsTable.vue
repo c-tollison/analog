@@ -5,9 +5,11 @@ import {
     addedColumn,
     coverColumn,
     titleColumn,
+    WIDE_ONLY,
 } from '@/components/admin/columns';
 import { Button } from '@/components/shadcn-components/button';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import WithTooltip from '@/components/WithTooltip.vue';
 import {
     type AdminItemRow,
     adminListQuery,
@@ -46,29 +48,44 @@ const itemTo = (row: AdminItemRow) => ({
     params: { id: row.id },
 });
 
+// e.g. "Bleach · Vol. 1 · Manga"
+function details(row: AdminItemRow): string {
+    const series =
+        row.seriesTitle && row.position !== null
+            ? `${row.seriesTitle} · Vol. ${row.position}`
+            : row.seriesTitle;
+    return [series, row.kind && SERIES_KIND_LABELS[row.kind]]
+        .filter(Boolean)
+        .join(' · ');
+}
+
 const columns: ColumnDef<AdminItemRow>[] = [
     coverColumn(),
-    titleColumn(itemTo),
+    titleColumn(itemTo, details),
     {
         id: 'series',
         header: 'Series',
         cell: ({ row }) => row.original.seriesTitle ?? '—',
+        meta: WIDE_ONLY,
     },
     {
         id: 'volume',
         header: 'Volume',
         cell: ({ row }) => row.original.position ?? '—',
+        meta: WIDE_ONLY,
     },
     {
         id: 'kind',
         header: 'Kind',
         cell: ({ row }) =>
             row.original.kind ? SERIES_KIND_LABELS[row.original.kind] : '—',
+        meta: WIDE_ONLY,
     },
     {
         id: 'addedBy',
         header: 'Added by',
         cell: ({ row }) => row.original.addedBy ?? '—',
+        meta: { class: 'hidden lg:table-cell' },
     },
     addedColumn(),
 ];
@@ -80,21 +97,25 @@ const uploadColumn: ColumnDef<AdminItemRow> = {
     cell: ({ row }) => {
         const { id, mainIsbn } = row.original;
         if (!mainIsbn) return null;
-        return h(
-            Button,
-            {
-                variant: 'outline',
-                size: 'sm',
-                disabled: upload.isPending.value,
-                onClick: (event: MouseEvent) => {
-                    event.stopPropagation();
-                    choose({ itemId: id, isbn: mainIsbn });
+        // On phones the button is only an icon.
+        return h(WithTooltip, { label: 'Upload cover' }, () =>
+            h(
+                Button,
+                {
+                    variant: 'outline',
+                    size: 'sm',
+                    'aria-label': 'Upload cover',
+                    disabled: upload.isPending.value,
+                    onClick: (event: MouseEvent) => {
+                        event.stopPropagation();
+                        choose({ itemId: id, isbn: mainIsbn });
+                    },
                 },
-            },
-            () => [
-                isPendingFor(upload, mainIsbn) ? h(Spinner) : h(UploadIcon),
-                'Upload cover',
-            ]
+                () => [
+                    isPendingFor(upload, mainIsbn) ? h(Spinner) : h(UploadIcon),
+                    h('span', { class: 'hidden sm:inline' }, 'Upload cover'),
+                ]
+            )
         );
     },
 };

@@ -3,17 +3,11 @@ import { ItemTitleSchema, SeriesKind, SeriesTitleSchema } from '@analog/types';
 import { SeriesPickSchema, VolumeField } from './catalog-schemas';
 import { z } from 'zod';
 
-export const AdminItemFormSchema = z
-    .object({
-        title: ItemTitleSchema,
-        isSeries: z.boolean(),
-        series: SeriesPickSchema.nullish(),
-        volume: VolumeField,
-    })
-    .refine((values) => !values.isSeries || values.series != null, {
-        message: 'Pick a series or type a new name',
-        path: ['series'],
-    });
+// The series is saved as soon as it's picked, so it isn't a field here.
+export const AdminItemFormSchema = z.object({
+    title: ItemTitleSchema,
+    volume: VolumeField,
+});
 
 export const AdminSeriesFormSchema = z.object({
     title: SeriesTitleSchema,
@@ -37,3 +31,9 @@ export const MergeSeriesFormSchema = z
         message: 'Pick a series that already exists',
         path: ['into'],
     });
+
+// No series takes the item out of its series.
+export const ChangeSeriesFormSchema = z.object({
+    series: SeriesPickSchema.nullable(),
+    volume: VolumeField,
+});

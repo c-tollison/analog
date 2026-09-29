@@ -11,7 +11,9 @@ import {
     ComboboxList,
     ComboboxViewport,
 } from '@/components/shadcn-components/combobox';
+import { InputGroupAddon } from '@/components/shadcn-components/input-group';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import WithTooltip from '@/components/WithTooltip.vue';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useSeriesSearch } from '@/composables/useSeries';
 import type { AddBookFormSchema } from '@/lib/catalog-schemas';
@@ -39,6 +41,10 @@ const inputAttrs = computed(() => {
 const props = defineProps<{ admin?: boolean }>();
 
 const model = defineModel<SeriesPick | null>({ default: null });
+
+// Fires when a series is picked from the list or cleared, but not while a
+// name is being typed.
+const emit = defineEmits<{ pick: [] }>();
 
 const search = ref(model.value?.title ?? '');
 const { trimmed, term, isTyping } = useSearchTerm(search);
@@ -90,6 +96,13 @@ watch(
     }
 );
 
+// The picked series as the search found it, for its cover and kind. The
+// search is its name, so it's in the results.
+const pickedSeries = computed(() => {
+    const id = model.value?.id;
+    return id ? list.items.find((s) => s.id === id) : undefined;
+});
+
 function isSeriesPick(value: unknown): value is SeriesPick {
     return typeof value === 'object' && value !== null && 'title' in value;
 }
@@ -103,7 +116,7 @@ function sameSeries(a: unknown, b: unknown) {
 </script>
 
 <template>
-    <div class="flex gap-1">
+    <div class="flex items-center gap-1">
         <Combobox
             v-model="model"
             class="flex-1"
@@ -111,6 +124,7 @@ function sameSeries(a: unknown, b: unknown) {
             open-on-focus
             :by="sameSeries"
             :reset-search-term-on-blur="false"
+            @update:model-value="emit('pick')"
         >
             <ComboboxAnchor>
                 <ComboboxInput
@@ -118,7 +132,24 @@ function sameSeries(a: unknown, b: unknown) {
                     v-model="search"
                     :display-value="(v: SeriesPick | null) => v?.title ?? ''"
                     placeholder="Search or create a series…"
-                />
+                    :group-class="model?.id ? 'h-auto' : undefined"
+                >
+                    <template v-if="model?.id" #start>
+                        <InputGroupAddon class="py-1">
+                            <CoverImage
+                                size="sm"
+                                :src="pickedSeries?.coverUrl ?? null"
+                                alt=""
+                                class="h-8 w-6 shrink-0 [&_svg]:size-3"
+                            />
+                        </InputGroupAddon>
+                    </template>
+                    <template v-if="pickedSeries" #end>
+                        <InputGroupAddon align="inline-end">
+                            {{ SERIES_KIND_LABELS[pickedSeries.kind] }}
+                        </InputGroupAddon>
+                    </template>
+                </ComboboxInput>
             </ComboboxAnchor>
             <ComboboxList>
                 <ComboboxViewport>
@@ -163,17 +194,19 @@ function sameSeries(a: unknown, b: unknown) {
                 </ComboboxViewport>
             </ComboboxList>
         </Combobox>
-        <Button
-            v-if="model"
-            variant="ghost"
-            size="icon"
-            aria-label="Clear series"
-            @click="
-                model = null;
-                search = '';
-            "
-        >
-            <XIcon />
-        </Button>
+        <WithTooltip v-if="model" label="Clear series">
+            <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Clear series"
+                @click="
+                    model = null;
+                    search = '';
+                    emit('pick');
+                "
+            >
+                <XIcon />
+            </Button>
+        </WithTooltip>
     </div>
 </template>

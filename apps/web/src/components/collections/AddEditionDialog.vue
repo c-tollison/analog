@@ -96,7 +96,7 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Add an edition</DialogTitle>
                 <DialogDescription>
-                    Own another printing of this? Enter its ISBN or pick one
+                    Own another edition of this? Enter its ISBN or pick one
                     below.
                 </DialogDescription>
             </DialogHeader>

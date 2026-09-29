@@ -129,7 +129,7 @@ watch(term, (q) => {
         <h1 class="text-lg font-semibold">Admin dashboard</h1>
 
         <Tabs v-model="tab">
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <TabsList>
                     <TabsTrigger :value="Tab.Series">
                         Series

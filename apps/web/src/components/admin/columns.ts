@@ -3,11 +3,21 @@ import CoverImage from '@/components/CoverImage.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { formatDate } from '@/lib/dates';
 
-import type { ColumnDef } from '@tanstack/vue-table';
+import type { ColumnDef, RowData } from '@tanstack/vue-table';
 import { h } from 'vue';
 import { type RouteLocationRaw, RouterLink } from 'vue-router';
 
+declare module '@tanstack/vue-table' {
+    interface ColumnMeta<TData extends RowData, TValue> {
+        // Classes for the column's header and cells, e.g. to hide it on phones.
+        class?: string;
+    }
+}
+
 // Columns both admin tables share.
+
+/** Only shown on wide screens. The title shows the same details on phones. */
+export const WIDE_ONLY = { class: 'hidden md:table-cell' };
 
 export function coverColumn<
     T extends { coverUrl: string | null },
@@ -20,34 +30,55 @@ export function coverColumn<
                 size: 'sm',
                 src: row.original.coverUrl,
                 alt: '',
-                class: 'h-12 w-8',
+                // Without max-w-none, a squeezed cell on a phone shrinks
+                // the cover to nothing.
+                class: 'h-12 w-8 max-w-none',
             }),
     };
 }
 
-/** The title as a link, with a badge once it's verified. */
+/**
+ * The title as a link, with a badge once it's verified. On phones, `details`
+ * shows under it in place of the columns that hide.
+ */
 export function titleColumn<
     T extends { title: string; verifiedAt: string | null },
->(to: (row: T) => RouteLocationRaw): ColumnDef<T> {
+>(
+    to: (row: T) => RouteLocationRaw,
+    details: (row: T) => string | null
+): ColumnDef<T> {
     return {
         id: 'title',
         header: 'Title',
-        cell: ({ row }) =>
-            h('div', { class: 'flex items-center gap-2' }, [
-                h(
-                    RouterLink,
-                    {
-                        to: to(row.original),
-                        class: 'font-medium hover:underline',
-                        // The row opens it too.
-                        onClick: (event: MouseEvent) => event.stopPropagation(),
-                    },
-                    () => row.original.title
-                ),
-                row.original.verifiedAt
-                    ? h(Badge, { variant: 'secondary' }, () => 'Verified')
+        meta: { class: 'w-full whitespace-normal md:w-auto' },
+        cell: ({ row }) => {
+            const text = details(row.original);
+            return h('div', { class: 'grid gap-0.5' }, [
+                h('div', { class: 'flex flex-wrap items-center gap-x-2' }, [
+                    h(
+                        RouterLink,
+                        {
+                            to: to(row.original),
+                            class: 'font-medium hover:underline',
+                            // The row opens it too.
+                            onClick: (event: MouseEvent) =>
+                                event.stopPropagation(),
+                        },
+                        () => row.original.title
+                    ),
+                    row.original.verifiedAt
+                        ? h(Badge, { variant: 'secondary' }, () => 'Verified')
+                        : null,
+                ]),
+                text
+                    ? h(
+                          'span',
+                          { class: 'text-muted-foreground md:hidden' },
+                          text
+                      )
                     : null,
-            ]),
+            ]);
+        },
     };
 }
 
@@ -62,5 +93,6 @@ export function addedColumn<T extends { createdAt: string }>(): ColumnDef<T> {
                 onToggle: () => column.toggleSorting(),
             }),
         cell: ({ row }) => formatDate(row.original.createdAt),
+        meta: { class: 'hidden sm:table-cell' },
     };
 }

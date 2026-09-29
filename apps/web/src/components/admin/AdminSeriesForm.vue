@@ -1,15 +1,13 @@
 <script setup lang="ts">
+import TitleInput from '@/components/admin/TitleInput.vue';
 import FormError from '@/components/FormError.vue';
-import SaveButton from '@/components/SaveButton.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     FormControl,
     FormField,
     FormItem,
-    FormLabel,
     FormMessage,
 } from '@/components/shadcn-components/form';
-import { Input } from '@/components/shadcn-components/input';
 import {
     Popover,
     PopoverContent,
@@ -22,77 +20,76 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/shadcn-components/select';
+import { Spinner } from '@/components/shadcn-components/spinner';
+import WithTooltip from '@/components/WithTooltip.vue';
 import { type AdminSeries, useUpdateAdminSeries } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
 import { AdminSeriesFormSchema } from '@/lib/admin-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
-import { vNoAutofill } from '@/lib/no-autofill';
 
 import { InfoIcon } from '@lucide/vue';
-import { ref } from 'vue';
+import { watch } from 'vue';
 
+// The series' name and kind, edited in place. Changes save when the name box
+// is left or a kind is picked.
 const props = defineProps<{ series: AdminSeries }>();
 
 const update = useUpdateAdminSeries();
-const saved = ref(false);
 
-const { submit, formError, isSubmitting, fieldProps } = useAppForm({
+const { submit, formError, isSubmitting, fieldProps, values } = useAppForm({
     schema: AdminSeriesFormSchema,
     initialValues: {
         title: props.series.title,
         kind: props.series.kind,
     },
     onSubmit: async (values) => {
-        saved.value = false;
         await update.mutateAsync({ seriesId: props.series.id, ...values });
-        saved.value = true;
         return undefined;
     },
 });
+
+function saveIfChanged() {
+    if (
+        values.title !== props.series.title ||
+        values.kind !== props.series.kind
+    ) {
+        submit();
+    }
+}
+
+watch(() => values.kind, saveIfChanged);
 </script>
 
 <template>
-    <form class="grid gap-4 sm:max-w-md" novalidate @submit="submit">
+    <form class="grid gap-2" novalidate @submit.prevent="saveIfChanged">
         <FormError :message="formError" />
-        <FormField v-slot="{ componentField }" v-bind="fieldProps" name="title">
-            <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                    <Input v-no-autofill v-bind="componentField" />
-                </FormControl>
-                <FormMessage />
-            </FormItem>
-        </FormField>
-        <div class="flex flex-wrap items-start gap-4">
+        <div class="flex flex-wrap items-start gap-2">
+            <FormField
+                v-slot="{ componentField }"
+                v-bind="fieldProps"
+                name="title"
+            >
+                <FormItem class="min-w-60 flex-1">
+                    <FormControl>
+                        <TitleInput
+                            v-bind="componentField"
+                            aria-label="Name"
+                            class="text-lg font-semibold md:text-lg"
+                            @blur="saveIfChanged"
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            </FormField>
             <FormField
                 v-slot="{ componentField }"
                 v-bind="fieldProps"
                 name="kind"
             >
-                <FormItem>
-                    <div class="flex items-center gap-1">
-                        <FormLabel>Kind</FormLabel>
-                        <Popover>
-                            <PopoverTrigger as-child>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    class="-my-1"
-                                    aria-label="About kind"
-                                >
-                                    <InfoIcon />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent class="w-64 text-sm">
-                                Changing the kind changes it for every item in
-                                this series.
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+                <FormItem class="flex items-center gap-1 py-1">
                     <Select v-bind="componentField">
                         <FormControl>
-                            <SelectTrigger class="w-40">
+                            <SelectTrigger class="w-32" aria-label="Kind">
                                 <SelectValue />
                             </SelectTrigger>
                         </FormControl>
@@ -106,10 +103,27 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <FormMessage />
+                    <Popover>
+                        <WithTooltip label="About kind">
+                            <PopoverTrigger as-child>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    aria-label="About kind"
+                                >
+                                    <InfoIcon />
+                                </Button>
+                            </PopoverTrigger>
+                        </WithTooltip>
+                        <PopoverContent class="w-64 text-sm">
+                            Changing the kind changes it for every item in this
+                            series.
+                        </PopoverContent>
+                    </Popover>
+                    <Spinner v-if="isSubmitting" />
                 </FormItem>
             </FormField>
         </div>
-        <SaveButton :pending="isSubmitting" :saved="saved" />
     </form>
 </template>

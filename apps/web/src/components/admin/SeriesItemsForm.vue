@@ -1,26 +1,29 @@
 <script setup lang="ts">
+import ChangeSeriesDialog from '@/components/admin/ChangeSeriesDialog.vue';
+import TitleInput from '@/components/admin/TitleInput.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SaveButton from '@/components/SaveButton.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Checkbox } from '@/components/shadcn-components/checkbox';
+import { Empty, EmptyDescription } from '@/components/shadcn-components/empty';
 import {
     FormControl,
     FormField,
     FormItem,
+    FormLabel,
     FormMessage,
 } from '@/components/shadcn-components/form';
 import { Input } from '@/components/shadcn-components/input';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableEmpty,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/shadcn-components/table';
+    Item,
+    ItemContent,
+    ItemGroup,
+    ItemMedia,
+} from '@/components/shadcn-components/item';
+import { Label } from '@/components/shadcn-components/label';
+import WithTooltip from '@/components/WithTooltip.vue';
 import {
     type AdminSeriesItem,
     useSetSeriesItems,
@@ -30,16 +33,26 @@ import { SeriesItemsFormSchema } from '@/lib/admin-schemas';
 import { vNoAutofill } from '@/lib/no-autofill';
 import { missingVolumes } from '@/lib/volumes';
 
-import { ArrowUpRightIcon } from '@lucide/vue';
+import { ArrowRightLeftIcon, ArrowUpRightIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
     seriesId: string;
+    seriesTitle: string;
     volumeCount: number | null;
     items: AdminSeriesItem[];
 }>();
 
 const setItems = useSetSeriesItems();
+
+// The item whose series is being changed.
+const moving = ref<AdminSeriesItem | null>(null);
+const isMoveOpen = ref(false);
+
+function openMove(item: AdminSeriesItem) {
+    moving.value = item;
+    isMoveOpen.value = true;
+}
 const saved = ref(false);
 
 const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
@@ -140,56 +153,70 @@ function setAllVerified(checked: boolean | 'indeterminate') {
 <template>
     <form class="grid gap-3" novalidate @submit="submit">
         <FormError :message="formError" />
-        <p v-if="missing" class="text-muted-foreground text-sm">
-            Missing {{ missing }}
-        </p>
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead class="w-12" />
-                    <TableHead>Title</TableHead>
-                    <TableHead class="w-28">Volume</TableHead>
-                    <TableHead class="w-24">
-                        <div class="flex items-center gap-2">
-                            <Checkbox
-                                :model-value="allVerified"
-                                aria-label="Verify all"
-                                @update:model-value="setAllVerified"
-                            />
-                            Verified
-                        </div>
-                    </TableHead>
-                    <TableHead class="w-28" />
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                <TableRow v-for="(item, index) in items" :key="item.id">
-                    <TableCell>
-                        <CoverImage
-                            size="sm"
-                            :src="item.coverUrl"
-                            alt=""
-                            class="h-12 w-8"
-                        />
-                    </TableCell>
-                    <TableCell>
-                        <div class="flex items-start gap-1">
-                            <FormField
-                                v-slot="{ componentField }"
-                                v-bind="fieldProps"
-                                :name="`items[${index}].title`"
+        <div
+            v-if="missing || items.length"
+            class="flex flex-wrap items-center justify-between gap-2"
+        >
+            <p class="text-muted-foreground text-sm">
+                <template v-if="missing">Missing {{ missing }}</template>
+            </p>
+            <div v-if="items.length" class="flex items-center gap-2">
+                <Checkbox
+                    id="verify-all"
+                    :model-value="allVerified"
+                    @update:model-value="setAllVerified"
+                />
+                <Label for="verify-all">Verify all</Label>
+            </div>
+        </div>
+        <Empty v-if="!items.length">
+            <EmptyDescription>Nothing in this series.</EmptyDescription>
+        </Empty>
+        <ItemGroup v-else class="gap-2">
+            <Item
+                v-for="(item, index) in items"
+                :key="item.id"
+                variant="outline"
+                size="sm"
+                class="flex-nowrap items-start"
+            >
+                <ItemMedia>
+                    <CoverImage
+                        size="sm"
+                        :src="item.coverUrl"
+                        alt=""
+                        class="h-12 w-8"
+                    />
+                </ItemMedia>
+                <ItemContent class="min-w-0 gap-2 md:flex-row md:items-start">
+                    <div class="flex flex-1 items-start gap-1">
+                        <FormField
+                            v-slot="{ componentField }"
+                            v-bind="fieldProps"
+                            :name="`items[${index}].title`"
+                        >
+                            <FormItem class="flex-1">
+                                <FormControl>
+                                    <TitleInput
+                                        :aria-label="`Title of ${item.title}`"
+                                        v-bind="componentField"
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                        <WithTooltip label="Change series">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Change series"
+                                @click="openMove(item)"
                             >
-                                <FormItem class="flex-1">
-                                    <FormControl>
-                                        <Input
-                                            v-no-autofill
-                                            :aria-label="`Title of ${item.title}`"
-                                            v-bind="componentField"
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                                <ArrowRightLeftIcon />
+                            </Button>
+                        </WithTooltip>
+                        <WithTooltip label="Open media page">
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -205,15 +232,16 @@ function setAllVerified(checked: boolean | 'indeterminate') {
                                     <ArrowUpRightIcon />
                                 </RouterLink>
                             </Button>
-                        </div>
-                    </TableCell>
-                    <TableCell>
+                        </WithTooltip>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                         <FormField
                             v-slot="{ componentField }"
                             v-bind="fieldProps"
                             :name="`items[${index}].volume`"
                         >
-                            <FormItem>
+                            <FormItem class="flex items-center gap-2">
+                                <FormLabel>Vol.</FormLabel>
                                 <FormControl>
                                     <Input
                                         type="number"
@@ -221,35 +249,31 @@ function setAllVerified(checked: boolean | 'indeterminate') {
                                         v-no-autofill
                                         min="0"
                                         step="any"
-                                        :aria-label="`Volume of ${item.title}`"
+                                        class="w-20"
                                         v-bind="componentField"
                                     />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         </FormField>
-                    </TableCell>
-                    <TableCell>
                         <FormField
                             v-slot="{ value }"
                             :name="`items[${index}].verified`"
                             type="checkbox"
                         >
-                            <FormItem>
+                            <FormItem class="flex items-center gap-2">
                                 <FormControl>
                                     <Checkbox
                                         :model-value="value"
-                                        :aria-label="`Verify ${item.title}`"
                                         @update:model-value="
                                             (checked) =>
                                                 setVerified(index, checked)
                                         "
                                     />
                                 </FormControl>
+                                <FormLabel>Verified</FormLabel>
                             </FormItem>
                         </FormField>
-                    </TableCell>
-                    <TableCell>
                         <Badge
                             v-if="problem(index)"
                             :variant="
@@ -260,17 +284,20 @@ function setAllVerified(checked: boolean | 'indeterminate') {
                         >
                             {{ problem(index) }}
                         </Badge>
-                    </TableCell>
-                </TableRow>
-                <TableEmpty v-if="!items.length" :colspan="5">
-                    Nothing in this series.
-                </TableEmpty>
-            </TableBody>
-        </Table>
+                    </div>
+                </ItemContent>
+            </Item>
+        </ItemGroup>
         <SaveButton
             v-if="items.length"
             :pending="isSubmitting"
             :saved="saved"
         />
     </form>
+    <ChangeSeriesDialog
+        v-if="moving"
+        v-model:open="isMoveOpen"
+        :item="moving"
+        :series="{ id: seriesId, title: seriesTitle }"
+    />
 </template>
