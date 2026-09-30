@@ -32,6 +32,13 @@ import {
     mergeSeries,
     refreshSeriesCover,
 } from '../lib/books.js';
+import {
+    checkCountsBySeries,
+    clearAppliedItemChecks,
+    clearItemChecks,
+    clearSeriesChecks,
+    clearSeriesNameChecks,
+} from '../lib/checks.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -75,6 +82,7 @@ const adminSeries = new Hono<AppEnv>()
         );
 
         const counts = itemCounts();
+        const checks = checkCountsBySeries();
 
         const result = await paginateWithTotal(
             page,
@@ -90,9 +98,11 @@ const adminSeries = new Hono<AppEnv>()
                         detailsSource: series.detailsSource,
                         createdAt: series.createdAt,
                         verifiedAt: series.verifiedAt,
+                        suggestions: sql<number>`coalesce(${checks.checkCount}, 0)::int`,
                     })
                     .from(series)
                     .leftJoin(counts, eq(counts.seriesId, series.id))
+                    .leftJoin(checks, eq(checks.seriesId, series.id))
                     .where(where)
                     .orderBy(byAdded(series.createdAt, sort), asc(series.id))
                     .limit(limit)
@@ -202,6 +212,9 @@ const adminSeries = new Hono<AppEnv>()
                     await matchSeriesKind(found.id, tx);
                 }
             });
+            if (title !== found.title) {
+                await clearSeriesNameChecks(found.id);
+            }
             return c.body(null, 204);
         }
     )
@@ -250,6 +263,18 @@ const adminSeries = new Hono<AppEnv>()
                         .where(eq(catalogItem.id, itemId));
                 }
             });
+            // Verified items are done; others lose the suggestions they now
+            // match.
+            await clearItemChecks(
+                items.filter((item) => item.verified).map((item) => item.id)
+            );
+            for (const item of items.filter((row) => !row.verified)) {
+                await clearAppliedItemChecks(item.id, {
+                    title: item.title,
+                    volume: item.volume,
+                    seriesId: id,
+                });
+            }
             await refreshSeriesCover(id);
             return c.body(null, 204);
         }
@@ -264,6 +289,9 @@ const adminSeries = new Hono<AppEnv>()
             const by = verified ? c.get('user').id : null;
             if (!(await setVerified(series, id, by))) {
                 throw new HTTPException(404, { message: 'Series not found' });
+            }
+            if (verified) {
+                await clearSeriesChecks(id);
             }
             return c.body(null, 204);
         }
