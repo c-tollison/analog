@@ -17,6 +17,7 @@
         "db:migrate": "pnpm --filter @analog/db migrate",
         "db:seed": "pnpm --filter @analog/db seed",
         "books:refresh": "pnpm --filter @analog/api refresh-books",
+        "catalog:check": "pnpm --filter @analog/api check-catalog",
         "users:set-role": "pnpm --filter @analog/api set-role"
     },
     "devEngines": {

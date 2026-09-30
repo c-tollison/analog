@@ -1,5 +1,6 @@
 import { and, eq, schema, sql } from '@analog/db';
 import {
+    CheckTrigger,
     GoogleSearchQuerySchema,
     IsbnSchema,
     ProgressStatus,
@@ -16,6 +17,7 @@ import {
     suggestSeries,
     toBookLookup,
 } from '../lib/books.js';
+import { checkInBackground } from '../lib/check-runs.js';
 import { searchGoogleBooks } from '../lib/google-books.js';
 import { db } from '../lib/init.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -144,7 +146,9 @@ const catalog = new Hono<AppEnv>()
         schemaValidator('param', IdParamSchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            return c.json(await refreshBook(id));
+            const refreshed = await refreshBook(id);
+            checkInBackground(id, CheckTrigger.Refresh);
+            return c.json(refreshed);
         }
     )
     .get(

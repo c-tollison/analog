@@ -32,6 +32,8 @@ const EnvSchema = z.object({
     BETTER_AUTH_SECRET: z.string().min(32),
     RESEND_API_KEY: z.string().min(1).optional(),
     GOOGLE_BOOKS_API_KEY: z.string().min(1),
+    // Books are checked by Jev when they're saved.
+    TYPESAFE_API_KEY: z.string().min(1),
 });
 
 type StageConfig = z.infer<typeof StageConfigSchema>;
@@ -42,6 +44,7 @@ export type Config = Omit<StageConfig, 'db'> & {
     auth: { secret: string };
     email: StageConfig['email'] & { resendApiKey: string | undefined };
     googleBooks: { apiKey: string };
+    typesafe: { apiKey: string };
 };
 
 const CONFIG_PATH = resolve(import.meta.dirname, '../../config/config.toml');
@@ -73,5 +76,6 @@ export function loadConfig(
         auth: { secret: parsedEnv.BETTER_AUTH_SECRET },
         email: { ...stageConfig.email, resendApiKey: parsedEnv.RESEND_API_KEY },
         googleBooks: { apiKey: parsedEnv.GOOGLE_BOOKS_API_KEY },
+        typesafe: { apiKey: parsedEnv.TYPESAFE_API_KEY },
     };
 }
