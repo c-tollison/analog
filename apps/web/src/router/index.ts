@@ -140,6 +140,12 @@ export const router = createRouter({
                     meta: { title: 'Admin', requiresRole: UserRole.Admin },
                 },
                 {
+                    path: 'admin/lookup',
+                    name: 'admin-lookup',
+                    component: () => import('@/views/AdminLookupView.vue'),
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
+                },
+                {
                     path: 'admin/items/:id',
                     name: 'admin-item',
                     component: () => import('@/views/AdminItemView.vue'),

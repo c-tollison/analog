@@ -3,6 +3,7 @@ import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
+import { usePaginatedList } from './usePaginatedList';
 import { SERIES_KEY } from './useSeries';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { type MaybeRefOrGetter, toValue } from 'vue';
@@ -19,8 +20,9 @@ export type GoogleResult = InferResponseType<
 
 export const CATALOG_KEY = ['catalog'] as const;
 
-// Kept apart from CATALOG_KEY, so adding a book doesn't search Google again.
-const GOOGLE_KEY = ['google-books'] as const;
+// Kept apart from CATALOG_KEY, and skipped by admin edits, so adding a book
+// doesn't search Google again.
+export const GOOGLE_KEY = ['google-books'] as const;
 
 /**
  * Searches Google Books by title. Each search counts against a daily limit,
@@ -40,6 +42,34 @@ export function useGoogleSearch(
         staleTime: Number.POSITIVE_INFINITY,
         retry: false,
     });
+}
+
+/**
+ * Searches Google Books by title for admins, a page at a time, optionally in
+ * one language. Pages are kept for the session, like `useGoogleSearch`.
+ */
+export function useAdminGoogleSearch(
+    term: MaybeRefOrGetter<string>,
+    lang: MaybeRefOrGetter<string | null>,
+    enabled: MaybeRefOrGetter<boolean>
+) {
+    const q = () => toValue(term).toLowerCase();
+    return usePaginatedList(
+        () => [...GOOGLE_KEY, 'admin', q(), toValue(lang)],
+        async (offset) => {
+            const language = toValue(lang);
+            return unwrap(
+                await api.admin.google.$get({
+                    query: {
+                        q: q(),
+                        offset,
+                        ...(language ? { lang: language } : {}),
+                    },
+                })
+            );
+        },
+        { enabled: () => !!toValue(term) && toValue(enabled), once: true }
+    );
 }
 
 /**

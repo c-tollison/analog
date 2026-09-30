@@ -4,6 +4,7 @@ import AdminItemsTable from '@/components/admin/AdminItemsTable.vue';
 import AdminSeriesTable from '@/components/admin/AdminSeriesTable.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
+import { Button } from '@/components/shadcn-components/button';
 import {
     Select,
     SelectContent,
@@ -24,6 +25,7 @@ import {
 } from '@/composables/useAdmin';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 
+import { SearchIcon } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { z } from 'zod';
@@ -126,7 +128,15 @@ watch(term, (q) => {
 
 <template>
     <div class="flex flex-col gap-4">
-        <h1 class="text-lg font-semibold">Admin dashboard</h1>
+        <div class="flex items-center justify-between gap-2">
+            <h1 class="text-lg font-semibold">Admin dashboard</h1>
+            <Button as-child variant="outline">
+                <RouterLink :to="{ name: 'admin-lookup' }">
+                    <SearchIcon />
+                    Look up
+                </RouterLink>
+            </Button>
+        </div>
 
         <Tabs v-model="tab">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">

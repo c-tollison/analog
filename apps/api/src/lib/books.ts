@@ -109,7 +109,7 @@ export async function findBookByIsbn(isbn: string) {
 
 // Who is picking a series. An admin editing from the dashboard can pick
 // any series; everyone else only the ones they can find.
-type SeriesPicker = { userId: string; admin: boolean };
+export type SeriesPicker = { userId: string; admin: boolean };
 
 function pickableSeries({ userId, admin }: SeriesPicker) {
     return admin ? undefined : discoverableSeries(userId);

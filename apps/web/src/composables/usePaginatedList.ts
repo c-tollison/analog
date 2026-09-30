@@ -15,6 +15,11 @@ export interface PaginatedListOptions {
     pending?: MaybeRefOrGetter<boolean>;
     /** Reload every `POLL_MS` while the list is on screen. */
     poll?: boolean;
+    /**
+     * Load each page once, with no reloads or retries, for lists that cost
+     * something to load.
+     */
+    once?: boolean;
 }
 
 export interface PaginatedList<T> {
@@ -40,7 +45,12 @@ export interface PaginatedList<T> {
 export function usePaginatedList<P extends Page>(
     queryKey: () => QueryKey,
     fetchPage: (offset: string) => Promise<P>,
-    { enabled = true, pending = false, poll = false }: PaginatedListOptions = {}
+    {
+        enabled = true,
+        pending = false,
+        poll = false,
+        once = false,
+    }: PaginatedListOptions = {}
 ): PaginatedList<P['items'][number]> {
     const query = useInfiniteQuery({
         queryKey: computed(queryKey),
@@ -50,6 +60,7 @@ export function usePaginatedList<P extends Page>(
         enabled: () => toValue(enabled),
         placeholderData: keepPreviousData,
         refetchInterval: poll ? POLL_MS : false,
+        ...(once ? { staleTime: Number.POSITIVE_INFINITY, retry: false } : {}),
     });
 
     return reactive({

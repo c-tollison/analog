@@ -1,5 +1,6 @@
 import type { InferResponseType } from '@analog/api/client';
 import {
+    type AddBookSchema,
     type AdminItemListQuerySchema,
     type AdminListQuerySchema,
     DEFAULT_PAGE_SIZE,
@@ -13,6 +14,7 @@ import {
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
+import { GOOGLE_KEY } from './useCatalog';
 import {
     keepPreviousData,
     useMutation,
@@ -80,21 +82,28 @@ function listQuery({ q, status, sort, limit, offset }: AdminListQuery) {
 }
 
 /**
- * Admin edits change data every page shows, so everything is refetched.
+ * Admin edits change data every page shows, so everything is refetched,
+ * except Google searches, which don't change and count against a limit.
  * After a delete, nothing refetches until it's shown again, so the deleted
  * row's page doesn't reload first.
  */
 function useInvalidateAll() {
     const queryClient = useQueryClient();
+    const predicate = ({ queryKey }: { queryKey: readonly unknown[] }) =>
+        queryKey[0] !== GOOGLE_KEY[0];
     return {
-        afterEdit: () => queryClient.invalidateQueries(),
+        afterEdit: () => queryClient.invalidateQueries({ predicate }),
         afterDelete: () =>
-            queryClient.invalidateQueries({ refetchType: 'none' }),
+            queryClient.invalidateQueries({ predicate, refetchType: 'none' }),
     };
 }
 
-export function useAdminItems(query: MaybeRefOrGetter<AdminItemListQuery>) {
+export function useAdminItems(
+    query: MaybeRefOrGetter<AdminItemListQuery>,
+    enabled: MaybeRefOrGetter<boolean> = true
+) {
     return useQuery({
+        enabled: () => toValue(enabled),
         queryKey: () => [...ADMIN_KEY, 'items', 'list', toValue(query)],
         queryFn: async () => {
             const { noCover, ...rest } = toValue(query);
@@ -321,6 +330,16 @@ export function useSetSeriesVerified() {
                     json: { verified },
                 })
             ),
+        onSuccess: afterEdit,
+    });
+}
+
+/** Adds a book to the shared catalog, without a collection. */
+export function useSaveAdminBook() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async (json: z.output<typeof AddBookSchema>) =>
+            unwrap(await api.admin.items.$post({ json })),
         onSuccess: afterEdit,
     });
 }
