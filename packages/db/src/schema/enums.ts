@@ -1,4 +1,6 @@
 import {
+    CheckRule,
+    CheckTrigger,
     CollectionRole,
     ExternalSource,
     MediaFormat,
@@ -35,3 +37,8 @@ export const progressStatus = appSchema.enum(
     values(ProgressStatus)
 );
 export const userRole = appSchema.enum('user_role', values(UserRole));
+export const checkRule = appSchema.enum('check_rule', values(CheckRule));
+export const checkTrigger = appSchema.enum(
+    'check_trigger',
+    values(CheckTrigger)
+);

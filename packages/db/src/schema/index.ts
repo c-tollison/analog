@@ -1,4 +1,6 @@
 export * from './auth.js';
+export * from './catalog-check.js';
+export * from './catalog-check-run.js';
 export * from './catalog-item.js';
 export * from './catalog-item-isbn.js';
 export * from './catalog-item-isbn-cover.js';
