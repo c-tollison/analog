@@ -30,14 +30,12 @@ export function useGoogleSearch(
     term: MaybeRefOrGetter<string>,
     enabled: MaybeRefOrGetter<boolean>
 ) {
+    // Google ignores case, so "Haikyu" and "haikyu" share one search.
+    const q = () => toValue(term).toLowerCase();
     return useQuery({
-        queryKey: () => [...GOOGLE_KEY, toValue(term)],
+        queryKey: () => [...GOOGLE_KEY, q()],
         queryFn: async () =>
-            unwrap(
-                await api.catalog.search.google.$get({
-                    query: { q: toValue(term) },
-                })
-            ),
+            unwrap(await api.catalog.search.google.$get({ query: { q: q() } })),
         enabled: () => !!toValue(term) && toValue(enabled),
         staleTime: Number.POSITIVE_INFINITY,
         retry: false,

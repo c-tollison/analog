@@ -187,7 +187,7 @@ const error = computed(
                     <SearchInput v-model="query" placeholder="Search titles" />
 
                     <PagedList
-                        v-if="term"
+                        v-if="term && (results.items.length || !showGoogle)"
                         :list="results"
                         empty-text="No titles match."
                     >
