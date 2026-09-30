@@ -123,8 +123,9 @@ function onPick() {
                 <FormMessage />
             </FormItem>
         </FormField>
-        <div class="flex flex-wrap items-center gap-2">
-            <div class="flex min-w-60 flex-1 items-center gap-1">
+        <!-- On phones, the volume gets its own line. -->
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div class="flex min-w-0 flex-1 items-center gap-1">
                 <div class="flex-1">
                     <SeriesPicker
                         v-model="picked"
@@ -151,30 +152,32 @@ function onPick() {
                     </Button>
                 </WithTooltip>
             </div>
-            <FormField
-                v-if="series"
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="volume"
-            >
-                <FormItem class="flex items-center gap-2">
-                    <FormLabel>Vol.</FormLabel>
-                    <FormControl>
-                        <Input
-                            type="number"
-                            inputmode="decimal"
-                            v-no-autofill
-                            min="0"
-                            step="any"
-                            class="w-20"
-                            v-bind="componentField"
-                            @blur="saveIfChanged"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <Spinner v-if="isSubmitting" />
+            <div v-if="series || isSubmitting" class="flex items-center gap-2">
+                <FormField
+                    v-if="series"
+                    v-slot="{ componentField }"
+                    v-bind="fieldProps"
+                    name="volume"
+                >
+                    <FormItem class="flex items-center gap-2">
+                        <FormLabel>Vol.</FormLabel>
+                        <FormControl>
+                            <Input
+                                type="number"
+                                inputmode="decimal"
+                                v-no-autofill
+                                min="0"
+                                step="any"
+                                class="w-20"
+                                v-bind="componentField"
+                                @blur="saveIfChanged"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+                <Spinner v-if="isSubmitting" />
+            </div>
         </div>
     </form>
 </template>
