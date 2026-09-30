@@ -82,6 +82,7 @@ const {
 // behind it so the next scan is instant, but scans are ignored until then.
 // It's never paused, because pausing turns the camera off.
 const showingResult = computed(() => lookup.value !== null);
+const hideCamera = computed(() => showingResult.value || isSubmitting.value);
 
 const RESCAN_COOLDOWN_MS = 3000;
 let lastScan: { isbn: string; at: number } | null = null;
@@ -215,9 +216,13 @@ function scanAnother() {
         </AlertDescription>
     </Alert>
 
+    <div v-if="isSubmitting" class="flex flex-col items-center gap-2 p-8">
+        <Spinner class="size-6" />
+        <span class="text-muted-foreground text-xs">Looking up…</span>
+    </div>
     <div
         v-if="!cameraError"
-        v-show="!showingResult"
+        v-show="!hideCamera"
         ref="cameraBox"
         class="bg-muted relative -mx-4 aspect-square overflow-hidden sm:mx-0 sm:aspect-4/3 sm:rounded-md"
     >
@@ -234,7 +239,7 @@ function scanAnother() {
             :class="{ 'ring-green-500': justScanned }"
         />
         <div
-            v-if="cameraReady && !isSubmitting"
+            v-if="cameraReady"
             class="pointer-events-none absolute inset-x-8 inset-y-3/10 rounded-sm border-2 border-white/60"
         >
             <div
@@ -270,24 +275,20 @@ function scanAnother() {
             class="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center"
         >
             <span class="rounded-full bg-black/60 px-3 py-1 text-xs text-white">
-                {{
-                    isSubmitting
-                        ? 'Looking up…'
-                        : 'Line up the barcode inside the box'
-                }}
+                Line up the barcode inside the box
             </span>
         </p>
         <div
-            v-if="!cameraReady || isSubmitting"
+            v-if="!cameraReady"
             class="absolute inset-0 flex flex-col items-center justify-center gap-2"
         >
             <Spinner class="size-6" />
-            <span v-if="!cameraReady" class="text-muted-foreground text-xs">
+            <span class="text-muted-foreground text-xs">
                 Starting camera…
             </span>
         </div>
     </div>
-    <Alert v-else-if="!showingResult">
+    <Alert v-else-if="!hideCamera">
         <AlertDescription>{{ cameraError }}</AlertDescription>
     </Alert>
 

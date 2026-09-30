@@ -71,7 +71,9 @@ const startingSeries = initialSeries();
 const storedLastSeries = useLocalStorage<SeriesPick | null>(
     'analog:last-series',
     null,
-    { serializer: StorageSerializers.object }
+    // Saves right away. The parent removes this component once the book is
+    // saved, which would drop a delayed save.
+    { serializer: StorageSerializers.object, flush: 'sync' }
 );
 
 const lastSeries = computed(() => {
