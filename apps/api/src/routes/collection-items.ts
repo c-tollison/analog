@@ -176,7 +176,9 @@ const collectionItems = new Hono<AppEnv>()
             catalogItemId: item.id,
             format: item.format,
             kind: item.kind,
-            title: edition?.title ?? item.title,
+            // The book's title, the one admins edit. Each edition's own
+            // title shows in the editions list.
+            title: item.title,
             coverUrl: edition?.coverUrl ?? item.coverUrl,
             position: item.position,
             seriesId: item.series?.id ?? null,

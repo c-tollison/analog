@@ -23,7 +23,7 @@ import { vNoAutofill } from '@/lib/no-autofill';
 import { ArrowUpRightIcon } from '@lucide/vue';
 import { ref, watch } from 'vue';
 
-// The item's title, series and volume, edited in place. Changes save when a
+// The item's title, subtitle, series and volume, edited in place. Changes save when a
 // box is left or a series is picked.
 const props = defineProps<{ item: AdminItem }>();
 
@@ -53,13 +53,15 @@ const { submit, formError, isSubmitting, fieldProps, values } = useAppForm({
     schema: AdminItemFormSchema,
     initialValues: {
         title: props.item.title,
+        subtitle: props.item.subtitle ?? '',
         volume: props.item.position ?? '',
     },
-    onSubmit: async ({ title, volume }) => {
+    onSubmit: async ({ title, subtitle, volume }) => {
         const choice = series.value;
         await update.mutateAsync({
             itemId: props.item.id,
             title,
+            subtitle,
             series: choice
                 ? choice.id
                     ? { id: choice.id }
@@ -74,6 +76,7 @@ const { submit, formError, isSubmitting, fieldProps, values } = useAppForm({
 function saveIfChanged() {
     if (
         values.title !== props.item.title ||
+        (values.subtitle ?? '') !== (props.item.subtitle ?? '') ||
         String(values.volume ?? '') !== String(props.item.position ?? '')
     ) {
         submit();
@@ -102,8 +105,27 @@ function onPick() {
                 <FormMessage />
             </FormItem>
         </FormField>
-        <div class="flex flex-wrap items-center gap-2">
-            <div class="flex min-w-60 flex-1 items-center gap-1">
+        <FormField
+            v-slot="{ componentField }"
+            v-bind="fieldProps"
+            name="subtitle"
+        >
+            <FormItem>
+                <FormControl>
+                    <Input
+                        v-no-autofill
+                        aria-label="Subtitle"
+                        placeholder="Subtitle"
+                        v-bind="componentField"
+                        @blur="saveIfChanged"
+                    />
+                </FormControl>
+                <FormMessage />
+            </FormItem>
+        </FormField>
+        <!-- On phones, the volume gets its own line. -->
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div class="flex min-w-0 flex-1 items-center gap-1">
                 <div class="flex-1">
                     <SeriesPicker
                         v-model="picked"
@@ -130,30 +152,32 @@ function onPick() {
                     </Button>
                 </WithTooltip>
             </div>
-            <FormField
-                v-if="series"
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="volume"
-            >
-                <FormItem class="flex items-center gap-2">
-                    <FormLabel>Vol.</FormLabel>
-                    <FormControl>
-                        <Input
-                            type="number"
-                            inputmode="decimal"
-                            v-no-autofill
-                            min="0"
-                            step="any"
-                            class="w-20"
-                            v-bind="componentField"
-                            @blur="saveIfChanged"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <Spinner v-if="isSubmitting" />
+            <div v-if="series || isSubmitting" class="flex items-center gap-2">
+                <FormField
+                    v-if="series"
+                    v-slot="{ componentField }"
+                    v-bind="fieldProps"
+                    name="volume"
+                >
+                    <FormItem class="flex items-center gap-2">
+                        <FormLabel>Vol.</FormLabel>
+                        <FormControl>
+                            <Input
+                                type="number"
+                                inputmode="decimal"
+                                v-no-autofill
+                                min="0"
+                                step="any"
+                                class="w-20"
+                                v-bind="componentField"
+                                @blur="saveIfChanged"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+                <Spinner v-if="isSubmitting" />
+            </div>
         </div>
     </form>
 </template>

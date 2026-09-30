@@ -8,6 +8,7 @@ import {
     or,
     type SQL,
     schema,
+    sql,
 } from '@analog/db';
 import {
     AddBookSchema,
@@ -16,6 +17,7 @@ import {
     MergeItemSchema,
     SetVerifiedSchema,
     UpdateCatalogItemSchema,
+    UpdateIsbnSchema,
     VerifiedFilter,
 } from '@analog/types';
 
@@ -31,9 +33,15 @@ import type { AppEnv } from '../lib/app-env.js';
 import {
     itemLinks,
     kindInSeries,
+    readMetadata,
     refreshSeriesCover,
     seriesForItem,
 } from '../lib/books.js';
+import {
+    checkCountsByItem,
+    clearAppliedItemChecks,
+    clearItemChecks,
+} from '../lib/checks.js';
 import { toCover, uploadedCoverUrl } from '../lib/covers.js';
 import { mergeItem, splitOffIsbn, upsertBook } from '../lib/editions.js';
 import { db } from '../lib/init.js';
@@ -103,6 +111,7 @@ const adminItems = new Hono<AppEnv>()
             noCover ? isNull(catalogItem.coverUrl) : undefined,
             catalogItemsMatching(searchTerms(q ?? ''))
         );
+        const checks = checkCountsByItem();
 
         const result = await paginateWithTotal(
             page,
@@ -119,9 +128,11 @@ const adminItems = new Hono<AppEnv>()
                         addedBy: addedByUser.username,
                         createdAt: catalogItem.createdAt,
                         verifiedAt: catalogItem.verifiedAt,
+                        suggestions: sql<number>`coalesce(${checks.checkCount}, 0)::int`,
                     })
                     .from(catalogItem)
                     .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                    .leftJoin(checks, eq(checks.itemId, catalogItem.id))
                     .leftJoin(
                         catalogItemIsbn,
                         and(
@@ -220,6 +231,7 @@ const adminItems = new Hono<AppEnv>()
         const { metadata, externalSource, externalId, ...item } = row;
         return c.json({
             ...item,
+            subtitle: readMetadata(row).subtitle,
             collectionCount,
             isbns,
             links: itemLinks(row),
@@ -231,7 +243,12 @@ const adminItems = new Hono<AppEnv>()
         schemaValidator('json', UpdateCatalogItemSchema),
         async (c) => {
             const item = await requireItem(c.req.valid('param').id);
-            const { title, series: choice, volume } = c.req.valid('json');
+            const {
+                title,
+                subtitle,
+                series: choice,
+                volume,
+            } = c.req.valid('json');
             const next = choice
                 ? await seriesForItem(choice, item, {
                       userId: c.get('user').id,
@@ -243,12 +260,22 @@ const adminItems = new Hono<AppEnv>()
                 .update(catalogItem)
                 .set({
                     title,
+                    ...(subtitle === undefined
+                        ? {}
+                        : {
+                              metadata: sql`jsonb_set(${catalogItem.metadata}, '{subtitle}', ${JSON.stringify(subtitle)}::jsonb)`,
+                          }),
                     seriesId: next?.id ?? null,
                     position: volume,
                     kind: kindInSeries(next, item.kind),
                     updatedAt: new Date(),
                 })
                 .where(eq(catalogItem.id, item.id));
+            await clearAppliedItemChecks(item.id, {
+                title,
+                volume,
+                seriesId: next?.id ?? null,
+            });
             await refreshCovers([item.seriesId, next?.id ?? null]);
             return c.body(null, 204);
         }
@@ -263,6 +290,9 @@ const adminItems = new Hono<AppEnv>()
             const by = verified ? c.get('user').id : null;
             if (!(await setVerified(catalogItem, id, by))) {
                 throw new HTTPException(404, { message: 'Item not found' });
+            }
+            if (verified) {
+                await clearItemChecks([id]);
             }
             return c.body(null, 204);
         }
@@ -288,6 +318,29 @@ const adminItems = new Hono<AppEnv>()
             const { id, isbn } = c.req.valid('param');
             const created = await splitOffIsbn(id, isbn, c.get('user').id);
             return c.json({ id: created }, 201);
+        }
+    )
+    .put(
+        '/:id/isbns/:isbn',
+        schemaValidator('param', ItemIsbnParamSchema),
+        schemaValidator('json', UpdateIsbnSchema),
+        async (c) => {
+            const { id, isbn } = c.req.valid('param');
+            const { title } = c.req.valid('json');
+            const [updated] = await db()
+                .update(catalogItemIsbn)
+                .set({ title })
+                .where(
+                    and(
+                        eq(catalogItemIsbn.catalogItemId, id),
+                        eq(catalogItemIsbn.isbn, isbn)
+                    )
+                )
+                .returning({ isbn: catalogItemIsbn.isbn });
+            if (!updated) {
+                throw new HTTPException(404, { message: 'ISBN not found' });
+            }
+            return c.body(null, 204);
         }
     )
     .put(

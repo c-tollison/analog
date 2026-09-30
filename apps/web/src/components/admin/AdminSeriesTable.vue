@@ -9,6 +9,7 @@ import AdminTable from '@/components/admin/AdminTable.vue';
 import {
     addedColumn,
     coverColumn,
+    suggestionsColumn,
     titleColumn,
     WIDE_ONLY,
 } from '@/components/admin/columns';
@@ -49,6 +50,7 @@ function details(row: AdminSeriesRow): string {
 const columns: ColumnDef<AdminSeriesRow>[] = [
     coverColumn(),
     titleColumn(seriesTo, details),
+    suggestionsColumn(),
     {
         id: 'kind',
         header: 'Kind',

@@ -1,7 +1,8 @@
 import { and, asc, eq, inArray, isNull, or, schema } from '@analog/db';
-import { MediaFormat } from '@analog/types';
+import { CheckTrigger, MediaFormat } from '@analog/types';
 
 import { refreshBook } from '../lib/books.js';
+import { checkInBackground, settleChecks } from '../lib/check-runs.js';
 import { loadConfig } from '../lib/config.js';
 import { db, init, logger } from '../lib/init.js';
 import { HTTPException } from 'hono/http-exception';
@@ -62,6 +63,7 @@ async function main() {
         }
         try {
             const updated = await refreshBook(book.id, true);
+            checkInBackground(book.id, CheckTrigger.Refresh);
             busyTries = 0;
             logger().info(
                 { title: updated?.title, hasCover: !!updated?.coverUrl },
@@ -89,6 +91,7 @@ async function main() {
         await sleep(PAUSE_MS);
     }
     logger().info({ count: books.length, failed }, 'Done');
+    await settleChecks();
     await db().$client.end();
 }
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { MediaFormat } from '@analog/types';
 import AdminItemForm from '@/components/admin/AdminItemForm.vue';
+import CheckList from '@/components/admin/CheckList.vue';
+import IsbnTitleDialog from '@/components/admin/IsbnTitleDialog.vue';
 import MergeItemDialog from '@/components/admin/MergeItemDialog.vue';
 import VerifiedBy from '@/components/admin/VerifiedBy.vue';
 import BackButton from '@/components/BackButton.vue';
@@ -18,6 +20,7 @@ import {
     useAdminItem,
     useApproveIsbn,
     useDeleteAdminItem,
+    useItemChecks,
     useSetItemVerified,
     useSplitIsbn,
     useUploadCover,
@@ -29,7 +32,13 @@ import { isPendingFor } from '@/lib/editions';
 import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
 import { goBackOr } from '@/lib/navigation';
 
-import { MergeIcon, RefreshCwIcon, Trash2Icon, UploadIcon } from '@lucide/vue';
+import {
+    MergeIcon,
+    PencilIcon,
+    RefreshCwIcon,
+    Trash2Icon,
+    UploadIcon,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -38,6 +47,7 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 
 const { data: item, error: loadError } = useAdminItem(() => props.id);
+const { data: checks } = useItemChecks(() => props.id);
 usePageTitle(() => item.value?.title);
 
 const setVerified = useSetItemVerified();
@@ -49,6 +59,14 @@ const { upload: uploadCover, choose: chooseCover } = useUploadCover();
 
 const confirmingDelete = ref(false);
 const isMergeOpen = ref(false);
+// The ISBN whose title is being edited.
+const editing = ref<{ isbn: string; title: string | null } | null>(null);
+const isTitleOpen = ref(false);
+
+function editTitle(edition: { isbn: string; title: string | null }) {
+    editing.value = edition;
+    isTitleOpen.value = true;
+}
 
 const facts = computed(() => {
     if (!item.value) return [];
@@ -151,6 +169,13 @@ function onDelete() {
                 :item-id="item.id"
                 :item-title="item.title"
             />
+            <IsbnTitleDialog
+                v-if="editing"
+                v-model:open="isTitleOpen"
+                :item-id="item.id"
+                :isbn="editing.isbn"
+                :title="editing.title"
+            />
 
             <div class="grid gap-6 sm:grid-cols-[12rem_1fr]">
                 <CoverImage
@@ -161,7 +186,13 @@ function onDelete() {
                 />
 
                 <div class="grid min-w-0 content-start gap-4">
-                    <AdminItemForm :key="item.id" :item="item" />
+                    <!-- Rebuilt when an accepted suggestion changes it. -->
+                    <AdminItemForm
+                        :key="`${item.id}:${item.title}:${item.position}:${item.seriesId}`"
+                        :item="item"
+                    />
+
+                    <CheckList v-if="checks" :checks="checks" />
 
                     <div class="grid gap-2">
                         <div class="flex flex-wrap gap-2">
@@ -232,6 +263,14 @@ function onDelete() {
                             :edition="edition"
                             :fallback-title="edition.isbn"
                         >
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                @click="editTitle(edition)"
+                            >
+                                <PencilIcon />
+                                Edit title
+                            </Button>
                             <Button
                                 variant="outline"
                                 size="sm"

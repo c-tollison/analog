@@ -20,6 +20,7 @@ export const itemVariants = cva(
                 default: 'border-transparent',
                 outline: 'border-border',
                 muted: 'bg-muted/50 border-transparent',
+                success: 'border-success',
             },
             size: {
                 default: 'gap-2.5 px-3 py-2.5',

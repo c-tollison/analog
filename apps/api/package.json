@@ -25,13 +25,15 @@
         "build": "tsc",
         "start": "node dist/index.js",
         "refresh-books": "tsx --conditions=development --env-file=.env src/scripts/refresh-books.ts",
-        "set-role": "tsx --conditions=development --env-file=.env src/scripts/set-role.ts"
+        "set-role": "tsx --conditions=development --env-file=.env src/scripts/set-role.ts",
+        "check-catalog": "tsx --conditions=development --env-file=.env src/scripts/check-catalog.ts"
     },
     "dependencies": {
         "@analog/db": "workspace:*",
         "@analog/types": "workspace:*",
         "@hono/node-server": "^2.1.1",
         "@hono/zod-validator": "^0.9.1",
+        "@typesafe-ai/sdk": "^0.6.0",
         "better-auth": "catalog:",
         "hono": "catalog:",
         "pino": "^10.3.1",

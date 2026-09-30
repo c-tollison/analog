@@ -32,6 +32,12 @@ import {
     mergeSeries,
     refreshSeriesCover,
 } from '../lib/books.js';
+import {
+    checkCountsBySeries,
+    clearAppliedItemChecks,
+    clearSeriesChecks,
+    clearSeriesNameChecks,
+} from '../lib/checks.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -75,6 +81,7 @@ const adminSeries = new Hono<AppEnv>()
         );
 
         const counts = itemCounts();
+        const checks = checkCountsBySeries();
 
         const result = await paginateWithTotal(
             page,
@@ -90,9 +97,11 @@ const adminSeries = new Hono<AppEnv>()
                         detailsSource: series.detailsSource,
                         createdAt: series.createdAt,
                         verifiedAt: series.verifiedAt,
+                        suggestions: sql<number>`coalesce(${checks.checkCount}, 0)::int`,
                     })
                     .from(series)
                     .leftJoin(counts, eq(counts.seriesId, series.id))
+                    .leftJoin(checks, eq(checks.seriesId, series.id))
                     .where(where)
                     .orderBy(byAdded(series.createdAt, sort), asc(series.id))
                     .limit(limit)
@@ -202,6 +211,9 @@ const adminSeries = new Hono<AppEnv>()
                     await matchSeriesKind(found.id, tx);
                 }
             });
+            if (title !== found.title) {
+                await clearSeriesNameChecks(found.id);
+            }
             return c.body(null, 204);
         }
     )
@@ -212,7 +224,6 @@ const adminSeries = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { items } = c.req.valid('json');
-            const me = c.get('user').id;
             await requireSeries(id);
             const ids = items.map((item) => item.id);
             const inSeries = await db()
@@ -230,26 +241,20 @@ const adminSeries = new Hono<AppEnv>()
                 });
             }
             await db().transaction(async (tx) => {
-                for (const { id: itemId, title, volume, verified } of items) {
+                for (const { id: itemId, title, volume } of items) {
                     await tx
                         .update(catalogItem)
-                        .set({
-                            title,
-                            position: volume,
-                            // Items already verified keep who verified them.
-                            verifiedAt: verified
-                                ? sql`coalesce(${catalogItem.verifiedAt}, now())`
-                                : null,
-                            verifiedByUserId: verified
-                                ? sql`case when ${catalogItem.verifiedAt} is null
-                                    then ${me}::uuid
-                                    else ${catalogItem.verifiedByUserId} end`
-                                : null,
-                            updatedAt: new Date(),
-                        })
+                        .set({ title, position: volume, updatedAt: new Date() })
                         .where(eq(catalogItem.id, itemId));
                 }
             });
+            for (const item of items) {
+                await clearAppliedItemChecks(item.id, {
+                    title: item.title,
+                    volume: item.volume,
+                    seriesId: id,
+                });
+            }
             await refreshSeriesCover(id);
             return c.body(null, 204);
         }
@@ -264,6 +269,9 @@ const adminSeries = new Hono<AppEnv>()
             const by = verified ? c.get('user').id : null;
             if (!(await setVerified(series, id, by))) {
                 throw new HTTPException(404, { message: 'Series not found' });
+            }
+            if (verified) {
+                await clearSeriesChecks(id);
             }
             return c.body(null, 204);
         }

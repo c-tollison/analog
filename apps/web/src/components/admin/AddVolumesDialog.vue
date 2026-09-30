@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/shadcn-components/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -47,6 +48,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import { VolumeField } from '@/lib/catalog-schemas';
 import { SEARCH_LANGUAGES } from '@/lib/languages';
 import { vNoAutofill } from '@/lib/no-autofill';
+import { missingVolumes } from '@/lib/volumes';
 
 import { CheckCircleIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -58,6 +60,7 @@ const props = defineProps<{
     seriesTitle: string;
     // Volume numbers the series already has.
     volumes: number[];
+    volumeCount: number | null;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -89,6 +92,13 @@ const selected = ref(new Set<string>());
 // Typed volume numbers by ISBN. Rows start with the number in the title.
 const typedVolumes = ref<Record<string, string>>({});
 const have = computed(() => new Set(props.volumes));
+
+// Up to the total, or the highest number when there's no total.
+const missing = computed(() => {
+    const total =
+        props.volumeCount ?? Math.floor(Math.max(0, ...props.volumes));
+    return total ? missingVolumes(props.volumes, total) : null;
+});
 
 function volumeText(result: GoogleResult): string {
     return typedVolumes.value[result.isbn] ?? String(result.volume ?? '');
@@ -155,6 +165,9 @@ async function onAdd() {
         <DialogContent class="sm:max-w-xl">
             <DialogHeader>
                 <DialogTitle>Add volumes to {{ seriesTitle }}</DialogTitle>
+                <DialogDescription v-if="missing">
+                    Missing {{ missing }}
+                </DialogDescription>
             </DialogHeader>
 
             <div class="flex gap-2">

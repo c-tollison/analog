@@ -112,6 +112,7 @@ one directory:
      `[deployed.email].from` in `apps/api/config/config.toml`
    - `GOOGLE_BOOKS_API_KEY` set to a Google Cloud API key restricted to the
      Books API
+   - `TYPESAFE_API_KEY` set to a TypeSafe API key, for checking books with Jev
    - `IMAGE_TAG` left empty
 
    Then run `chmod 600 ~/analog/.env`.

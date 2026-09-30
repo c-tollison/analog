@@ -45,7 +45,7 @@ const BookMetadataSchema = z.object({
     genres: z.array(z.string()).catch([]),
 }) satisfies z.ZodType<BookDetails>;
 
-function readMetadata(item: Pick<CatalogItem, 'metadata'>): BookDetails {
+export function readMetadata(item: Pick<CatalogItem, 'metadata'>): BookDetails {
     return BookMetadataSchema.parse(item.metadata);
 }
 
@@ -64,7 +64,8 @@ function toBookKind(kind: SeriesKind | null | undefined): BookLookup['kind'] {
 
 /**
  * A stored book as a lookup, showing the edition with this ISBN when it has
- * its own title, cover and publisher on file.
+ * its own cover and publisher on file. The title is always the book's, the
+ * one admins edit.
  */
 export function toBookLookup(
     item: CatalogItem,
@@ -76,7 +77,7 @@ export function toBookLookup(
     return {
         ...meta,
         isbn,
-        title: edition?.title ?? item.title,
+        title: item.title,
         publishers: edition?.publisher ? [edition.publisher] : meta.publishers,
         physicalFormat: edition?.format ?? meta.physicalFormat,
         releaseDate: item.releaseDate,
@@ -143,7 +144,7 @@ export async function suggestSeries(
 
 const SERIES_MATCH_LIMIT = 3;
 const SERIES_MATCH_THRESHOLD = 0.5;
-const VOLUME_TEXT =
+export const VOLUME_TEXT =
     /[\s,:;]*(\b(vol(ume)?|v|book|part|no)\.?|#)\s*\d+(\.\d+)?\b|[\s,:;]+\d+(\.\d+)?\s*$/gi;
 
 /**

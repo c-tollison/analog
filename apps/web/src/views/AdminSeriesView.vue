@@ -2,6 +2,7 @@
 import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
 import AddVolumesDialog from '@/components/admin/AddVolumesDialog.vue';
 import AdminSeriesForm from '@/components/admin/AdminSeriesForm.vue';
+import CheckList from '@/components/admin/CheckList.vue';
 import MergeSeriesDialog from '@/components/admin/MergeSeriesDialog.vue';
 import SeriesItemsForm from '@/components/admin/SeriesItemsForm.vue';
 import VerifiedBy from '@/components/admin/VerifiedBy.vue';
@@ -30,6 +31,7 @@ import {
     useAdminSeries,
     useAdminSeriesItems,
     useDeleteAdminSeries,
+    useSeriesChecks,
     useSetSeriesVerified,
 } from '@/composables/useAdmin';
 import { usePageTitle } from '@/composables/usePageTitle';
@@ -54,6 +56,14 @@ const router = useRouter();
 const { data: series, error: seriesError } = useAdminSeries(() => props.id);
 usePageTitle(() => series.value?.title);
 const { data: items, error: itemsError } = useAdminSeriesItems(() => props.id);
+const { data: checks } = useSeriesChecks(() => props.id);
+// The series' own suggestions show at the top, its items' on their rows.
+const seriesChecks = computed(
+    () => checks.value?.filter((check) => !check.catalogItemId) ?? []
+);
+const itemChecks = computed(
+    () => checks.value?.filter((check) => check.catalogItemId) ?? []
+);
 
 const setVerified = useSetSeriesVerified();
 const remove = useDeleteAdminSeries();
@@ -132,6 +142,7 @@ function onDelete() {
                 :series-id="series.id"
                 :series-title="series.title"
                 :volumes="volumes"
+                :volume-count="series.volumeCount"
             />
             <MergeSeriesDialog
                 v-model:open="isMergeOpen"
@@ -193,7 +204,13 @@ function onDelete() {
                     class="h-24 w-16 shrink-0 sm:h-36 sm:w-24"
                 />
                 <div class="grid min-w-0 flex-1 content-start gap-4">
-                    <AdminSeriesForm :key="series.id" :series="series" />
+                    <!-- Rebuilt when an accepted suggestion renames it. -->
+                    <AdminSeriesForm
+                        :key="`${series.id}:${series.title}`"
+                        :series="series"
+                    />
+
+                    <CheckList :checks="seriesChecks" />
 
                     <div class="grid gap-2">
                         <div class="flex flex-wrap gap-2">
@@ -333,6 +350,7 @@ function onDelete() {
                     :series-title="series.title"
                     :volume-count="series.volumeCount"
                     :items="items"
+                    :checks="itemChecks"
                 />
             </section>
         </template>

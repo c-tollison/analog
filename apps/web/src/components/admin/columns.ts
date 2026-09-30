@@ -3,6 +3,7 @@ import CoverImage from '@/components/CoverImage.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { formatDate } from '@/lib/dates';
 
+import { SparklesIcon } from '@lucide/vue';
 import type { ColumnDef, RowData } from '@tanstack/vue-table';
 import { h } from 'vue';
 import { type RouteLocationRaw, RouterLink } from 'vue-router';
@@ -79,6 +80,27 @@ export function titleColumn<
                     : null,
             ]);
         },
+    };
+}
+
+/** How many suggestions `pnpm catalog:check` left, when there are any. */
+export function suggestionsColumn<
+    T extends { suggestions: number },
+>(): ColumnDef<T> {
+    return {
+        id: 'suggestions',
+        header: '',
+        cell: ({ row }) =>
+            row.original.suggestions
+                ? h(
+                      Badge,
+                      {
+                          variant: 'outline',
+                          title: `${row.original.suggestions} suggestions`,
+                      },
+                      () => [h(SparklesIcon), row.original.suggestions]
+                  )
+                : null,
     };
 }
 

@@ -9,7 +9,7 @@ import {
     schema,
     sql,
 } from '@analog/db';
-import type { SeriesChoiceSchema } from '@analog/types';
+import { CheckTrigger, type SeriesChoiceSchema } from '@analog/types';
 
 import {
     createItemClaimingIsbn,
@@ -25,6 +25,7 @@ import {
     seriesForItem,
     type Transaction,
 } from './books.js';
+import { checkInBackground } from './check-runs.js';
 import { db } from './init.js';
 import { HTTPException } from 'hono/http-exception';
 import type { z } from 'zod';
@@ -289,6 +290,10 @@ export async function upsertBook(
     if (updated.seriesId) {
         await refreshSeriesCover(updated.seriesId);
     }
+    checkInBackground(
+        updated.id,
+        picker.admin ? CheckTrigger.Admin : CheckTrigger.Scan
+    );
     return updated;
 }
 

@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import { CheckRule } from '@analog/types';
 import ChangeSeriesDialog from '@/components/admin/ChangeSeriesDialog.vue';
+import CheckHint from '@/components/admin/CheckHint.vue';
 import TitleInput from '@/components/admin/TitleInput.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SaveButton from '@/components/SaveButton.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import { Checkbox } from '@/components/shadcn-components/checkbox';
 import { Empty, EmptyDescription } from '@/components/shadcn-components/empty';
 import {
     FormControl,
@@ -22,10 +23,12 @@ import {
     ItemGroup,
     ItemMedia,
 } from '@/components/shadcn-components/item';
-import { Label } from '@/components/shadcn-components/label';
 import WithTooltip from '@/components/WithTooltip.vue';
 import {
+    type AdminCheck,
     type AdminSeriesItem,
+    useAcceptCheck,
+    useDismissCheck,
     useSetSeriesItems,
 } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
@@ -33,14 +36,22 @@ import { SeriesItemsFormSchema } from '@/lib/admin-schemas';
 import { vNoAutofill } from '@/lib/no-autofill';
 import { missingVolumes } from '@/lib/volumes';
 
-import { ArrowRightLeftIcon, ArrowUpRightIcon } from '@lucide/vue';
+import {
+    ArrowRightLeftIcon,
+    ArrowUpRightIcon,
+    CheckIcon,
+    SparklesIcon,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
+import type { z } from 'zod';
 
 const props = defineProps<{
     seriesId: string;
     seriesTitle: string;
     volumeCount: number | null;
     items: AdminSeriesItem[];
+    // Suggestions `pnpm catalog:check` left on the items.
+    checks: AdminCheck[];
 }>();
 
 const setItems = useSetSeriesItems();
@@ -63,7 +74,6 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 id: item.id,
                 title: item.title,
                 volume: item.position ?? '',
-                verified: item.verifiedAt !== null,
             })),
         },
         onSubmit: async ({ items }) => {
@@ -74,8 +84,7 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 return (
                     !before ||
                     before.title !== item.title ||
-                    before.position !== item.volume ||
-                    (before.verifiedAt !== null) !== item.verified
+                    before.position !== item.volume
                 );
             });
             if (changed.length) {
@@ -123,51 +132,100 @@ const missing = computed(() => {
     return total ? missingVolumes(numbers, total) : null;
 });
 
-const allVerified = computed(() => {
-    const rows = values.items ?? [];
-    const count = rows.filter((row) => row.verified).length;
-    if (count === 0) return false;
-    return count === rows.length ? true : 'indeterminate';
-});
+// Title and volume suggestions fill the form, so they're saved with the
+// rest. Others are accepted or dismissed on their own.
+const FORM_RULES = [CheckRule.TitleStyle, CheckRule.VolumeMismatch];
 
-function setVerified(index: number, checked: boolean | 'indeterminate') {
+function checksFor(itemId: string) {
+    return props.checks.filter((check) => check.catalogItemId === itemId);
+}
+
+function isUsed(index: number, check: AdminCheck): boolean {
+    const row = values.items?.[index];
+    if (!row || check.fix === null) return false;
+    return check.rule === CheckRule.TitleStyle
+        ? row.title === check.fix
+        : String(row.volume) === check.fix;
+}
+
+type Row = z.input<typeof SeriesItemsFormSchema>['items'][number];
+
+function withFix(row: Row, check: AdminCheck): Row {
+    if (check.fix === null) return row;
+    return check.rule === CheckRule.TitleStyle
+        ? { ...row, title: check.fix }
+        : { ...row, volume: Number(check.fix) };
+}
+
+function useFix(index: number, check: AdminCheck) {
     setFieldValue(
         'items',
         (values.items ?? []).map((row, i) =>
-            i === index ? { ...row, verified: checked === true } : row
+            i === index ? withFix(row, check) : row
         )
     );
 }
 
-function setAllVerified(checked: boolean | 'indeterminate') {
-    setFieldValue(
-        'items',
-        (values.items ?? []).map((row) => ({
-            ...row,
-            verified: checked === true,
-        }))
-    );
+// Every form suggestion not filled in yet, by row.
+const unused = computed(() =>
+    props.items.flatMap((item, index) =>
+        checksFor(item.id)
+            .filter((check) => FORM_RULES.includes(check.rule))
+            .filter((check) => !isUsed(index, check))
+            .map((check) => ({ index, check }))
+    )
+);
+
+function useAll() {
+    const rows = [...(values.items ?? [])];
+    for (const { index, check } of unused.value) {
+        const row = rows[index];
+        if (row) rows[index] = withFix(row, check);
+    }
+    setFieldValue('items', rows);
 }
+
+const accept = useAcceptCheck();
+const dismiss = useDismissCheck();
+const checkBusy = computed(
+    () => accept.isPending.value || dismiss.isPending.value
+);
+
+function pendingFor(check: AdminCheck) {
+    if (accept.isPending.value && accept.variables.value === check.id) {
+        return 'accept';
+    }
+    if (dismiss.isPending.value && dismiss.variables.value === check.id) {
+        return 'dismiss';
+    }
+    return null;
+}
+
+const checkError = computed(
+    () => accept.error.value?.message ?? dismiss.error.value?.message ?? null
+);
 </script>
 
 <template>
     <form class="grid gap-3" novalidate @submit="submit">
-        <FormError :message="formError" />
+        <FormError :message="formError ?? checkError" />
         <div
-            v-if="missing || items.length"
+            v-if="missing || unused.length"
             class="flex flex-wrap items-center justify-between gap-2"
         >
             <p class="text-muted-foreground text-sm">
                 <template v-if="missing">Missing {{ missing }}</template>
             </p>
-            <div v-if="items.length" class="flex items-center gap-2">
-                <Checkbox
-                    id="verify-all"
-                    :model-value="allVerified"
-                    @update:model-value="setAllVerified"
-                />
-                <Label for="verify-all">Verify all</Label>
-            </div>
+            <Button
+                v-if="unused.length"
+                type="button"
+                variant="outline"
+                size="sm"
+                @click="useAll"
+            >
+                <SparklesIcon />
+                Use all suggestions ({{ unused.length }})
+            </Button>
         </div>
         <Empty v-if="!items.length">
             <EmptyDescription>Nothing in this series.</EmptyDescription>
@@ -176,7 +234,7 @@ function setAllVerified(checked: boolean | 'indeterminate') {
             <Item
                 v-for="(item, index) in items"
                 :key="item.id"
-                variant="outline"
+                :variant="item.verifiedAt ? 'success' : 'outline'"
                 size="sm"
                 class="flex-nowrap items-start"
             >
@@ -188,103 +246,105 @@ function setAllVerified(checked: boolean | 'indeterminate') {
                         class="h-12 w-8"
                     />
                 </ItemMedia>
-                <ItemContent class="min-w-0 gap-2 md:flex-row md:items-start">
-                    <div class="flex flex-1 items-start gap-1">
-                        <FormField
-                            v-slot="{ componentField }"
-                            v-bind="fieldProps"
-                            :name="`items[${index}].title`"
-                        >
-                            <FormItem class="flex-1">
-                                <FormControl>
-                                    <TitleInput
-                                        :aria-label="`Title of ${item.title}`"
-                                        v-bind="componentField"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                        <WithTooltip label="Change series">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Change series"
-                                @click="openMove(item)"
+                <ItemContent class="min-w-0 gap-2">
+                    <div class="flex flex-col gap-2 md:flex-row md:items-start">
+                        <div class="flex flex-1 items-start gap-1">
+                            <FormField
+                                v-slot="{ componentField }"
+                                v-bind="fieldProps"
+                                :name="`items[${index}].title`"
                             >
-                                <ArrowRightLeftIcon />
-                            </Button>
-                        </WithTooltip>
-                        <WithTooltip label="Open media page">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                as-child
-                                aria-label="Open media page"
-                            >
-                                <RouterLink
-                                    :to="{
+                                <FormItem class="flex-1">
+                                    <FormControl>
+                                        <TitleInput
+                                            :aria-label="`Title of ${item.title}`"
+                                            v-bind="componentField"
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+                            <WithTooltip label="Change series">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Change series"
+                                    @click="openMove(item)"
+                                >
+                                    <ArrowRightLeftIcon />
+                                </Button>
+                            </WithTooltip>
+                            <WithTooltip label="Open media page">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    as-child
+                                    aria-label="Open media page"
+                                >
+                                    <RouterLink
+                                        :to="{
                                         name: 'admin-item',
                                         params: { id: item.id },
                                     }"
-                                >
-                                    <ArrowUpRightIcon />
-                                </RouterLink>
-                            </Button>
-                        </WithTooltip>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <FormField
-                            v-slot="{ componentField }"
-                            v-bind="fieldProps"
-                            :name="`items[${index}].volume`"
+                                    >
+                                        <ArrowUpRightIcon />
+                                    </RouterLink>
+                                </Button>
+                            </WithTooltip>
+                        </div>
+                        <div
+                            class="flex flex-wrap items-center gap-x-4 gap-y-2"
                         >
-                            <FormItem class="flex items-center gap-2">
-                                <FormLabel>Vol.</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        type="number"
-                                        inputmode="decimal"
-                                        v-no-autofill
-                                        min="0"
-                                        step="any"
-                                        class="w-20"
-                                        v-bind="componentField"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                        <FormField
-                            v-slot="{ value }"
-                            :name="`items[${index}].verified`"
-                            type="checkbox"
-                        >
-                            <FormItem class="flex items-center gap-2">
-                                <FormControl>
-                                    <Checkbox
-                                        :model-value="value"
-                                        @update:model-value="
-                                            (checked) =>
-                                                setVerified(index, checked)
-                                        "
-                                    />
-                                </FormControl>
-                                <FormLabel>Verified</FormLabel>
-                            </FormItem>
-                        </FormField>
-                        <Badge
-                            v-if="problem(index)"
-                            :variant="
+                            <FormField
+                                v-slot="{ componentField }"
+                                v-bind="fieldProps"
+                                :name="`items[${index}].volume`"
+                            >
+                                <FormItem class="flex items-center gap-2">
+                                    <FormLabel>Vol.</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            inputmode="decimal"
+                                            v-no-autofill
+                                            min="0"
+                                            step="any"
+                                            class="w-20"
+                                            v-bind="componentField"
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+                            <Badge v-if="item.verifiedAt" variant="success">
+                                <CheckIcon />
+                                Verified
+                            </Badge>
+                            <Badge
+                                v-if="problem(index)"
+                                :variant="
                                 problem(index) === 'Duplicate'
                                     ? 'destructive'
                                     : 'outline'
                             "
-                        >
-                            {{ problem(index) }}
-                        </Badge>
+                            >
+                                {{ problem(index) }}
+                            </Badge>
+                        </div>
                     </div>
+                    <CheckHint
+                        v-for="check in checksFor(item.id)"
+                        :key="check.id"
+                        :check="check"
+                        :disabled="checkBusy"
+                        :pending="pendingFor(check)"
+                        :fillable="FORM_RULES.includes(check.rule)"
+                        :used="isUsed(index, check)"
+                        @use="useFix(index, check)"
+                        @accept="accept.mutate(check.id)"
+                        @dismiss="dismiss.mutate(check.id)"
+                    />
                 </ItemContent>
             </Item>
         </ItemGroup>
