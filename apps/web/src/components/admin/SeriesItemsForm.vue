@@ -8,7 +8,6 @@ import FormError from '@/components/FormError.vue';
 import SaveButton from '@/components/SaveButton.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
-import { Checkbox } from '@/components/shadcn-components/checkbox';
 import { Empty, EmptyDescription } from '@/components/shadcn-components/empty';
 import {
     FormControl,
@@ -24,7 +23,6 @@ import {
     ItemGroup,
     ItemMedia,
 } from '@/components/shadcn-components/item';
-import { Label } from '@/components/shadcn-components/label';
 import WithTooltip from '@/components/WithTooltip.vue';
 import {
     type AdminCheck,
@@ -41,6 +39,7 @@ import { missingVolumes } from '@/lib/volumes';
 import {
     ArrowRightLeftIcon,
     ArrowUpRightIcon,
+    CheckIcon,
     SparklesIcon,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -75,7 +74,6 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 id: item.id,
                 title: item.title,
                 volume: item.position ?? '',
-                verified: item.verifiedAt !== null,
             })),
         },
         onSubmit: async ({ items }) => {
@@ -86,8 +84,7 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                 return (
                     !before ||
                     before.title !== item.title ||
-                    before.position !== item.volume ||
-                    (before.verifiedAt !== null) !== item.verified
+                    before.position !== item.volume
                 );
             });
             if (changed.length) {
@@ -134,22 +131,6 @@ const missing = computed(() => {
     const total = props.volumeCount ?? Math.floor(Math.max(0, ...numbers));
     return total ? missingVolumes(numbers, total) : null;
 });
-
-const allVerified = computed(() => {
-    const rows = values.items ?? [];
-    const count = rows.filter((row) => row.verified).length;
-    if (count === 0) return false;
-    return count === rows.length ? true : 'indeterminate';
-});
-
-function setVerified(index: number, checked: boolean | 'indeterminate') {
-    setFieldValue(
-        'items',
-        (values.items ?? []).map((row, i) =>
-            i === index ? { ...row, verified: checked === true } : row
-        )
-    );
-}
 
 // Title and volume suggestions fill the form, so they're saved with the
 // rest. Others are accepted or dismissed on their own.
@@ -223,48 +204,28 @@ function pendingFor(check: AdminCheck) {
 const checkError = computed(
     () => accept.error.value?.message ?? dismiss.error.value?.message ?? null
 );
-
-function setAllVerified(checked: boolean | 'indeterminate') {
-    setFieldValue(
-        'items',
-        (values.items ?? []).map((row) => ({
-            ...row,
-            verified: checked === true,
-        }))
-    );
-}
 </script>
 
 <template>
     <form class="grid gap-3" novalidate @submit="submit">
         <FormError :message="formError ?? checkError" />
         <div
-            v-if="missing || items.length"
+            v-if="missing || unused.length"
             class="flex flex-wrap items-center justify-between gap-2"
         >
             <p class="text-muted-foreground text-sm">
                 <template v-if="missing">Missing {{ missing }}</template>
             </p>
-            <div v-if="items.length" class="flex items-center gap-4">
-                <Button
-                    v-if="unused.length"
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    @click="useAll"
-                >
-                    <SparklesIcon />
-                    Use all suggestions ({{ unused.length }})
-                </Button>
-                <div class="flex items-center gap-2">
-                    <Checkbox
-                        id="verify-all"
-                        :model-value="allVerified"
-                        @update:model-value="setAllVerified"
-                    />
-                    <Label for="verify-all">Verify all</Label>
-                </div>
-            </div>
+            <Button
+                v-if="unused.length"
+                type="button"
+                variant="outline"
+                size="sm"
+                @click="useAll"
+            >
+                <SparklesIcon />
+                Use all suggestions ({{ unused.length }})
+            </Button>
         </div>
         <Empty v-if="!items.length">
             <EmptyDescription>Nothing in this series.</EmptyDescription>
@@ -273,7 +234,7 @@ function setAllVerified(checked: boolean | 'indeterminate') {
             <Item
                 v-for="(item, index) in items"
                 :key="item.id"
-                variant="outline"
+                :variant="item.verifiedAt ? 'success' : 'outline'"
                 size="sm"
                 class="flex-nowrap items-start"
             >
@@ -356,24 +317,10 @@ function setAllVerified(checked: boolean | 'indeterminate') {
                                     <FormMessage />
                                 </FormItem>
                             </FormField>
-                            <FormField
-                                v-slot="{ value }"
-                                :name="`items[${index}].verified`"
-                                type="checkbox"
-                            >
-                                <FormItem class="flex items-center gap-2">
-                                    <FormControl>
-                                        <Checkbox
-                                            :model-value="value"
-                                            @update:model-value="
-                                            (checked) =>
-                                                setVerified(index, checked)
-                                        "
-                                        />
-                                    </FormControl>
-                                    <FormLabel>Verified</FormLabel>
-                                </FormItem>
-                            </FormField>
+                            <Badge v-if="item.verifiedAt" variant="success">
+                                <CheckIcon />
+                                Verified
+                            </Badge>
                             <Badge
                                 v-if="problem(index)"
                                 :variant="

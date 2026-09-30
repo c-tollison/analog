@@ -17,6 +17,7 @@ import {
     MergeItemSchema,
     SetVerifiedSchema,
     UpdateCatalogItemSchema,
+    UpdateIsbnSchema,
     VerifiedFilter,
 } from '@analog/types';
 
@@ -317,6 +318,29 @@ const adminItems = new Hono<AppEnv>()
             const { id, isbn } = c.req.valid('param');
             const created = await splitOffIsbn(id, isbn, c.get('user').id);
             return c.json({ id: created }, 201);
+        }
+    )
+    .put(
+        '/:id/isbns/:isbn',
+        schemaValidator('param', ItemIsbnParamSchema),
+        schemaValidator('json', UpdateIsbnSchema),
+        async (c) => {
+            const { id, isbn } = c.req.valid('param');
+            const { title } = c.req.valid('json');
+            const [updated] = await db()
+                .update(catalogItemIsbn)
+                .set({ title })
+                .where(
+                    and(
+                        eq(catalogItemIsbn.catalogItemId, id),
+                        eq(catalogItemIsbn.isbn, isbn)
+                    )
+                )
+                .returning({ isbn: catalogItemIsbn.isbn });
+            if (!updated) {
+                throw new HTTPException(404, { message: 'ISBN not found' });
+            }
+            return c.body(null, 204);
         }
     )
     .put(

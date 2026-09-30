@@ -48,6 +48,9 @@ export const ItemSubtitleSchema = z
     .max(CATALOG_TITLE_MAX_LENGTH)
     .transform((value) => value || null);
 
+/** An ISBN's own title, edited on the admin item page. */
+export const UpdateIsbnSchema = z.object({ title: ItemTitleSchema });
+
 export const UpdateCatalogItemSchema = z.object({
     title: ItemTitleSchema,
     // Left out, it stays as it is.
@@ -73,7 +76,6 @@ export const SetSeriesItemsSchema = z.object({
                 id: z.uuid(),
                 title: ItemTitleSchema,
                 volume: VolumeSchema,
-                verified: z.boolean(),
             })
         )
         .min(1)

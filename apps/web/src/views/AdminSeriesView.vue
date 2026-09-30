@@ -142,6 +142,7 @@ function onDelete() {
                 :series-id="series.id"
                 :series-title="series.title"
                 :volumes="volumes"
+                :volume-count="series.volumeCount"
             />
             <MergeSeriesDialog
                 v-model:open="isMergeOpen"

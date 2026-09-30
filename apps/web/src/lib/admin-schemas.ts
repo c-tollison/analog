@@ -28,13 +28,14 @@ export const AdminSeriesFormSchema = z.object({
     kind: z.enum(SeriesKind),
 });
 
+export const IsbnTitleFormSchema = z.object({ title: ItemTitleSchema });
+
 export const SeriesItemsFormSchema = z.object({
     items: z.array(
         z.object({
             id: z.string(),
             title: ItemTitleSchema,
             volume: VolumeField,
-            verified: z.boolean(),
         })
     ),
 });

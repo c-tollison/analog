@@ -11,6 +11,7 @@ import {
     type SetSeriesItemsSchema,
     type SetVerifiedSchema,
     type UpdateCatalogItemSchema,
+    type UpdateIsbnSchema,
     type UpdateSeriesSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
@@ -188,6 +189,24 @@ export function useApproveIsbn() {
             unwrap(
                 await api.admin.items[':id'].isbns[':isbn'].approve.$put({
                     param: { id: itemId, isbn },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
+export function useUpdateIsbn() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({
+            itemId,
+            isbn,
+            ...json
+        }: ItemIsbn & z.input<typeof UpdateIsbnSchema>) =>
+            unwrap(
+                await api.admin.items[':id'].isbns[':isbn'].$put({
+                    param: { id: itemId, isbn },
+                    json,
                 })
             ),
         onSuccess: afterEdit,

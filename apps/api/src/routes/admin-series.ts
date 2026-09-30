@@ -35,7 +35,6 @@ import {
 import {
     checkCountsBySeries,
     clearAppliedItemChecks,
-    clearItemChecks,
     clearSeriesChecks,
     clearSeriesNameChecks,
 } from '../lib/checks.js';
@@ -225,7 +224,6 @@ const adminSeries = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const { items } = c.req.valid('json');
-            const me = c.get('user').id;
             await requireSeries(id);
             const ids = items.map((item) => item.id);
             const inSeries = await db()
@@ -243,32 +241,14 @@ const adminSeries = new Hono<AppEnv>()
                 });
             }
             await db().transaction(async (tx) => {
-                for (const { id: itemId, title, volume, verified } of items) {
+                for (const { id: itemId, title, volume } of items) {
                     await tx
                         .update(catalogItem)
-                        .set({
-                            title,
-                            position: volume,
-                            // Items already verified keep who verified them.
-                            verifiedAt: verified
-                                ? sql`coalesce(${catalogItem.verifiedAt}, now())`
-                                : null,
-                            verifiedByUserId: verified
-                                ? sql`case when ${catalogItem.verifiedAt} is null
-                                    then ${me}::uuid
-                                    else ${catalogItem.verifiedByUserId} end`
-                                : null,
-                            updatedAt: new Date(),
-                        })
+                        .set({ title, position: volume, updatedAt: new Date() })
                         .where(eq(catalogItem.id, itemId));
                 }
             });
-            // Verified items are done; others lose the suggestions they now
-            // match.
-            await clearItemChecks(
-                items.filter((item) => item.verified).map((item) => item.id)
-            );
-            for (const item of items.filter((row) => !row.verified)) {
+            for (const item of items) {
                 await clearAppliedItemChecks(item.id, {
                     title: item.title,
                     volume: item.volume,
