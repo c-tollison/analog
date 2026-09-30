@@ -25,6 +25,7 @@ import { useAddBook } from '@/composables/useCollections';
 import { AddBookFormSchema, SeriesPickSchema } from '@/lib/catalog-schemas';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
+import { volumeFromTitle } from '@/lib/volumes';
 
 import { HistoryIcon } from '@lucide/vue';
 import { StorageSerializers, useLocalStorage } from '@vueuse/core';
@@ -68,6 +69,11 @@ function initialSeries(): SeriesPick | null {
 
 const startingSeries = initialSeries();
 
+// Only guesses for series books, since other titles can end in a number too.
+function guessVolume() {
+    return (startingSeries && volumeFromTitle(props.lookup.book.title)) ?? '';
+}
+
 const storedLastSeries = useLocalStorage<SeriesPick | null>(
     'analog:last-series',
     null,
@@ -94,7 +100,7 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
         initialValues: {
             isSeries: startingSeries !== null,
             series: startingSeries,
-            volume: props.lookup.book.volume ?? '',
+            volume: props.lookup.book.volume ?? guessVolume(),
         },
         onSubmit: async ({ isSeries, series, volume }) => {
             const { collection } = props;
@@ -193,15 +199,24 @@ const seriesNote = computed(() => {
     };
 });
 
-function pickSeries({ id, title }: SeriesPick) {
+// Fills the volume from the title when it's blank.
+function markAsSeries() {
     setFieldValue('isSeries', true);
+    if (!values.volume) {
+        setFieldValue('volume', volumeFromTitle(book.value.title) ?? '');
+    }
+}
+
+function pickSeries({ id, title }: SeriesPick) {
+    markAsSeries();
     setFieldValue('series', { id, title });
 }
 
 function onSeriesToggle(checked: boolean | 'indeterminate') {
-    setFieldValue('isSeries', checked === true);
-
-    if (checked !== true) {
+    if (checked === true) {
+        markAsSeries();
+    } else {
+        setFieldValue('isSeries', false);
         setFieldValue('volume', '');
     }
 }
