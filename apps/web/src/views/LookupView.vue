@@ -5,13 +5,17 @@ import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import SearchInput from '@/components/SearchInput.vue';
+import BookResult from '@/components/scan/BookResult.vue';
 import IsbnScanner from '@/components/scan/IsbnScanner.vue';
+import { Alert, AlertDescription } from '@/components/shadcn-components/alert';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
+import { Empty, EmptyDescription } from '@/components/shadcn-components/empty';
 import {
     Item,
     ItemActions,
     ItemContent,
+    ItemDescription,
     ItemGroup,
     ItemMedia,
     ItemTitle,
@@ -32,6 +36,12 @@ import {
     TabsTrigger,
 } from '@/components/shadcn-components/tabs';
 import {
+    type GoogleResult,
+    type IsbnLookup,
+    useGoogleSearch,
+    useIsbnLookup,
+} from '@/composables/useCatalog';
+import {
     useAddCollectionItems,
     useCatalogItems,
     useCollection,
@@ -40,7 +50,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import { MEDIA_TYPES, type MediaTypeValue } from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
 
-import { PlusIcon } from '@lucide/vue';
+import { CheckCircleIcon, PlusIcon, SearchIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -73,6 +83,45 @@ const { term, isTyping } = useSearchTerm(query);
 const results = useCatalogItems(() => props.collectionId, term, undefined, {
     pending: isTyping,
 });
+
+// Google is searched when asked to, or when nothing here matches.
+const searchMoreTerm = ref<string | null>(null);
+const showGoogle = computed(
+    () =>
+        !!term.value &&
+        !isTyping.value &&
+        (searchMoreTerm.value === term.value ||
+            (!results.isLoading && !results.error && !results.items.length))
+);
+const {
+    data: googleResults,
+    isLoading: googleLoading,
+    error: googleError,
+} = useGoogleSearch(term, showGoogle);
+
+const lookupIsbn = useIsbnLookup();
+const picked = ref<IsbnLookup | null>(null);
+const picking = ref<string | null>(null);
+const pickError = ref<string | null>(null);
+const lastAdded = ref<string | null>(null);
+
+async function pick(result: GoogleResult) {
+    picking.value = result.isbn;
+    pickError.value = null;
+    lastAdded.value = null;
+    try {
+        picked.value = await lookupIsbn(result.isbn);
+    } catch (err) {
+        pickError.value = err instanceof Error ? err.message : null;
+    } finally {
+        picking.value = null;
+    }
+}
+
+function onAdded() {
+    lastAdded.value = picked.value?.book.title ?? null;
+    picked.value = null;
+}
 
 const addItems = useAddCollectionItems();
 const adding = ref(new Set<string>());
@@ -118,60 +167,149 @@ const error = computed(
             </TabsList>
 
             <TabsContent value="lookup" class="grid gap-4 pt-2">
-                <SearchInput v-model="query" placeholder="Search titles" />
+                <Alert v-if="lastAdded && !picked">
+                    <CheckCircleIcon />
+                    <AlertDescription>
+                        Added {{ lastAdded }} to {{ collection.name }}.
+                    </AlertDescription>
+                </Alert>
 
-                <PagedList
-                    v-if="term"
-                    :list="results"
-                    empty-text="No titles match."
-                >
-                    <template #default="{ items }">
-                        <ItemGroup>
+                <BookResult
+                    v-if="picked"
+                    :key="picked.book.isbn"
+                    :lookup="picked"
+                    :collection="collection"
+                    done-text="Back to results"
+                    @done="picked = null"
+                    @added="onAdded"
+                />
+                <template v-else>
+                    <SearchInput v-model="query" placeholder="Search titles" />
+
+                    <PagedList
+                        v-if="term"
+                        :list="results"
+                        empty-text="No titles match."
+                    >
+                        <template #default="{ items }">
+                            <ItemGroup>
+                                <Item
+                                    v-for="(item, index) in items"
+                                    v-bind="staggerIn(index)"
+                                    :key="item.id"
+                                    size="sm"
+                                >
+                                    <ItemMedia>
+                                        <CoverImage
+                                            :src="item.coverUrl"
+                                            alt=""
+                                            size="sm"
+                                            class="h-12 w-8"
+                                        />
+                                    </ItemMedia>
+                                    <ItemContent>
+                                        <ItemTitle>
+                                            <span v-if="item.position !== null">
+                                                Vol. {{ item.position }} ·
+                                            </span>
+                                            {{ item.title }}
+                                        </ItemTitle>
+                                    </ItemContent>
+                                    <ItemActions>
+                                        <Badge
+                                            v-if="item.inCollection"
+                                            variant="secondary"
+                                        >
+                                            Added
+                                        </Badge>
+                                        <Button
+                                            v-else
+                                            variant="outline"
+                                            size="sm"
+                                            :disabled="adding.has(item.id)"
+                                            @click="add(item.id)"
+                                        >
+                                            <Spinner
+                                                v-if="adding.has(item.id)"
+                                            />
+                                            <PlusIcon v-else />
+                                            Add
+                                        </Button>
+                                    </ItemActions>
+                                </Item>
+                            </ItemGroup>
+                        </template>
+                    </PagedList>
+
+                    <Button
+                        v-if="term && !isTyping && !showGoogle"
+                        variant="outline"
+                        @click="searchMoreTerm = term"
+                    >
+                        <SearchIcon />
+                        Search more
+                    </Button>
+
+                    <section v-if="showGoogle" class="grid gap-2">
+                        <h2 class="font-medium">More results</h2>
+                        <FormError
+                            :message="pickError ?? googleError?.message ?? null"
+                        />
+                        <div
+                            v-if="googleLoading"
+                            class="flex justify-center p-8"
+                        >
+                            <Spinner class="size-6" />
+                        </div>
+                        <Empty
+                            v-else-if="googleResults && !googleResults.length"
+                            class="motion-safe:animate-in fade-in animation-duration-500"
+                        >
+                            <EmptyDescription>Nothing found.</EmptyDescription>
+                        </Empty>
+                        <ItemGroup v-else-if="googleResults">
                             <Item
-                                v-for="(item, index) in items"
+                                v-for="(result, index) in googleResults"
                                 v-bind="staggerIn(index)"
-                                :key="item.id"
+                                :key="result.isbn"
                                 size="sm"
                             >
                                 <ItemMedia>
                                     <CoverImage
-                                        :src="item.coverUrl"
+                                        :src="result.coverUrl"
                                         alt=""
                                         size="sm"
                                         class="h-12 w-8"
                                     />
                                 </ItemMedia>
                                 <ItemContent>
-                                    <ItemTitle>
-                                        <span v-if="item.position !== null">
-                                            Vol. {{ item.position }} ·
-                                        </span>
-                                        {{ item.title }}
-                                    </ItemTitle>
+                                    <ItemTitle>{{ result.title }}</ItemTitle>
+                                    <ItemDescription>
+                                        {{
+                                        [result.author, result.language, result.year]
+                                            .filter(Boolean)
+                                            .join(' · ')
+                                        }}
+                                    </ItemDescription>
                                 </ItemContent>
                                 <ItemActions>
-                                    <Badge
-                                        v-if="item.inCollection"
-                                        variant="secondary"
-                                    >
-                                        Added
-                                    </Badge>
                                     <Button
-                                        v-else
                                         variant="outline"
                                         size="sm"
-                                        :disabled="adding.has(item.id)"
-                                        @click="add(item.id)"
+                                        :disabled="picking !== null"
+                                        @click="pick(result)"
                                     >
-                                        <Spinner v-if="adding.has(item.id)" />
+                                        <Spinner
+                                            v-if="picking === result.isbn"
+                                        />
                                         <PlusIcon v-else />
                                         Add
                                     </Button>
                                 </ItemActions>
                             </Item>
                         </ItemGroup>
-                    </template>
-                </PagedList>
+                    </section>
+                </template>
             </TabsContent>
 
             <TabsContent value="scan" class="grid gap-4 pt-2">

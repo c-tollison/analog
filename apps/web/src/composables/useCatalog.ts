@@ -4,14 +4,45 @@ import { type ApiClient, api, unwrap } from '@/lib/api';
 import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
 import { SERIES_KEY } from './useSeries';
-import { useMutation, useQueryClient } from '@tanstack/vue-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { type MaybeRefOrGetter, toValue } from 'vue';
 
 export type IsbnLookup = InferResponseType<
     ApiClient['catalog']['isbn'][':isbn']['$get'],
     200
 >;
 
+export type GoogleResult = InferResponseType<
+    ApiClient['catalog']['search']['google']['$get'],
+    200
+>[number];
+
 export const CATALOG_KEY = ['catalog'] as const;
+
+// Kept apart from CATALOG_KEY, so adding a book doesn't search Google again.
+const GOOGLE_KEY = ['google-books'] as const;
+
+/**
+ * Searches Google Books by title. Each search counts against a daily limit,
+ * so results are kept for the session and failures aren't retried.
+ */
+export function useGoogleSearch(
+    term: MaybeRefOrGetter<string>,
+    enabled: MaybeRefOrGetter<boolean>
+) {
+    return useQuery({
+        queryKey: () => [...GOOGLE_KEY, toValue(term)],
+        queryFn: async () =>
+            unwrap(
+                await api.catalog.search.google.$get({
+                    query: { q: toValue(term) },
+                })
+            ),
+        enabled: () => !!toValue(term) && toValue(enabled),
+        staleTime: Number.POSITIVE_INFINITY,
+        retry: false,
+    });
+}
 
 /**
  * Looks up an ISBN on demand (e.g. from a scan), through the cache so

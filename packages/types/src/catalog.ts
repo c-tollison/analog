@@ -9,6 +9,10 @@ export const SeriesSearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().max(200).optional(),
 });
 
+export const GoogleSearchQuerySchema = z.object({
+    q: z.string().trim().min(1).max(200),
+});
+
 export const COLLECTION_NAME_MAX_LENGTH = 64;
 
 export const SeriesTitleSchema = z

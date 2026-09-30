@@ -30,10 +30,14 @@ import { StorageSerializers, useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
 // Without a collection, only the book shows until one is picked.
-const props = defineProps<{
-    lookup: IsbnLookup;
-    collection: Pick<CollectionSummary, 'id' | 'name'> | null;
-}>();
+const props = withDefaults(
+    defineProps<{
+        lookup: IsbnLookup;
+        collection: Pick<CollectionSummary, 'id' | 'name'> | null;
+        doneText?: string;
+    }>(),
+    { doneText: 'Scan another' }
+);
 
 const emit = defineEmits<{ done: []; added: [] }>();
 
@@ -332,6 +336,8 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             </Button>
         </form>
 
-        <Button variant="outline" @click="emit('done')">Scan another</Button>
+        <Button variant="outline" @click="emit('done')">
+            {{ doneText }}
+        </Button>
     </section>
 </template>

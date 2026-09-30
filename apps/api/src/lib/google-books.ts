@@ -157,3 +157,113 @@ export async function lookupGoogleBooksIsbn(
         sourceId: volume.id,
     };
 }
+
+// Google sends at most 20 results a request, even when asked for more.
+const PAGE_SIZE = 20;
+
+interface SearchOptions {
+    offset?: number;
+    // An ISO 639-1 code, like "en".
+    lang?: string;
+}
+
+async function searchVolumes(
+    query: string,
+    { offset = 0, lang }: SearchOptions
+): Promise<Volume[]> {
+    const params = new URLSearchParams({
+        q: query,
+        printType: 'books',
+        maxResults: String(PAGE_SIZE),
+        startIndex: String(offset),
+    });
+    if (lang) {
+        params.set('langRestrict', lang);
+    }
+    const { apiKey } = config().googleBooks;
+    const search = SearchSchema.safeParse(
+        await getJson(`/volumes?${params}`, apiKey)
+    );
+    return search.data?.items ?? [];
+}
+
+function firstIsbn(volume: Volume): string | null {
+    for (const { identifier } of volume.volumeInfo.industryIdentifiers ?? []) {
+        const isbn = normalizeIsbn(identifier);
+        if (isbn) {
+            return isbn;
+        }
+    }
+    return null;
+}
+
+// Same title and language, ignoring case and punctuation.
+function sameBookKey(volume: Volume): string {
+    const { title, language } = volume.volumeInfo;
+    const words = title.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+    return `${words.join(' ')}|${language ?? ''}`;
+}
+
+function searchResult(volume: Volume, isbn: string) {
+    const info = volume.volumeInfo;
+    return {
+        isbn,
+        title: info.title,
+        author: info.authors?.[0] ?? null,
+        language: languageName(info.language),
+        year: info.publishedDate?.match(/^\d{4}/)?.[0] ?? null,
+        coverUrl: coverUrl(info.imageLinks),
+        volume: parseVolume(info.title, null) ?? displayNumber(volume),
+    };
+}
+
+type SearchResult = ReturnType<typeof searchResult>;
+
+// Drops volumes with no ISBN and keeps one of each ISBN, and of each title
+// in a language: the first Google ranked, or the first with a cover.
+function cleanResults(volumes: Volume[]): SearchResult[] {
+    const kept = new Map<string, SearchResult>();
+    const isbns = new Set<string>();
+    for (const volume of volumes) {
+        const isbn = firstIsbn(volume);
+        if (!isbn || isbns.has(isbn)) {
+            continue;
+        }
+        isbns.add(isbn);
+        const key = sameBookKey(volume);
+        const found = kept.get(key);
+        if (!found || (!found.coverUrl && volume.volumeInfo.imageLinks)) {
+            kept.set(key, searchResult(volume, isbn));
+        }
+    }
+    return [...kept.values()];
+}
+
+/**
+ * Searches Google Books titles, a page at a time. When the first page isn't
+ * full, the plain query's results come after it, which finds searches that
+ * include an author's name.
+ */
+export async function searchGoogleBooks(q: string, options: SearchOptions) {
+    const words = q
+        .split(/\s+/)
+        .map((word) => word.replace(/["':]/g, ''))
+        .filter(Boolean);
+    const offset = options.offset ?? 0;
+
+    const byTitle = words.length
+        ? await searchVolumes(
+              words.map((word) => `intitle:${word}`).join(' '),
+              options
+          )
+        : [];
+    if (byTitle.length >= PAGE_SIZE) {
+        return {
+            items: cleanResults(byTitle),
+            nextOffset: offset + PAGE_SIZE,
+        };
+    }
+    // Later pages of the plain query are mostly unrelated books.
+    const plain = offset === 0 ? await searchVolumes(q, options) : [];
+    return { items: cleanResults([...byTitle, ...plain]), nextOffset: null };
+}
