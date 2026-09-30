@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
+import AddVolumesDialog from '@/components/admin/AddVolumesDialog.vue';
 import AdminSeriesForm from '@/components/admin/AdminSeriesForm.vue';
 import MergeSeriesDialog from '@/components/admin/MergeSeriesDialog.vue';
 import SeriesItemsForm from '@/components/admin/SeriesItemsForm.vue';
@@ -40,6 +41,7 @@ import {
     LinkIcon,
     MergeIcon,
     PencilIcon,
+    PlusIcon,
     Trash2Icon,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -59,6 +61,13 @@ const remove = useDeleteAdminSeries();
 const isLinkOpen = ref(false);
 const isVolumeCountOpen = ref(false);
 const isMergeOpen = ref(false);
+const isAddVolumesOpen = ref(false);
+const volumes = computed(
+    () =>
+        items.value?.flatMap((item) =>
+            item.position === null ? [] : [item.position]
+        ) ?? []
+);
 // The series to merge into, when picked from the duplicate warning.
 const mergeInto = ref<{ id: string; title: string } | null>(null);
 
@@ -117,6 +126,12 @@ function onDelete() {
                 confirm-text="Delete"
                 :pending="remove.isPending.value"
                 @confirm="onDelete"
+            />
+            <AddVolumesDialog
+                v-model:open="isAddVolumesOpen"
+                :series-id="series.id"
+                :series-title="series.title"
+                :volumes="volumes"
             />
             <MergeSeriesDialog
                 v-model:open="isMergeOpen"
@@ -294,7 +309,17 @@ function onDelete() {
             <Separator />
 
             <section class="grid gap-3">
-                <h2 class="font-semibold">Volumes</h2>
+                <div class="flex items-center justify-between gap-2">
+                    <h2 class="font-semibold">Volumes</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        @click="isAddVolumesOpen = true"
+                    >
+                        <PlusIcon />
+                        Add volumes
+                    </Button>
+                </div>
                 <div
                     v-if="!items && !itemsError"
                     class="flex justify-center p-4"

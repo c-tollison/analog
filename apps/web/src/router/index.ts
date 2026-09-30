@@ -41,12 +41,6 @@ export const router = createRouter({
                     redirect: { name: 'collections' },
                 },
                 {
-                    path: 'scan',
-                    name: 'scan',
-                    meta: { title: 'Scan' },
-                    component: () => import('@/views/ScanView.vue'),
-                },
-                {
                     path: 'lookup',
                     name: 'lookup',
                     meta: { title: 'Add media' },
@@ -143,6 +137,12 @@ export const router = createRouter({
                     path: 'admin',
                     name: 'admin',
                     component: () => import('@/views/AdminView.vue'),
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
+                },
+                {
+                    path: 'admin/lookup',
+                    name: 'admin-lookup',
+                    component: () => import('@/views/AdminLookupView.vue'),
                     meta: { title: 'Admin', requiresRole: UserRole.Admin },
                 },
                 {

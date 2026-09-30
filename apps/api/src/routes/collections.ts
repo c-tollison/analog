@@ -541,7 +541,10 @@ const collections = new Hono<AppEnv>()
             const user = c.get('user');
             await requireMember(id, user.id);
 
-            const item = await upsertBook(isbn, seriesChoice, volume, user.id);
+            const item = await upsertBook(isbn, seriesChoice, volume, {
+                userId: user.id,
+                admin: false,
+            });
 
             // A collection holds each volume once. Another edition of one it
             // already has joins that entry.

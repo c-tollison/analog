@@ -3,15 +3,80 @@ import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
+import { usePaginatedList } from './usePaginatedList';
 import { SERIES_KEY } from './useSeries';
-import { useMutation, useQueryClient } from '@tanstack/vue-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { type MaybeRefOrGetter, toValue } from 'vue';
 
 export type IsbnLookup = InferResponseType<
     ApiClient['catalog']['isbn'][':isbn']['$get'],
     200
 >;
 
+export type GoogleResult = InferResponseType<
+    ApiClient['catalog']['search']['google']['$get'],
+    200
+>[number];
+
 export const CATALOG_KEY = ['catalog'] as const;
+
+/**
+ * How long typing must pause before Google is searched. Longer than other
+ * searches, since each one counts against the daily limit.
+ */
+export const GOOGLE_SEARCH_DELAY_MS = 1000;
+
+// Kept apart from CATALOG_KEY, and skipped by admin edits, so adding a book
+// doesn't search Google again.
+export const GOOGLE_KEY = ['google-books'] as const;
+
+/**
+ * Searches Google Books by title. Each search counts against a daily limit,
+ * so results are kept for the session and failures aren't retried.
+ */
+export function useGoogleSearch(
+    term: MaybeRefOrGetter<string>,
+    enabled: MaybeRefOrGetter<boolean>
+) {
+    // Google ignores case, so "Haikyu" and "haikyu" share one search.
+    const q = () => toValue(term).toLowerCase();
+    return useQuery({
+        queryKey: () => [...GOOGLE_KEY, q()],
+        queryFn: async () =>
+            unwrap(await api.catalog.search.google.$get({ query: { q: q() } })),
+        enabled: () => !!toValue(term) && toValue(enabled),
+        staleTime: Number.POSITIVE_INFINITY,
+        retry: false,
+    });
+}
+
+/**
+ * Searches Google Books by title for admins, a page at a time, optionally in
+ * one language. Pages are kept for the session, like `useGoogleSearch`.
+ */
+export function useAdminGoogleSearch(
+    term: MaybeRefOrGetter<string>,
+    lang: MaybeRefOrGetter<string | null>,
+    enabled: MaybeRefOrGetter<boolean>
+) {
+    const q = () => toValue(term).toLowerCase();
+    return usePaginatedList(
+        () => [...GOOGLE_KEY, 'admin', q(), toValue(lang)],
+        async (offset) => {
+            const language = toValue(lang);
+            return unwrap(
+                await api.admin.google.$get({
+                    query: {
+                        q: q(),
+                        offset,
+                        ...(language ? { lang: language } : {}),
+                    },
+                })
+            );
+        },
+        { enabled: () => !!toValue(term) && toValue(enabled), once: true }
+    );
+}
 
 /**
  * Looks up an ISBN on demand (e.g. from a scan), through the cache so

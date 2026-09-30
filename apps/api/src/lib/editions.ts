@@ -20,6 +20,7 @@ import {
     type Lookup,
     lookupBook,
     refreshSeriesCover,
+    type SeriesPicker,
     saveLater,
     seriesForItem,
     type Transaction,
@@ -143,10 +144,15 @@ async function moveItemInto(
 
 /**
  * Moves a scanned book onto another item for the same volume. Its ISBN waits
- * on an admin there. Only an item with no series that isn't verified can
- * join, and false means someone else placed it first.
+ * on an admin there, unless an admin added it. Only an item with no series
+ * that isn't verified can join, and false means someone else placed it
+ * first.
  */
-async function joinItem(fromId: string, intoId: string): Promise<boolean> {
+async function joinItem(
+    fromId: string,
+    intoId: string,
+    { pending }: { pending: boolean }
+): Promise<boolean> {
     const { catalogItem } = schema;
     return db().transaction(async (tx) => {
         // Locks the row, so a scan placing it at the same time waits.
@@ -164,7 +170,7 @@ async function joinItem(fromId: string, intoId: string): Promise<boolean> {
         if (!joinable) {
             return false;
         }
-        await moveItemInto(tx, fromId, intoId, { pending: true });
+        await moveItemInto(tx, fromId, intoId, { pending });
         return true;
     });
 }
@@ -221,7 +227,7 @@ export async function addEdition(
     userId: string
 ): Promise<boolean> {
     const { item } = await findOrCreateBook(isbn, userId);
-    return item.id === itemId || joinItem(item.id, itemId);
+    return item.id === itemId || joinItem(item.id, itemId, { pending: true });
 }
 
 /**
@@ -230,21 +236,22 @@ export async function addEdition(
  * Library's series data is unreliable. After that, only admins change them.
  *
  * When the series already has an item at that volume, the ISBN joins it as
- * another edition, waiting on an admin. Otherwise the item takes the spot.
+ * another edition, waiting on an admin unless an admin added it. Otherwise
+ * the item takes the spot.
  */
 export async function upsertBook(
     isbn: string,
     seriesChoice: SeriesChoice | null,
     volume: number | null,
-    userId: string
+    picker: SeriesPicker
 ): Promise<CatalogItem> {
-    const { item } = await findOrCreateBook(isbn, userId);
+    const { item } = await findOrCreateBook(isbn, picker.userId);
     if (item.seriesId || item.verifiedAt) {
         return item;
     }
 
     const series = seriesChoice
-        ? await seriesForItem(seriesChoice, item, { userId, admin: false })
+        ? await seriesForItem(seriesChoice, item, picker)
         : null;
 
     const sameVolume =
@@ -252,7 +259,9 @@ export async function upsertBook(
             ? await findVolume(series.id, volume, item.id)
             : null;
     if (sameVolume) {
-        const joined = await joinItem(item.id, sameVolume.id);
+        const joined = await joinItem(item.id, sameVolume.id, {
+            pending: !picker.admin,
+        });
         return joined ? sameVolume : ((await findBookByIsbn(isbn)) ?? item);
     }
 

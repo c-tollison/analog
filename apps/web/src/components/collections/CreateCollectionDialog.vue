@@ -24,17 +24,20 @@ import { CreateCollectionSchema } from '@/lib/catalog-schemas';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import { watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 const open = defineModel<boolean>('open', { required: true });
 
+const router = useRouter();
 const create = useCreateCollection();
 
 const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
     schema: CreateCollectionSchema,
     initialValues: { name: '' },
     onSubmit: async (values) => {
-        await create.mutateAsync(values);
+        const { id } = await create.mutateAsync(values);
         open.value = false;
+        await router.push({ name: 'collection', params: { id } });
         return undefined;
     },
 });

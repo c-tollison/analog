@@ -10,6 +10,7 @@ import {
     schema,
 } from '@analog/db';
 import {
+    AddBookSchema,
     AdminItemListQuerySchema,
     IsbnSchema,
     MergeItemSchema,
@@ -34,7 +35,7 @@ import {
     seriesForItem,
 } from '../lib/books.js';
 import { toCover, uploadedCoverUrl } from '../lib/covers.js';
-import { mergeItem, splitOffIsbn } from '../lib/editions.js';
+import { mergeItem, splitOffIsbn, upsertBook } from '../lib/editions.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -148,6 +149,16 @@ const adminItems = new Hono<AppEnv>()
             }
         );
         return c.json(result);
+    })
+    // Adds a book to the shared catalog without a collection. Any series can
+    // be picked.
+    .post('/', schemaValidator('json', AddBookSchema), async (c) => {
+        const { isbn, series: seriesChoice, volume } = c.req.valid('json');
+        const item = await upsertBook(isbn, seriesChoice, volume, {
+            userId: c.get('user').id,
+            admin: true,
+        });
+        return c.json({ id: item.id, seriesId: item.seriesId }, 201);
     })
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');

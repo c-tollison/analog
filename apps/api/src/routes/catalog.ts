@@ -1,5 +1,6 @@
 import { and, eq, schema, sql } from '@analog/db';
 import {
+    GoogleSearchQuerySchema,
     IsbnSchema,
     ProgressStatus,
     ReviewSchema,
@@ -15,6 +16,7 @@ import {
     suggestSeries,
     toBookLookup,
 } from '../lib/books.js';
+import { searchGoogleBooks } from '../lib/google-books.js';
 import { db } from '../lib/init.js';
 import { IdParamSchema } from '../lib/params.js';
 import { isCompleted } from '../lib/progress.js';
@@ -174,6 +176,15 @@ const catalog = new Hono<AppEnv>()
                 savedSeriesTitle: item.series?.title ?? null,
                 savedVolume: item.series ? item.position : null,
             });
+        }
+    )
+    .get(
+        '/search/google',
+        schemaValidator('query', GoogleSearchQuerySchema),
+        async (c) => {
+            const { q } = c.req.valid('query');
+            const { items } = await searchGoogleBooks(q, {});
+            return c.json(items);
         }
     )
     // A cover an admin uploaded. Its URL changes with each upload.

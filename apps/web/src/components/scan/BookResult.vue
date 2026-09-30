@@ -17,6 +17,7 @@ import {
 } from '@/components/shadcn-components/form';
 import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import { useSaveAdminBook } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
 import type { IsbnLookup } from '@/composables/useCatalog';
 import type { CollectionSummary } from '@/composables/useCollections';
@@ -29,13 +30,23 @@ import { HistoryIcon } from '@lucide/vue';
 import { StorageSerializers, useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
-// Without a collection, only the book shows until one is picked.
-const props = defineProps<{
-    lookup: IsbnLookup;
-    collection: Pick<CollectionSummary, 'id' | 'name'> | null;
-}>();
+// Without a collection, only the book shows until one is picked. `admin`
+// saves the book with no collection, and any series can be picked.
+const props = withDefaults(
+    defineProps<{
+        lookup: IsbnLookup;
+        collection: Pick<CollectionSummary, 'id' | 'name'> | null;
+        doneText?: string;
+        admin?: boolean;
+    }>(),
+    { doneText: 'Scan another', admin: false }
+);
 
-const emit = defineEmits<{ done: []; added: [] }>();
+const emit = defineEmits<{
+    done: [];
+    added: [];
+    saved: [saved: { itemId: string; seriesId: string | null }];
+}>();
 
 const book = computed(() => props.lookup.book);
 const added = ref(false);
@@ -69,6 +80,11 @@ const lastSeries = computed(() => {
 });
 
 const addBook = useAddBook();
+const saveAdminBook = useSaveAdminBook();
+
+const canSubmit = computed(
+    () => props.admin || (!!props.collection && !alreadyInCollection.value)
+);
 
 const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
     useAppForm({
@@ -80,15 +96,11 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
         },
         onSubmit: async ({ isSeries, series, volume }) => {
             const { collection } = props;
-            if (!collection) {
-                return undefined;
-            }
             if (!isSeries) {
                 series = null;
                 volume = null;
             }
-            const saved = await addBook.mutateAsync({
-                collectionId: collection.id,
+            const choice = {
                 isbn: book.value.isbn,
                 series: series
                     ? series.id
@@ -96,7 +108,18 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                         : { title: series.title }
                     : null,
                 volume,
-            });
+            };
+            const saved = props.admin
+                ? await saveAdminBook.mutateAsync(choice)
+                : collection
+                  ? await addBook.mutateAsync({
+                        ...choice,
+                        collectionId: collection.id,
+                    })
+                  : null;
+            if (!saved) {
+                return undefined;
+            }
             if (series) {
                 // A new series has its id now.
                 storedLastSeries.value = {
@@ -104,8 +127,12 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                     title: series.title,
                 };
             }
-            added.value = true;
-            emit('added');
+            if (props.admin) {
+                emit('saved', { itemId: saved.id, seriesId: saved.seriesId });
+            } else {
+                added.value = true;
+                emit('added');
+            }
             return undefined;
         },
     });
@@ -216,12 +243,7 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             </div>
         </div>
 
-        <form
-            v-if="collection && !alreadyInCollection"
-            class="grid gap-4"
-            novalidate
-            @submit="submit"
-        >
+        <form v-if="canSubmit" class="grid gap-4" novalidate @submit="submit">
             <FormError :message="formError" />
             <p v-if="lookup.savedSeriesTitle" class="text-sm">
                 {{ lookup.savedSeriesTitle }}
@@ -277,7 +299,10 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                         <FormItem>
                             <FormLabel>Series</FormLabel>
                             <FormControl>
-                                <SeriesPicker v-bind="componentField" />
+                                <SeriesPicker
+                                    :admin="admin"
+                                    v-bind="componentField"
+                                />
                             </FormControl>
                             <p
                                 v-if="seriesNote"
@@ -328,10 +353,12 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             </template>
             <Button type="submit" :disabled="isSubmitting">
                 <Spinner v-if="isSubmitting" />
-                Add to {{ collection.name }}
+                {{ admin ? 'Save' : `Add to ${collection?.name}` }}
             </Button>
         </form>
 
-        <Button variant="outline" @click="emit('done')">Scan another</Button>
+        <Button variant="outline" @click="emit('done')">
+            {{ doneText }}
+        </Button>
     </section>
 </template>

@@ -1,4 +1,8 @@
-import { SeriesChoiceSchema, SeriesTitleSchema } from './catalog.js';
+import {
+    GoogleSearchQuerySchema,
+    SeriesChoiceSchema,
+    SeriesTitleSchema,
+} from './catalog.js';
 import { SeriesKind } from './catalog-enums.js';
 import { PageQuerySchema } from './pagination.js';
 import { z } from 'zod';
@@ -68,3 +72,12 @@ export const SetSeriesItemsSchema = z.object({
 });
 
 export const MergeSeriesSchema = z.object({ intoSeriesId: z.uuid() });
+
+export const AdminGoogleSearchQuerySchema = GoogleSearchQuerySchema.extend({
+    // An ISO 639-1 code, like "en".
+    lang: z
+        .string()
+        .regex(/^[a-z]{2}$/)
+        .optional(),
+    offset: z.coerce.number().int().min(0).max(1000).default(0),
+});

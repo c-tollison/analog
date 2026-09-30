@@ -1,5 +1,6 @@
 import type { InferResponseType } from '@analog/api/client';
 import {
+    type AddBookSchema,
     type AdminItemListQuerySchema,
     type AdminListQuerySchema,
     DEFAULT_PAGE_SIZE,
@@ -13,6 +14,7 @@ import {
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
+import { GOOGLE_KEY } from './useCatalog';
 import {
     keepPreviousData,
     useMutation,
@@ -20,7 +22,7 @@ import {
     useQueryClient,
 } from '@tanstack/vue-query';
 import { useFileDialog } from '@vueuse/core';
-import { type MaybeRefOrGetter, toValue } from 'vue';
+import { type MaybeRefOrGetter, ref, toValue } from 'vue';
 import type { z } from 'zod';
 
 export const ADMIN_KEY = ['admin'] as const;
@@ -80,21 +82,28 @@ function listQuery({ q, status, sort, limit, offset }: AdminListQuery) {
 }
 
 /**
- * Admin edits change data every page shows, so everything is refetched.
+ * Admin edits change data every page shows, so everything is refetched,
+ * except Google searches, which don't change and count against a limit.
  * After a delete, nothing refetches until it's shown again, so the deleted
  * row's page doesn't reload first.
  */
 function useInvalidateAll() {
     const queryClient = useQueryClient();
+    const predicate = ({ queryKey }: { queryKey: readonly unknown[] }) =>
+        queryKey[0] !== GOOGLE_KEY[0];
     return {
-        afterEdit: () => queryClient.invalidateQueries(),
+        afterEdit: () => queryClient.invalidateQueries({ predicate }),
         afterDelete: () =>
-            queryClient.invalidateQueries({ refetchType: 'none' }),
+            queryClient.invalidateQueries({ predicate, refetchType: 'none' }),
     };
 }
 
-export function useAdminItems(query: MaybeRefOrGetter<AdminItemListQuery>) {
+export function useAdminItems(
+    query: MaybeRefOrGetter<AdminItemListQuery>,
+    enabled: MaybeRefOrGetter<boolean> = true
+) {
     return useQuery({
+        enabled: () => toValue(enabled),
         queryKey: () => [...ADMIN_KEY, 'items', 'list', toValue(query)],
         queryFn: async () => {
             const { noCover, ...rest } = toValue(query);
@@ -323,6 +332,81 @@ export function useSetSeriesVerified() {
             ),
         onSuccess: afterEdit,
     });
+}
+
+/** Adds a book to the shared catalog, without a collection. */
+export function useSaveAdminBook() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async (json: z.output<typeof AddBookSchema>) =>
+            unwrap(await api.admin.items.$post({ json })),
+        onSuccess: afterEdit,
+    });
+}
+
+export interface NewVolume {
+    isbn: string;
+    title: string;
+    volume: number | null;
+}
+
+export interface VolumeProblem extends NewVolume {
+    // The item that already has the ISBN, when that's the problem.
+    itemId: string | null;
+    message: string;
+}
+
+/**
+ * Adds books to a series one request at a time, counting them in `done`.
+ * A book whose ISBN is already on another item stays there, and one that
+ * fails doesn't stop the rest. Both come back as problems. Everything
+ * refreshes once at the end.
+ */
+export function useAddSeriesVolumes() {
+    const { afterEdit } = useInvalidateAll();
+    const done = ref(0);
+    const mutation = useMutation({
+        mutationFn: async ({
+            seriesId,
+            volumes,
+        }: {
+            seriesId: string;
+            volumes: NewVolume[];
+        }) => {
+            done.value = 0;
+            const problems: VolumeProblem[] = [];
+            for (const volume of volumes) {
+                try {
+                    const item = await unwrap(
+                        await api.admin.items.$post({
+                            json: {
+                                isbn: volume.isbn,
+                                series: { id: seriesId },
+                                volume: volume.volume,
+                            },
+                        })
+                    );
+                    if (item.seriesId !== seriesId) {
+                        problems.push({
+                            ...volume,
+                            itemId: item.id,
+                            message: 'Already on another item',
+                        });
+                    }
+                } catch (err) {
+                    problems.push({
+                        ...volume,
+                        itemId: null,
+                        message: err instanceof Error ? err.message : '',
+                    });
+                }
+                done.value += 1;
+            }
+            return problems;
+        },
+        onSettled: afterEdit,
+    });
+    return { ...mutation, done };
 }
 
 export function useMergeItem() {
