@@ -55,7 +55,7 @@ import { CheckCircleIcon, PlusIcon, SearchIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-const TABS = ['lookup', 'scan'] as const;
+const TABS = ['scan', 'lookup'] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: unknown): value is Tab {
@@ -68,7 +68,7 @@ const route = useRoute();
 const router = useRouter();
 
 const tab = computed({
-    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'lookup'),
+    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'scan'),
     set: (value) => {
         router.replace({ query: { ...route.query, tab: value } });
     },
@@ -167,9 +167,31 @@ const error = computed(
 
         <Tabs v-if="collection" v-model="tab">
             <TabsList>
-                <TabsTrigger value="lookup">Look up</TabsTrigger>
                 <TabsTrigger value="scan">Scan</TabsTrigger>
+                <TabsTrigger value="lookup">Look up</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="scan" class="grid gap-4 pt-2">
+                <IsbnScanner :formats="formats" :collection="collection">
+                    <div class="grid gap-1.5">
+                        <Label for="media-type">Type</Label>
+                        <Select v-model="mediaType">
+                            <SelectTrigger id="media-type" class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="type in MEDIA_TYPES"
+                                    :key="type.value"
+                                    :value="type.value"
+                                >
+                                    {{ type.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </IsbnScanner>
+            </TabsContent>
 
             <TabsContent value="lookup" class="grid gap-4 pt-2">
                 <Alert v-if="lastAdded && !picked">
@@ -320,28 +342,6 @@ const error = computed(
                         </ItemGroup>
                     </section>
                 </template>
-            </TabsContent>
-
-            <TabsContent value="scan" class="grid gap-4 pt-2">
-                <IsbnScanner :formats="formats" :collection="collection">
-                    <div class="grid gap-1.5">
-                        <Label for="media-type">Type</Label>
-                        <Select v-model="mediaType">
-                            <SelectTrigger id="media-type" class="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="type in MEDIA_TYPES"
-                                    :key="type.value"
-                                    :value="type.value"
-                                >
-                                    {{ type.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </IsbnScanner>
             </TabsContent>
         </Tabs>
     </div>
