@@ -36,6 +36,7 @@ import {
     TabsTrigger,
 } from '@/components/shadcn-components/tabs';
 import {
+    GOOGLE_SEARCH_DELAY_MS,
     type GoogleResult,
     type IsbnLookup,
     useGoogleSearch,
@@ -79,6 +80,10 @@ const { data: collection, error: loadError } = useCollection(
 
 const query = ref('');
 const { term, isTyping } = useSearchTerm(query);
+// Google waits for a longer pause, since each search counts.
+const { term: googleTerm, isTyping: googleTyping } = useSearchTerm(query, {
+    delayMs: GOOGLE_SEARCH_DELAY_MS,
+});
 
 const results = useCatalogItems(() => props.collectionId, term, undefined, {
     pending: isTyping,
@@ -88,16 +93,16 @@ const results = useCatalogItems(() => props.collectionId, term, undefined, {
 const searchMoreTerm = ref<string | null>(null);
 const showGoogle = computed(
     () =>
-        !!term.value &&
-        !isTyping.value &&
-        (searchMoreTerm.value === term.value ||
+        !!googleTerm.value &&
+        !googleTyping.value &&
+        (searchMoreTerm.value === googleTerm.value ||
             (!results.isLoading && !results.error && !results.items.length))
 );
 const {
     data: googleResults,
     isLoading: googleLoading,
     error: googleError,
-} = useGoogleSearch(term, showGoogle);
+} = useGoogleSearch(googleTerm, showGoogle);
 
 const lookupIsbn = useIsbnLookup();
 const picked = ref<IsbnLookup | null>(null);
@@ -187,7 +192,12 @@ const error = computed(
                     <SearchInput v-model="query" placeholder="Search titles" />
 
                     <PagedList
-                        v-if="term && (results.items.length || !showGoogle)"
+                        v-if="
+                            term &&
+                            (results.items.length ||
+                                results.isLoading ||
+                                (!showGoogle && !googleTyping))
+                        "
                         :list="results"
                         empty-text="No titles match."
                     >
@@ -242,7 +252,7 @@ const error = computed(
                     </PagedList>
 
                     <Button
-                        v-if="term && !isTyping && !showGoogle"
+                        v-if="term && !googleTyping && !showGoogle"
                         variant="outline"
                         @click="searchMoreTerm = term"
                     >

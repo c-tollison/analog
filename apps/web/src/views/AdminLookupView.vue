@@ -29,6 +29,7 @@ import {
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { adminListQuery, useAdminItems } from '@/composables/useAdmin';
 import {
+    GOOGLE_SEARCH_DELAY_MS,
     type GoogleResult,
     type IsbnLookup,
     useAdminGoogleSearch,
@@ -44,7 +45,11 @@ import { computed, ref } from 'vue';
 const ANY_LANGUAGE = 'any';
 
 const query = ref('');
-const { term, isTyping } = useSearchTerm(query);
+const { term } = useSearchTerm(query);
+// Google waits for a longer pause, since each search counts.
+const { term: googleTerm, isTyping: googleTyping } = useSearchTerm(query, {
+    delayMs: GOOGLE_SEARCH_DELAY_MS,
+});
 
 const {
     data: ours,
@@ -70,13 +75,13 @@ const language = ref('en');
 const searchMoreTerm = ref<string | null>(null);
 const showGoogle = computed(
     () =>
-        !!term.value &&
-        !isTyping.value &&
-        (searchMoreTerm.value === term.value ||
+        !!googleTerm.value &&
+        !googleTyping.value &&
+        (searchMoreTerm.value === googleTerm.value ||
             (!oursLoading.value && !oursError.value && !ourItems.value.length))
 );
 const google = useAdminGoogleSearch(
-    term,
+    googleTerm,
     () => (language.value === ANY_LANGUAGE ? null : language.value),
     showGoogle
 );
@@ -166,7 +171,9 @@ function onSaved(saved: { itemId: string; seriesId: string | null }) {
                 <Spinner class="size-6" />
             </div>
             <Empty
-                v-else-if="term && !isTyping && !ourItems.length && !showGoogle"
+                v-else-if="
+                    term && !googleTyping && !ourItems.length && !showGoogle
+                "
             >
                 <EmptyDescription>No titles match.</EmptyDescription>
             </Empty>
@@ -212,7 +219,7 @@ function onSaved(saved: { itemId: string; seriesId: string | null }) {
             </ItemGroup>
 
             <Button
-                v-if="term && !isTyping && !showGoogle"
+                v-if="term && !googleTyping && !showGoogle"
                 variant="outline"
                 @click="searchMoreTerm = term"
             >

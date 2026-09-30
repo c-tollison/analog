@@ -20,6 +20,12 @@ export type GoogleResult = InferResponseType<
 
 export const CATALOG_KEY = ['catalog'] as const;
 
+/**
+ * How long typing must pause before Google is searched. Longer than other
+ * searches, since each one counts against the daily limit.
+ */
+export const GOOGLE_SEARCH_DELAY_MS = 1000;
+
 // Kept apart from CATALOG_KEY, and skipped by admin edits, so adding a book
 // doesn't search Google again.
 export const GOOGLE_KEY = ['google-books'] as const;

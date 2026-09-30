@@ -22,7 +22,7 @@ import {
     useQueryClient,
 } from '@tanstack/vue-query';
 import { useFileDialog } from '@vueuse/core';
-import { type MaybeRefOrGetter, toValue } from 'vue';
+import { type MaybeRefOrGetter, ref, toValue } from 'vue';
 import type { z } from 'zod';
 
 export const ADMIN_KEY = ['admin'] as const;
@@ -342,6 +342,71 @@ export function useSaveAdminBook() {
             unwrap(await api.admin.items.$post({ json })),
         onSuccess: afterEdit,
     });
+}
+
+export interface NewVolume {
+    isbn: string;
+    title: string;
+    volume: number | null;
+}
+
+export interface VolumeProblem extends NewVolume {
+    // The item that already has the ISBN, when that's the problem.
+    itemId: string | null;
+    message: string;
+}
+
+/**
+ * Adds books to a series one request at a time, counting them in `done`.
+ * A book whose ISBN is already on another item stays there, and one that
+ * fails doesn't stop the rest. Both come back as problems. Everything
+ * refreshes once at the end.
+ */
+export function useAddSeriesVolumes() {
+    const { afterEdit } = useInvalidateAll();
+    const done = ref(0);
+    const mutation = useMutation({
+        mutationFn: async ({
+            seriesId,
+            volumes,
+        }: {
+            seriesId: string;
+            volumes: NewVolume[];
+        }) => {
+            done.value = 0;
+            const problems: VolumeProblem[] = [];
+            for (const volume of volumes) {
+                try {
+                    const item = await unwrap(
+                        await api.admin.items.$post({
+                            json: {
+                                isbn: volume.isbn,
+                                series: { id: seriesId },
+                                volume: volume.volume,
+                            },
+                        })
+                    );
+                    if (item.seriesId !== seriesId) {
+                        problems.push({
+                            ...volume,
+                            itemId: item.id,
+                            message: 'Already on another item',
+                        });
+                    }
+                } catch (err) {
+                    problems.push({
+                        ...volume,
+                        itemId: null,
+                        message: err instanceof Error ? err.message : '',
+                    });
+                }
+                done.value += 1;
+            }
+            return problems;
+        },
+        onSettled: afterEdit,
+    });
+    return { ...mutation, done };
 }
 
 export function useMergeItem() {
