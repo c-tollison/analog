@@ -21,7 +21,7 @@ import type { ApiClient } from '@/lib/api';
 import { staggerIn } from '@/lib/motion';
 import { useSessionStore } from '@/stores/session';
 
-import { PlusIcon, ScanBarcodeIcon } from '@lucide/vue';
+import { PlusIcon } from '@lucide/vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
@@ -72,22 +72,10 @@ function resultLink(result: SearchResult): RouteLocationRaw {
     <div class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
             <h1 class="text-lg font-semibold">Collections</h1>
-            <div class="flex gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="isCreateOpen = true"
-                >
-                    <PlusIcon />
-                    New collection
-                </Button>
-                <Button size="sm" as-child>
-                    <RouterLink :to="{ name: 'scan' }">
-                        <ScanBarcodeIcon />
-                        Scan
-                    </RouterLink>
-                </Button>
-            </div>
+            <Button size="sm" @click="isCreateOpen = true">
+                <PlusIcon />
+                New collection
+            </Button>
         </div>
 
         <FormError :message="preferences.error.value?.message ?? null" />

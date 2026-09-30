@@ -41,12 +41,6 @@ export const router = createRouter({
                     redirect: { name: 'collections' },
                 },
                 {
-                    path: 'scan',
-                    name: 'scan',
-                    meta: { title: 'Scan' },
-                    component: () => import('@/views/ScanView.vue'),
-                },
-                {
                     path: 'lookup',
                     name: 'lookup',
                     meta: { title: 'Add media' },
