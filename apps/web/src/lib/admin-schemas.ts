@@ -1,11 +1,25 @@
-import { ItemTitleSchema, SeriesKind, SeriesTitleSchema } from '@analog/types';
+import {
+    CATALOG_TITLE_MAX_LENGTH,
+    ItemTitleSchema,
+    SeriesKind,
+    SeriesTitleSchema,
+} from '@analog/types';
 
 import { SeriesPickSchema, VolumeField } from './catalog-schemas';
 import { z } from 'zod';
 
+// The form's starting values go through the schema too, so an empty
+// subtitle comes back as null and has to be accepted.
+const SubtitleField = z
+    .string()
+    .nullable()
+    .transform((value) => value?.trim() || null)
+    .pipe(z.string().max(CATALOG_TITLE_MAX_LENGTH).nullable());
+
 // The series is saved as soon as it's picked, so it isn't a field here.
 export const AdminItemFormSchema = z.object({
     title: ItemTitleSchema,
+    subtitle: SubtitleField,
     volume: VolumeField,
 });
 

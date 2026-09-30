@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AddedSort, VerifiedFilter } from '@analog/types';
+import AdminCheckRunsTable from '@/components/admin/AdminCheckRunsTable.vue';
 import AdminItemsTable from '@/components/admin/AdminItemsTable.vue';
 import AdminSeriesTable from '@/components/admin/AdminSeriesTable.vue';
 import SearchInput from '@/components/SearchInput.vue';
@@ -25,12 +26,17 @@ import {
 } from '@/composables/useAdmin';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 
-import { SearchIcon } from '@lucide/vue';
+import { PlusIcon } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { z } from 'zod';
 
-const Tab = { Series: 'series', Media: 'media', NoCover: 'no-cover' } as const;
+const Tab = {
+    Series: 'series',
+    Media: 'media',
+    NoCover: 'no-cover',
+    Checks: 'checks',
+} as const;
 
 const STATUS_LABELS: Record<VerifiedFilter, string> = {
     [VerifiedFilter.Unverified]: 'To verify',
@@ -132,8 +138,8 @@ watch(term, (q) => {
             <h1 class="text-lg font-semibold">Admin dashboard</h1>
             <Button as-child variant="outline">
                 <RouterLink :to="{ name: 'admin-lookup' }">
-                    <SearchIcon />
-                    Look up
+                    <PlusIcon />
+                    Add to catalog
                 </RouterLink>
             </Button>
         </div>
@@ -159,8 +165,9 @@ watch(term, (q) => {
                             {{ noCoverPage.total }}
                         </Badge>
                     </TabsTrigger>
+                    <TabsTrigger :value="Tab.Checks">Checks</TabsTrigger>
                 </TabsList>
-                <div class="flex flex-1 gap-2">
+                <div v-if="tab !== Tab.Checks" class="flex flex-1 gap-2">
                     <SearchInput v-model="search" placeholder="Search titles" />
                     <Select v-if="tab !== Tab.NoCover" v-model="status">
                         <SelectTrigger
@@ -197,6 +204,9 @@ watch(term, (q) => {
                     :status="VerifiedFilter.All"
                     no-cover
                 />
+            </TabsContent>
+            <TabsContent :value="Tab.Checks">
+                <AdminCheckRunsTable v-model:page="page" v-model:sort="sort" />
             </TabsContent>
             <TabsContent :value="Tab.Series">
                 <AdminSeriesTable

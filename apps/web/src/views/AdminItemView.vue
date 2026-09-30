@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { MediaFormat } from '@analog/types';
 import AdminItemForm from '@/components/admin/AdminItemForm.vue';
+import CheckList from '@/components/admin/CheckList.vue';
 import MergeItemDialog from '@/components/admin/MergeItemDialog.vue';
 import VerifiedBy from '@/components/admin/VerifiedBy.vue';
 import BackButton from '@/components/BackButton.vue';
@@ -18,6 +19,7 @@ import {
     useAdminItem,
     useApproveIsbn,
     useDeleteAdminItem,
+    useItemChecks,
     useSetItemVerified,
     useSplitIsbn,
     useUploadCover,
@@ -38,6 +40,7 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 
 const { data: item, error: loadError } = useAdminItem(() => props.id);
+const { data: checks } = useItemChecks(() => props.id);
 usePageTitle(() => item.value?.title);
 
 const setVerified = useSetItemVerified();
@@ -161,7 +164,13 @@ function onDelete() {
                 />
 
                 <div class="grid min-w-0 content-start gap-4">
-                    <AdminItemForm :key="item.id" :item="item" />
+                    <!-- Rebuilt when an accepted suggestion changes it. -->
+                    <AdminItemForm
+                        :key="`${item.id}:${item.title}:${item.position}:${item.seriesId}`"
+                        :item="item"
+                    />
+
+                    <CheckList v-if="checks" :checks="checks" />
 
                     <div class="grid gap-2">
                         <div class="flex flex-wrap gap-2">

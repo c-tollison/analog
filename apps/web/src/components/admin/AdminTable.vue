@@ -31,13 +31,19 @@ const props = defineProps<{
     isFetching: boolean;
     error: Error | null;
     columns: ColumnDef<TData>[];
-    rowTo: (row: TData) => RouteLocationRaw;
+    // Null leaves the row unclickable.
+    rowTo: (row: TData) => RouteLocationRaw | null;
 }>();
 
 const page = defineModel<number>('page', { required: true });
 const sort = defineModel<AddedSort>('sort', { required: true });
 
 const router = useRouter();
+
+function open(row: TData) {
+    const to = props.rowTo(row);
+    if (to) router.push(to);
+}
 
 const sorting = computed<SortingState>({
     get: () => [{ id: 'createdAt', desc: sort.value === AddedSort.Newest }],
@@ -102,8 +108,10 @@ const table = useVueTable({
                             <TableRow
                                 v-for="row in table.getRowModel().rows"
                                 :key="row.id"
-                                class="cursor-pointer"
-                                @click="router.push(rowTo(row.original))"
+                                :class="{
+                                    'cursor-pointer': rowTo(row.original),
+                                }"
+                                @click="open(row.original)"
                             >
                                 <TableCell
                                     v-for="cell in row.getVisibleCells()"

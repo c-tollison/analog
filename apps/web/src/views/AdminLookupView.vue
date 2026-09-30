@@ -121,7 +121,7 @@ function onSaved(saved: { itemId: string; seriesId: string | null }) {
             <BackButton :to="{ name: 'admin' }" text="Admin" class="-ml-2" />
         </div>
 
-        <h1 class="text-lg font-semibold">Look up</h1>
+        <h1 class="text-lg font-semibold">Add to catalog</h1>
 
         <Alert v-if="lastSaved && !picked">
             <CheckCircleIcon />

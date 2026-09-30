@@ -23,7 +23,7 @@ import { vNoAutofill } from '@/lib/no-autofill';
 import { ArrowUpRightIcon } from '@lucide/vue';
 import { ref, watch } from 'vue';
 
-// The item's title, series and volume, edited in place. Changes save when a
+// The item's title, subtitle, series and volume, edited in place. Changes save when a
 // box is left or a series is picked.
 const props = defineProps<{ item: AdminItem }>();
 
@@ -53,13 +53,15 @@ const { submit, formError, isSubmitting, fieldProps, values } = useAppForm({
     schema: AdminItemFormSchema,
     initialValues: {
         title: props.item.title,
+        subtitle: props.item.subtitle ?? '',
         volume: props.item.position ?? '',
     },
-    onSubmit: async ({ title, volume }) => {
+    onSubmit: async ({ title, subtitle, volume }) => {
         const choice = series.value;
         await update.mutateAsync({
             itemId: props.item.id,
             title,
+            subtitle,
             series: choice
                 ? choice.id
                     ? { id: choice.id }
@@ -74,6 +76,7 @@ const { submit, formError, isSubmitting, fieldProps, values } = useAppForm({
 function saveIfChanged() {
     if (
         values.title !== props.item.title ||
+        (values.subtitle ?? '') !== (props.item.subtitle ?? '') ||
         String(values.volume ?? '') !== String(props.item.position ?? '')
     ) {
         submit();
@@ -96,6 +99,24 @@ function onPick() {
                         v-bind="componentField"
                         aria-label="Title"
                         class="text-2xl font-semibold md:text-2xl"
+                        @blur="saveIfChanged"
+                    />
+                </FormControl>
+                <FormMessage />
+            </FormItem>
+        </FormField>
+        <FormField
+            v-slot="{ componentField }"
+            v-bind="fieldProps"
+            name="subtitle"
+        >
+            <FormItem>
+                <FormControl>
+                    <Input
+                        v-no-autofill
+                        aria-label="Subtitle"
+                        placeholder="Subtitle"
+                        v-bind="componentField"
                         @blur="saveIfChanged"
                     />
                 </FormControl>

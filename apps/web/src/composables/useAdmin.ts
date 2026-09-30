@@ -1,6 +1,7 @@
 import type { InferResponseType } from '@analog/api/client';
 import {
     type AddBookSchema,
+    type AddedSort,
     type AdminItemListQuerySchema,
     type AdminListQuerySchema,
     DEFAULT_PAGE_SIZE,
@@ -453,5 +454,99 @@ export function useDeleteAdminSeries() {
                 })
             ),
         onSuccess: afterDelete,
+    });
+}
+
+export type AdminCheck = InferResponseType<
+    ApiClient['admin']['checks']['items'][':id']['$get'],
+    200
+>[number];
+
+/** The suggestions `pnpm catalog:check` left on an item. */
+export function useItemChecks(id: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: () => [...ADMIN_KEY, 'checks', 'item', toValue(id)],
+        queryFn: async () =>
+            unwrap(
+                await api.admin.checks.items[':id'].$get({
+                    param: { id: toValue(id) },
+                })
+            ),
+    });
+}
+
+/** A series' suggestions and its items'. */
+export function useSeriesChecks(id: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: () => [...ADMIN_KEY, 'checks', 'series', toValue(id)],
+        queryFn: async () =>
+            unwrap(
+                await api.admin.checks.series[':id'].$get({
+                    param: { id: toValue(id) },
+                })
+            ),
+    });
+}
+
+/** Makes the change a problem suggests, and clears it. */
+export function useAcceptCheck() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async (checkId: string) =>
+            unwrap(
+                await api.admin.checks[':id'].accept.$post({
+                    param: { id: checkId },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
+/** Hides a problem. Later checks don't flag it again. */
+export function useDismissCheck() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async (checkId: string) =>
+            unwrap(
+                await api.admin.checks[':id'].dismiss.$post({
+                    param: { id: checkId },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
+export type AdminCheckRun = InferResponseType<
+    ApiClient['admin']['checks']['runs']['$get'],
+    200
+>['items'][number];
+
+/** One page of the Jev check history, counting pages from 1. */
+export function useAdminCheckRuns(
+    query: MaybeRefOrGetter<{ page: number; sort: AddedSort }>
+) {
+    return useQuery({
+        queryKey: () => [...ADMIN_KEY, 'checks', 'runs', toValue(query)],
+        queryFn: async () => {
+            const { page, sort } = toValue(query);
+            return unwrap(
+                await api.admin.checks.runs.$get({
+                    query: {
+                        sort,
+                        limit: String(DEFAULT_PAGE_SIZE),
+                        offset: String((page - 1) * DEFAULT_PAGE_SIZE),
+                    },
+                })
+            );
+        },
+        placeholderData: keepPreviousData,
+    });
+}
+
+/** Runs and TypeSafe tokens, over the last week and all time. */
+export function useAdminCheckUsage() {
+    return useQuery({
+        queryKey: [...ADMIN_KEY, 'checks', 'usage'],
+        queryFn: async () => unwrap(await api.admin.checks.usage.$get()),
     });
 }
