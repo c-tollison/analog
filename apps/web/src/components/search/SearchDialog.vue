@@ -111,8 +111,10 @@ watch(
 
 <template>
     <Dialog v-model:open="isOpen">
+        <!-- Full screen on phones, a large panel near the top on wider
+             screens. -->
         <DialogContent
-            class="flex h-[85svh] flex-col gap-3 sm:top-[10%] sm:max-w-2xl sm:translate-y-0"
+            class="top-0 left-0 flex h-svh max-w-none translate-x-0 translate-y-0 flex-col gap-3 rounded-none sm:top-[10%] sm:left-1/2 sm:h-[85svh] sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-xl"
         >
             <DialogHeader class="sr-only">
                 <DialogTitle>Search</DialogTitle>

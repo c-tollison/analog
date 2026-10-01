@@ -116,7 +116,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
               to: { name: 'series', params: { id: item.value.seriesId } },
               text: 'Back to series',
           }
-        : { to: { name: 'collections' }, text: 'Back to collections' }
+        : { to: { name: 'collections' }, text: 'Back to shelves' }
 );
 </script>
 

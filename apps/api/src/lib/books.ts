@@ -49,6 +49,15 @@ export function readMetadata(item: Pick<CatalogItem, 'metadata'>): BookDetails {
     return BookMetadataSchema.parse(item.metadata);
 }
 
+/**
+ * In a query grouped by series, the cover of the lowest volume in each
+ * group, like the lowest one a shelf owns.
+ */
+export const lowestVolumeCover = sql<string | null>`(
+    array_agg(${schema.catalogItem.coverUrl} order by ${schema.catalogItem.position} asc nulls last)
+        filter (where ${schema.catalogItem.coverUrl} is not null)
+)[1]`;
+
 export const seriesColumns = {
     id: schema.series.id,
     title: schema.series.title,

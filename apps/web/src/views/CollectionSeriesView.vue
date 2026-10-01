@@ -114,11 +114,11 @@ const headerError = computed(
             <BackButton
                 :to="{ name: 'collection', params: { id } }"
                 :text="
-                    collection ? `Back to ${collection.name}` : 'Back to collection'
+                    collection ? `Back to ${collection.name}` : 'Back to shelf'
                 "
             />
             <Button v-if="isMember" variant="outline" size="sm" as-child>
-                <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
+                <RouterLink :to="{ name: 'collection-scan', params: { id } }">
                     <PlusIcon />
                     {{ detail ? addMoreLabel(detail.series.kind) : 'Add more' }}
                 </RouterLink>
@@ -195,7 +195,7 @@ const headerError = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.title ?? 'item'}?`"
-            description="It'll be taken out of this collection."
+            description="It'll be taken off this shelf."
             confirm-text="Remove"
             :pending="isRemoving"
             @confirm="onRemove"

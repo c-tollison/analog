@@ -17,11 +17,9 @@ import { MEDIA_TYPES, type MediaTypeValue } from '@/lib/media-types';
 
 import { computed, ref } from 'vue';
 
-const props = defineProps<{ collectionId: string }>();
+const props = defineProps<{ id: string }>();
 
-const { data: collection, error: loadError } = useCollection(
-    () => props.collectionId
-);
+const { data: collection, error: loadError } = useCollection(() => props.id);
 
 const mediaType = ref<MediaTypeValue>(MediaFormat.Book);
 const formats = computed(
@@ -33,8 +31,8 @@ const formats = computed(
     <div class="mx-auto flex w-full max-w-lg flex-col gap-4">
         <div>
             <BackButton
-                :to="{ name: 'collection', params: { id: collectionId } }"
-                :text="collection?.name ?? 'Collection'"
+                :to="{ name: 'collection', params: { id } }"
+                :text="collection?.name ?? 'Shelf'"
                 class="-ml-2"
             />
         </div>

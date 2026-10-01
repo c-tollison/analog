@@ -54,7 +54,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
               },
               text: `Back to ${collection.value.ownerName}`,
           }
-        : { to: { name: 'collections' }, text: 'Collections' }
+        : { to: { name: 'collections' }, text: 'Shelves' }
 );
 
 const SORT_LABELS: Record<CollectionSort, string> = {
@@ -105,7 +105,7 @@ const headerError = computed(
         <div class="flex items-center justify-between">
             <BackButton :to="back.to" :text="back.text" />
             <Button v-if="isMember" size="sm" as-child>
-                <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
+                <RouterLink :to="{ name: 'collection-scan', params: { id } }">
                     <PlusIcon />
                     {{ collection ? `Add to ${collection.name}` : 'Add' }}
                 </RouterLink>
@@ -137,7 +137,7 @@ const headerError = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.title ?? 'item'}?`"
-            description="It'll be taken out of this collection."
+            description="It'll be taken off this shelf."
             confirm-text="Remove"
             :pending="isRemoving"
             @confirm="onRemove"

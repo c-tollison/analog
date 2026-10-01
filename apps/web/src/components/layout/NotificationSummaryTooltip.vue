@@ -99,7 +99,7 @@ function onUpdateOpen(value: boolean) {
                 <LibraryBigIcon class="size-4" />
                 {{ collectionInvites }}
                 <span class="sr-only">
-                    collection
+                    shelf
                     {{ collectionInvites === 1 ? 'invite' : 'invites' }}
                 </span>
             </span>

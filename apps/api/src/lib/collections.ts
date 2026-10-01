@@ -83,11 +83,11 @@ export async function requireMember(
         ),
     });
     if (!member) {
-        throw new HTTPException(404, { message: 'Collection not found' });
+        throw new HTTPException(404, { message: 'Shelf not found' });
     }
     if (requiredRole && member.role !== requiredRole) {
         throw new HTTPException(403, {
-            message: `Only the collection ${requiredRole} can do that`,
+            message: `Only the shelf ${requiredRole} can do that`,
         });
     }
     return member.role;
@@ -107,7 +107,7 @@ export async function requireViewer(collectionId: string, userId: string) {
         .leftJoin(myMember, isMyMember(userId))
         .where(and(eq(collection.id, collectionId), canSeeCollection(userId)));
     if (!found) {
-        throw new HTTPException(404, { message: 'Collection not found' });
+        throw new HTTPException(404, { message: 'Shelf not found' });
     }
     return {
         role: found.role,

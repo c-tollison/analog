@@ -88,7 +88,7 @@ function scanAnother() {
         <Alert v-if="!collection">
             <CircleAlertIcon />
             <AlertDescription>
-                Choose a collection to add this to.
+                Choose a shelf to add this to.
             </AlertDescription>
         </Alert>
         <BookResult

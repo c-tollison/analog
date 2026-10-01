@@ -185,8 +185,8 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
                     <p class="text-muted-foreground text-sm">
                         {{
                             isPublic
-                                ? 'Anyone on Analog can see your public collections.'
-                                : 'Only your friends can see your public collections.'
+                                ? 'Anyone on Analog can see your public shelves.'
+                                : 'Only your friends can see your public shelves.'
                         }}
                     </p>
                 </div>
@@ -202,7 +202,7 @@ const { submit, formError, isSubmitting, fieldProps, resetForm } = useAppForm({
         <ConfirmDialog
             v-model:open="confirmingPublic"
             title="Make your profile public?"
-            description="Anyone on Analog will be able to see your public collections."
+            description="Anyone on Analog will be able to see your public shelves."
             confirm-text="Make public"
             variant="default"
             :pending="preferences.isPending.value"

@@ -83,7 +83,7 @@ const facts = computed(() => {
         },
         { label: 'Added by', value: value.addedBy },
         { label: 'Added', value: formatDate(value.createdAt) },
-        { label: 'In collections', value: String(value.collectionCount) },
+        { label: 'On shelves', value: String(value.collectionCount) },
     ];
     if (value.format === MediaFormat.Book) {
         facts.push(
@@ -159,7 +159,7 @@ function onDelete() {
             <ConfirmDialog
                 v-model:open="confirmingDelete"
                 :title="`Delete ${item.title}?`"
-                description="It'll be removed from every collection, along with everyone's progress and reviews for it."
+                description="It'll be removed from every shelf, along with everyone's progress and reviews for it."
                 confirm-text="Delete"
                 :pending="remove.isPending.value"
                 @confirm="onDelete"

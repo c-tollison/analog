@@ -158,7 +158,7 @@ const error = computed(
         <div>
             <BackButton
                 :to="{ name: 'collection', params: { id } }"
-                :text="collection?.name ?? 'Collection'"
+                :text="collection?.name ?? 'Shelf'"
                 class="-ml-2"
             />
         </div>
@@ -170,7 +170,7 @@ const error = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.name ?? 'member'}?`"
-            description="They won't be able to see or edit this collection anymore."
+            description="They won't be able to see or edit this shelf anymore."
             confirm-text="Remove"
             :pending="removeMember.isPending.value"
             @confirm="onRemove"
@@ -190,7 +190,7 @@ const error = computed(
                     <div class="flex items-center justify-between gap-4">
                         <div class="grid gap-1">
                             <Label for="public-collection">
-                                Public collection
+                                Public shelf
                             </Label>
                             <p class="text-muted-foreground text-sm">
                                 {{ whoCanSee }}
@@ -219,12 +219,12 @@ const error = computed(
 
                     <Separator />
 
-                    <h2 class="font-medium">Delete collection</h2>
+                    <h2 class="font-medium">Delete shelf</h2>
                     <div>
                         <ConfirmDialog
                             v-model:open="confirmingDelete"
                             :title="`Delete ${collection.name}?`"
-                            description="This deletes the collection. It can't be restored."
+                            description="This deletes the shelf. It can't be restored."
                             confirm-text="Delete"
                             :pending="deleteCollection.isPending.value"
                             @confirm="onDelete"
@@ -232,14 +232,14 @@ const error = computed(
                             <template #trigger>
                                 <Button variant="destructive" size="sm">
                                     <Trash2Icon />
-                                    Delete collection
+                                    Delete shelf
                                 </Button>
                             </template>
                         </ConfirmDialog>
                     </div>
                 </template>
                 <template v-else>
-                    <h2 class="font-medium">Leave collection</h2>
+                    <h2 class="font-medium">Leave shelf</h2>
                     <div>
                         <ConfirmDialog
                             v-model:open="confirmingLeave"
@@ -252,7 +252,7 @@ const error = computed(
                             <template #trigger>
                                 <Button variant="outline" size="sm">
                                     <LogOutIcon />
-                                    Leave collection
+                                    Leave shelf
                                 </Button>
                             </template>
                         </ConfirmDialog>

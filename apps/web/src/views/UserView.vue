@@ -6,6 +6,7 @@ import CollectionRow from '@/components/collections/CollectionRow.vue';
 import InviteToCollectionsDialog from '@/components/collections/InviteToCollectionsDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import LogLists from '@/components/log/LogLists.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Empty,
@@ -16,6 +17,12 @@ import {
 } from '@/components/shadcn-components/empty';
 import { ItemGroup } from '@/components/shadcn-components/item';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/shadcn-components/tabs';
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import { useUserCollections } from '@/composables/useCollections';
 import {
@@ -51,7 +58,7 @@ const isFriend = computed(
     () => person.value?.relationship === Relationship.Friends
 );
 
-// A private profile shows its collections to friends only.
+// A private profile shows its shelves and Log to friends only.
 const canSeeCollections = computed(
     () =>
         !!person.value &&
@@ -86,6 +93,7 @@ function onRemove() {
 }
 
 const inviting = ref(false);
+const tab = ref('shelves');
 
 const error = computed(
     () =>
@@ -205,7 +213,7 @@ const error = computed(
                             v-else
                             v-model:open="confirmingRemove"
                             :title="`Unfriend ${person.name}?`"
-                            description="Pending invites between you will be canceled, and you'll both be removed from each other's collections."
+                            description="Pending invites between you will be canceled, and you'll both be removed from each other's shelves."
                             confirm-text="Unfriend"
                             :pending="remove.isPending.value"
                             @confirm="onRemove"
@@ -224,28 +232,39 @@ const error = computed(
                             @click="inviting = true"
                         >
                             <LibraryIcon />
-                            Invite to collection
+                            Invite to shelf
                         </Button>
                     </div>
                 </div>
             </div>
 
-            <template v-if="canSeeCollections">
-                <h2 class="font-medium">Collections</h2>
-                <PagedList :list="collections" empty-text="No collections yet.">
-                    <template #default="{ items }">
-                        <ItemGroup class="grid sm:grid-cols-2">
-                            <CollectionRow
-                                v-for="(c, index) in items"
-                                v-bind="staggerIn(index)"
-                                :key="c.id"
-                                :collection="c"
-                                :show-progress="showProgress"
-                            />
-                        </ItemGroup>
-                    </template>
-                </PagedList>
-            </template>
+            <Tabs v-if="canSeeCollections" v-model="tab" class="gap-4">
+                <TabsList>
+                    <TabsTrigger value="shelves">Shelves</TabsTrigger>
+                    <TabsTrigger value="log">Log</TabsTrigger>
+                </TabsList>
+                <TabsContent value="shelves">
+                    <PagedList :list="collections" empty-text="No shelves yet.">
+                        <template #default="{ items }">
+                            <ItemGroup class="grid sm:grid-cols-2">
+                                <CollectionRow
+                                    v-for="(c, index) in items"
+                                    v-bind="staggerIn(index)"
+                                    :key="c.id"
+                                    :collection="c"
+                                    :show-progress="showProgress"
+                                />
+                            </ItemGroup>
+                        </template>
+                    </PagedList>
+                </TabsContent>
+                <TabsContent value="log">
+                    <LogLists
+                        :username="person.username"
+                        :is-me="person.relationship === Relationship.Self"
+                    />
+                </TabsContent>
+            </Tabs>
             <Empty
                 v-else
                 class="motion-safe:animate-in fade-in animation-duration-500"
@@ -256,7 +275,8 @@ const error = computed(
                     </EmptyMedia>
                     <EmptyTitle>This profile is private</EmptyTitle>
                     <EmptyDescription>
-                        Only friends can see {{ person.name }}'s collections.
+                        Only friends can see {{ person.name }}'s shelves and
+                        Log.
                     </EmptyDescription>
                 </EmptyHeader>
             </Empty>

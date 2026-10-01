@@ -41,10 +41,7 @@ const hasDetails = computed(
 <template>
     <div class="flex flex-col gap-4">
         <div>
-            <BackButton
-                :to="{ name: 'collections' }"
-                text="Back to collections"
-            />
+            <BackButton :to="{ name: 'collections' }" text="Back to shelves" />
         </div>
 
         <FormError :message="loadError?.message ?? null" />

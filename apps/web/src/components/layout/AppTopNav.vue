@@ -13,7 +13,7 @@ import NotificationSummaryTooltip from './NotificationSummaryTooltip.vue';
 import NotificationsBell from './NotificationsBell.vue';
 import { isNavActive, navLinks } from './nav-links';
 import UserMenu from './UserMenu.vue';
-import { DiscAlbumIcon, SearchIcon } from '@lucide/vue';
+import { SearchIcon } from '@lucide/vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
@@ -27,11 +27,9 @@ const search = useSearchStore();
         <div class="mx-auto flex h-full max-w-5xl items-center gap-2 px-4">
             <RouterLink
                 :to="{ name: 'home' }"
-                class="mr-2 flex items-center"
-                aria-label="Analog home"
+                class="mr-2 text-lg font-semibold"
             >
-                <!-- TODO: swap for the Analog logo. -->
-                <DiscAlbumIcon class="size-6" />
+                Analog
             </RouterLink>
             <NavigationMenu :viewport="false" class="hidden md:flex">
                 <NavigationMenuList class="gap-1">
@@ -63,17 +61,8 @@ const search = useSearchStore();
                     <Kbd class="ml-auto">⌘K</Kbd>
                 </Button>
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                class="md:hidden"
-                aria-label="Search"
-                @click="search.isOpen = true"
-            >
-                <SearchIcon />
-            </Button>
             <NotificationSummaryTooltip side="bottom" desktop>
-                <NotificationsBell class="hidden md:inline-flex" />
+                <NotificationsBell />
             </NotificationSummaryTooltip>
             <UserMenu />
         </div>

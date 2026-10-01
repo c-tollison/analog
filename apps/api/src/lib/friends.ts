@@ -2,6 +2,7 @@ import { and, type Column, eq, type SQL, schema, sql } from '@analog/db';
 import { Relationship } from '@analog/types';
 
 import { db } from './init.js';
+import { HTTPException } from 'hono/http-exception';
 
 const { friendship, friendRequest, user } = schema;
 
@@ -75,3 +76,22 @@ export const userColumns = {
     username: user.username,
     image: user.image,
 };
+
+/**
+ * The person behind a profile, or an error when `me` can't see what's on it.
+ * A private profile shows its shelves and Log to friends only.
+ */
+export async function requireVisibleProfile(username: string, me: string) {
+    const [found] = await db()
+        .select({ id: user.id, isPublic: user.isPublic })
+        .from(user)
+        .where(eq(user.username, username));
+    if (!found) {
+        throw new HTTPException(404, { message: 'User not found' });
+    }
+    const isMe = found.id === me;
+    if (!isMe && !found.isPublic && !(await areFriends(me, found.id))) {
+        throw new HTTPException(403, { message: 'This profile is private' });
+    }
+    return { id: found.id, isMe };
+}

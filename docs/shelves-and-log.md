@@ -133,12 +133,13 @@ Each step is its own branch from `main` and its own PR. Each one passes `pnpm ch
 
 ### 4. Nav and Log
 
-- [ ] UI text says Shelves, and the web URLs move to `/shelves`. Add the name mapping to CLAUDE.md.
-- [ ] Desktop top nav with "Analog" text and the search bar in the middle.
-- [ ] Mobile pill and mobile top bar with the bell.
-- [ ] `/log` page, and the Log on the profile.
-- [ ] `/shelves/:id/scan` route, and delete `/lookup`.
-- [ ] `/` goes to Shelves.
+- [x] UI text says Shelves, and the web URLs move to `/shelves`. The name mapping is in CLAUDE.md.
+- [x] Desktop top nav with "Analog" text and the search bar in the middle.
+- [x] Mobile pill and mobile top bar with the bell.
+- [x] `/log` page, and the Log on the profile.
+- [x] `/shelves/:id/scan` route, and delete `/lookup`.
+- [x] `/` goes to Shelves.
+- [x] Search is full screen on phones.
 
 ## Testing
 
@@ -186,6 +187,23 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 9. Each tab scrolls endlessly.
 10. "Not here? Add by ISBN" closes search and opens the scan or type dialog. A book already in the app opens its page straight away. A new one asks for series and volume, then saves and opens its page as unreviewed.
 11. The shelf list, the shelf page and Friends have no search bar. The shelf page still sorts.
+
+### Step 4
+
+1. **Desktop top bar:** "Analog" on the left goes to Shelves. Next to it are Shelves, Log and Friends, with the current one outlined. The search bar sits in the middle, with the bell and profile menu on the right.
+2. **Phone:** the top bar has "Analog", the bell and the profile menu. The pill at the bottom has Shelves, Log, Search and Friends, and fits a narrow phone.
+3. Search on a phone fills the screen. On desktop it's a large panel near the top.
+4. **URLs:** shelves live at `/shelves`, `/shelves/:id` and `/shelves/:id/series/:seriesId`. Old `/collections` links don't work.
+5. **Wording:** every page says shelf or shelves, not collection. That covers titles, buttons, settings, profile settings, invites, confirm dialogs and error messages.
+6. **Scan page:** a shelf's Add button and a series' "Add more" open `/shelves/:id/scan`. `/lookup` is gone.
+7. **Log page:** it has Reading, Want to read and Read tabs.
+    - Reading and Want to read show series cards with a volume count, plus single books.
+    - Read lists each book with the date finished, the series and your stars, newest first.
+8. Changing a status anywhere updates the Log.
+9. **A profile:** it has Shelves and Log tabs.
+    - On a friend's or a public profile, the Log shows only reviewed books.
+    - A private profile you're not friends with says only friends can see its shelves and Log.
+10. **Empty Log tabs:** they say "Nothing here yet." on yours and "Nothing here." on someone else's.
 
 ## Not now
 

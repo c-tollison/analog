@@ -24,7 +24,7 @@ import {
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { seriesColumns } from '../lib/books.js';
+import { lowestVolumeCover, seriesColumns } from '../lib/books.js';
 import {
     canSeeCollection,
     collectionSummaries,
@@ -97,13 +97,6 @@ const itemColumns = {
     coverUrl: catalogItem.coverUrl,
     position: catalogItem.position,
 };
-
-// The cover of the lowest volume a collection owns, in a query grouped by
-// series.
-const lowestOwnedCover = sql<string | null>`(
-    array_agg(${catalogItem.coverUrl} order by ${catalogItem.position} asc nulls last)
-        filter (where ${catalogItem.coverUrl} is not null)
-)[1]`;
 
 const ownerFirst = [
     sql`${collectionMember.role} = ${CollectionRole.Owner} desc`,
@@ -181,7 +174,7 @@ const collections = new Hono<AppEnv>()
                 .values({ name })
                 .returning({ id: collection.id });
             if (!row) {
-                throw new Error('Failed to create collection');
+                throw new Error('Failed to create shelf');
             }
             await tx.insert(collectionMember).values({
                 collectionId: row.id,
@@ -201,7 +194,7 @@ const collections = new Hono<AppEnv>()
             and(eq(collection.id, id), canSeeCollection(me))
         );
         if (!found) {
-            throw new HTTPException(404, { message: 'Collection not found' });
+            throw new HTTPException(404, { message: 'Shelf not found' });
         }
         return c.json(found);
     })
@@ -261,7 +254,7 @@ const collections = new Hono<AppEnv>()
                         format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         kind: sql<SeriesKind | null>`min(${catalogItem.kind}::text)`,
                         title: itemTitle,
-                        coverUrl: lowestOwnedCover,
+                        coverUrl: lowestVolumeCover,
                         position: sql<
                             number | null
                         >`min(${catalogItem.position})::float`,
@@ -307,7 +300,7 @@ const collections = new Hono<AppEnv>()
                     .select({
                         ownedCount: sql<number>`count(*)::int`,
                         completedCount,
-                        coverUrl: lowestOwnedCover,
+                        coverUrl: lowestVolumeCover,
                         ownedPositions: sql<number[]>`coalesce(
                             array_agg(distinct ${catalogItem.position}::float)
                                 filter (where ${catalogItem.position} is not null),
@@ -433,7 +426,7 @@ const collections = new Hono<AppEnv>()
                 .returning({ isbn: collectionItemIsbn.isbn });
             if (!owned) {
                 throw new HTTPException(409, {
-                    message: 'Already in this collection',
+                    message: 'Already on this shelf',
                 });
             }
 
@@ -474,8 +467,7 @@ const collections = new Hono<AppEnv>()
             );
             if (leaving && role === CollectionRole.Owner) {
                 throw new HTTPException(400, {
-                    message:
-                        "Owners can't leave. Delete the collection instead.",
+                    message: "Owners can't leave. Delete the shelf instead.",
                 });
             }
 

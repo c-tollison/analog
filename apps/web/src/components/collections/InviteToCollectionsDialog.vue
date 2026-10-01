@@ -47,7 +47,7 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Invite {{ friend.name }}</DialogTitle>
                 <DialogDescription>
-                    Pick the collections to share with them.
+                    Pick the shelves to share with them.
                 </DialogDescription>
             </DialogHeader>
 
@@ -56,7 +56,7 @@ watch(open, (isOpen) => {
             <div class="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
                 <PagedList
                     :list="collections"
-                    empty-text="You don't own any collections yet."
+                    empty-text="You don't own any shelves yet."
                 >
                     <template #default="{ items }">
                         <ItemGroup class="gap-2">

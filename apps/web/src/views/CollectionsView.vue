@@ -41,10 +41,10 @@ function setShowProgress(showCollectionProgress: boolean) {
 <template>
     <div class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
-            <h1 class="text-lg font-semibold">Collections</h1>
+            <h1 class="text-lg font-semibold">Shelves</h1>
             <Button size="sm" @click="isCreateOpen = true">
                 <PlusIcon />
-                New collection
+                New shelf
             </Button>
         </div>
 
@@ -65,7 +65,7 @@ function setShowProgress(showCollectionProgress: boolean) {
 
         <PagedList
             :list="collections"
-            empty-text="No collections yet. Click New collection to make one."
+            empty-text="No shelves yet. Click New shelf to make one."
         >
             <template #default="{ items }">
                 <ItemGroup class="grid sm:grid-cols-2">
