@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, schema, sql } from '@analog/db';
+import { and, asc, desc, eq, isNotNull, schema, sql } from '@analog/db';
 import {
-    GoalYearSchema,
+    LogRange,
     type MediaFormat,
     PageQuerySchema,
     ProgressStatus,
@@ -13,7 +13,7 @@ import { requireVisibleProfile } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { paginate } from '../lib/pagination.js';
 import { UsernameParamSchema } from '../lib/params.js';
-import { isCompleted, whenCompleted } from '../lib/progress.js';
+import { isCompleted } from '../lib/progress.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -25,9 +25,6 @@ import { z } from 'zod';
 
 const { catalogItem, progress, readingGoal, series } = schema;
 
-const LogQuerySchema = PageQuerySchema.extend({
-    status: z.enum([ProgressStatus.Planned, ProgressStatus.InProgress]),
-});
 function isTimeZone(zone: string) {
     try {
         new Intl.DateTimeFormat('en-US', { timeZone: zone });
@@ -37,10 +34,10 @@ function isTimeZone(zone: string) {
     }
 }
 
-// The viewer's own year and time zone, since a year and its months start at
-// a different moment for each of them.
+// The viewer's time zone, since a day, month and year start at a different
+// moment for each of them.
 const StatsQuerySchema = z.object({
-    year: GoalYearSchema,
+    range: z.enum(LogRange).default(LogRange.ThirtyDays),
     tz: z
         .string()
         .max(64)
@@ -48,8 +45,55 @@ const StatsQuerySchema = z.object({
         .default('UTC'),
 });
 
-function statusCount(status: ProgressStatus) {
-    return sql<number>`(count(*) filter (where ${progress.status} = ${status}))::int`;
+function todayIn(tz: string) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+    }).formatToParts(new Date());
+    const part = (type: string) =>
+        Number(parts.find((p) => p.type === type)?.value);
+    return { year: part('year'), month: part('month'), day: part('day') };
+}
+
+type Today = ReturnType<typeof todayIn>;
+
+// One bar per day, month or year. A bar's key is the to_char of its start.
+const BAR_PATTERNS = {
+    [LogRange.ThirtyDays]: 'YYYY-MM-DD',
+    [LogRange.TwelveMonths]: 'YYYY-MM',
+    [LogRange.AllTime]: 'YYYY',
+} as const;
+
+function isoDate(year: number, monthIndex: number, day: number) {
+    return new Date(Date.UTC(year, monthIndex, day)).toISOString().slice(0, 10);
+}
+
+/** The first day the range counts, or null for all time. */
+function rangeStart(range: LogRange, { year, month, day }: Today) {
+    if (range === LogRange.ThirtyDays)
+        return isoDate(year, month - 1, day - 29);
+    if (range === LogRange.TwelveMonths) return isoDate(year, month - 12, 1);
+    return null;
+}
+
+/** The keys of every bar in the range, oldest first, ending today. */
+function barKeys(range: LogRange, today: Today, firstYear: number) {
+    const { year, month, day } = today;
+    if (range === LogRange.ThirtyDays) {
+        return Array.from({ length: 30 }, (_, index) =>
+            isoDate(year, month - 1, day - 29 + index)
+        );
+    }
+    if (range === LogRange.TwelveMonths) {
+        return Array.from({ length: 12 }, (_, index) =>
+            isoDate(year, month - 12 + index, 1).slice(0, 7)
+        );
+    }
+    return Array.from({ length: year - firstYear + 1 }, (_, index) =>
+        String(firstYear + index)
+    );
 }
 
 function inLog(userId: string, isMe: boolean, status: ProgressStatus) {
@@ -61,21 +105,20 @@ function inLog(userId: string, isMe: boolean, status: ProgressStatus) {
 }
 
 const userLog = new Hono<AppEnv>()
-    // Want to read or Reading, grouped by series, most recently changed first.
+    // Want to read, grouped by series, most recently changed first.
     .get(
-        '/log',
+        '/want-to-read',
         schemaValidator('param', UsernameParamSchema),
-        schemaValidator('query', LogQuerySchema),
+        schemaValidator('query', PageQuerySchema),
         async (c) => {
             const { username } = c.req.valid('param');
-            const { status, ...pageQuery } = c.req.valid('query');
             const { id, isMe } = await requireVisibleProfile(
                 username,
                 c.get('user').id
             );
             const groupKey = sql<string>`coalesce(${catalogItem.seriesId}, ${catalogItem.id})`;
 
-            const page = await paginate(pageQuery, (limit, offset) =>
+            const page = await paginate(c.req.valid('query'), (limit, offset) =>
                 db()
                     .select({
                         series: seriesColumns,
@@ -93,9 +136,44 @@ const userLog = new Hono<AppEnv>()
                         eq(catalogItem.id, progress.catalogItemId)
                     )
                     .leftJoin(series, eq(series.id, catalogItem.seriesId))
-                    .where(inLog(id, isMe, status))
+                    .where(inLog(id, isMe, ProgressStatus.Planned))
                     .groupBy(groupKey, series.id)
                     .orderBy(desc(sql`max(${progress.updatedAt})`), groupKey)
+                    .limit(limit)
+                    .offset(offset)
+            );
+            return c.json(page);
+        }
+    )
+    // Each volume being read on its own, most recently changed first.
+    .get(
+        '/reading',
+        schemaValidator('param', UsernameParamSchema),
+        schemaValidator('query', PageQuerySchema),
+        async (c) => {
+            const { username } = c.req.valid('param');
+            const { id, isMe } = await requireVisibleProfile(
+                username,
+                c.get('user').id
+            );
+
+            const page = await paginate(c.req.valid('query'), (limit, offset) =>
+                db()
+                    .select({
+                        id: catalogItem.id,
+                        title: catalogItem.title,
+                        coverUrl: catalogItem.coverUrl,
+                        position: catalogItem.position,
+                        seriesTitle: series.title,
+                    })
+                    .from(progress)
+                    .innerJoin(
+                        catalogItem,
+                        eq(catalogItem.id, progress.catalogItemId)
+                    )
+                    .leftJoin(series, eq(series.id, catalogItem.seriesId))
+                    .where(inLog(id, isMe, ProgressStatus.InProgress))
+                    .orderBy(desc(progress.updatedAt), asc(catalogItem.id))
                     .limit(limit)
                     .offset(offset)
             );
@@ -144,37 +222,41 @@ const userLog = new Hono<AppEnv>()
             return c.json(page);
         }
     )
-    // Totals for the top of the Log, the year's finishes by month, and the
-    // year's goal.
+    // How many were read in the range and their average rating, the finishes
+    // bar by bar, and this year's goal.
     .get(
         '/log/stats',
         schemaValidator('param', UsernameParamSchema),
         schemaValidator('query', StatsQuerySchema),
         async (c) => {
             const { username } = c.req.valid('param');
-            const { year, tz } = c.req.valid('query');
+            const { range, tz } = c.req.valid('query');
             const { id, isMe } = await requireVisibleProfile(
                 username,
                 c.get('user').id
             );
+            const today = todayIn(tz);
             const theirs = and(
                 eq(progress.userId, id),
                 isMe ? undefined : visibleToVisitors()
             );
             const finishedAt = sql`(${progress.completedAt} at time zone ${tz})`;
-            const finishedThisYear = sql`${isCompleted} and extract(year from ${finishedAt}) = ${year}`;
-            const month = sql<number>`extract(month from ${finishedAt})::int`;
+            const finishedThisYear = sql`${isCompleted} and extract(year from ${finishedAt}) = ${today.year}`;
+            // All time also counts finishes with no date.
+            const start = rangeStart(range, today);
+            const inRange = start
+                ? sql`${isCompleted} and ${finishedAt} >= ${start}::date`
+                : isCompleted;
+            const barKey = sql<string>`to_char(${finishedAt}, ${BAR_PATTERNS[range]})`;
 
-            const [[counts], months, [goal]] = await Promise.all([
+            const [[counts], bars, [goal]] = await Promise.all([
                 db()
                     .select({
+                        read: sql<number>`(count(*) filter (where ${inRange}))::int`,
                         readThisYear: sql<number>`(count(*) filter (where ${finishedThisYear}))::int`,
-                        readAllTime: statusCount(ProgressStatus.Completed),
-                        reading: statusCount(ProgressStatus.InProgress),
-                        wantToRead: statusCount(ProgressStatus.Planned),
                         ratingAverage: sql<
                             number | null
-                        >`avg(${whenCompleted(progress.rating)})::real`,
+                        >`avg(case when ${inRange} then ${progress.rating} end)::real`,
                     })
                     .from(progress)
                     .innerJoin(
@@ -184,16 +266,18 @@ const userLog = new Hono<AppEnv>()
                     .leftJoin(series, eq(series.id, catalogItem.seriesId))
                     .where(theirs),
                 db()
-                    .select({ month, count: sql<number>`count(*)::int` })
+                    .select({ key: barKey, count: sql<number>`count(*)::int` })
                     .from(progress)
                     .innerJoin(
                         catalogItem,
                         eq(catalogItem.id, progress.catalogItemId)
                     )
                     .leftJoin(series, eq(series.id, catalogItem.seriesId))
-                    .where(and(theirs, finishedThisYear))
+                    .where(
+                        and(theirs, inRange, isNotNull(progress.completedAt))
+                    )
                     // By position: the time zone is sent once per use, so
-                    // Postgres can't match the two month expressions.
+                    // Postgres can't match the two expressions.
                     .groupBy(sql`1`),
                 db()
                     .select({ target: readingGoal.target })
@@ -201,25 +285,27 @@ const userLog = new Hono<AppEnv>()
                     .where(
                         and(
                             eq(readingGoal.userId, id),
-                            eq(readingGoal.year, year)
+                            eq(readingGoal.year, today.year)
                         )
                     ),
             ]);
 
-            // Finishes in January through December, zero when none.
-            const perMonth = Array.from(
-                { length: 12 },
-                (_, index) =>
-                    months.find((row) => row.month === index + 1)?.count ?? 0
+            // All time starts at the year of the first finish.
+            const firstYear = Math.min(
+                today.year,
+                ...bars.map((bar) => Number(bar.key))
             );
+            const perBar = barKeys(range, today, firstYear).map((key) => ({
+                key,
+                count: bars.find((bar) => bar.key === key)?.count ?? 0,
+            }));
             return c.json({
-                year,
+                range,
+                year: today.year,
+                read: counts?.read ?? 0,
                 readThisYear: counts?.readThisYear ?? 0,
-                readAllTime: counts?.readAllTime ?? 0,
-                reading: counts?.reading ?? 0,
-                wantToRead: counts?.wantToRead ?? 0,
                 ratingAverage: counts?.ratingAverage ?? null,
-                perMonth,
+                perBar,
                 goal: goal?.target ?? null,
             });
         }

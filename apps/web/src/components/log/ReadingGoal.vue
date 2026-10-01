@@ -52,6 +52,7 @@ const pace = computed(() => {
             <CardTitle>{{ stats.year }} goal</CardTitle>
             <CardDescription v-if="stats.goal">
                 {{ stats.readThisYear }} of {{ stats.goal }}
+                <template v-if="pace">· {{ pace }}</template>
             </CardDescription>
             <CardAction v-if="isMe && stats.goal">
                 <Button
@@ -66,10 +67,11 @@ const pace = computed(() => {
         </CardHeader>
         <CardContent class="grid gap-2">
             <template v-if="stats.goal">
-                <Progress :model-value="percent" class="h-2" />
-                <div class="flex justify-between text-xs">
-                    <span>{{ pace }}</span>
-                    <span class="text-muted-foreground">{{ percent }}%</span>
+                <div class="flex items-center gap-3">
+                    <Progress :model-value="percent" class="h-2" />
+                    <span class="text-muted-foreground text-xs tabular-nums">
+                        {{ percent }}%
+                    </span>
                 </div>
             </template>
             <Button

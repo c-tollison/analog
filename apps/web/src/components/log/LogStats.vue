@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { MediaFormat, ProgressStatus } from '@analog/types';
+import { LogRange, MediaFormat, ProgressStatus } from '@analog/types';
 import {
     Card,
+    CardAction,
     CardContent,
     CardHeader,
     CardTitle,
 } from '@/components/shadcn-components/card';
+import {
+    ToggleGroup,
+    ToggleGroupItem,
+} from '@/components/shadcn-components/toggle-group';
 import {
     Tooltip,
     TooltipContent,
@@ -16,28 +21,58 @@ import { formatStatusLabels } from '@/lib/media-types';
 
 import { StarIcon } from '@lucide/vue';
 import { computed } from 'vue';
+import { z } from 'zod';
 
 const props = defineProps<{ stats: LogStats }>();
+
+const range = defineModel<LogRange>('range', { required: true });
+
+const RangeSchema = z.enum(LogRange);
+
+// Clicking the picked range again unpicks it, so keep the old one.
+function onRange(value: unknown) {
+    const parsed = RangeSchema.safeParse(value);
+    if (parsed.success) range.value = parsed.data;
+}
+
+// How each range is labelled and drawn. `step` labels every nth bar,
+// counting back from today.
+const RANGES = {
+    [LogRange.ThirtyDays]: {
+        label: '30 days',
+        unit: 'day',
+        name: { month: 'short', day: 'numeric' },
+        axis: { month: 'short', day: 'numeric' },
+        step: () => 7,
+    },
+    [LogRange.TwelveMonths]: {
+        label: '12 months',
+        unit: 'month',
+        name: { month: 'short', year: 'numeric' },
+        axis: { month: 'narrow' },
+        step: () => 1,
+    },
+    [LogRange.AllTime]: {
+        label: 'All time',
+        unit: 'year',
+        name: { year: 'numeric' },
+        axis: { year: 'numeric' },
+        step: (bars: number) => Math.ceil(bars / 6),
+    },
+} satisfies Record<
+    LogRange,
+    {
+        label: string;
+        unit: string;
+        name: Intl.DateTimeFormatOptions;
+        axis: Intl.DateTimeFormatOptions;
+        step: (bars: number) => number;
+    }
+>;
 
 // Books are the only media so far, so the counts use their words.
 const labels = formatStatusLabels(MediaFormat.Book);
 const readWord = labels[ProgressStatus.Completed].toLowerCase();
-
-const tiles = computed(() => [
-    {
-        value: props.stats.readThisYear,
-        label: `${readWord} in ${props.stats.year}`,
-    },
-    { value: props.stats.readAllTime, label: `${readWord} all time` },
-    {
-        value: props.stats.reading,
-        label: labels[ProgressStatus.InProgress].toLowerCase(),
-    },
-    {
-        value: props.stats.wantToRead,
-        label: labels[ProgressStatus.Planned].toLowerCase(),
-    },
-]);
 
 // Out of 5 stars, like the rating picker.
 const averageStars = computed(() =>
@@ -46,19 +81,26 @@ const averageStars = computed(() =>
         : null
 );
 
-const shortMonth = new Intl.DateTimeFormat(undefined, { month: 'short' });
-const narrowMonth = new Intl.DateTimeFormat(undefined, { month: 'narrow' });
+const shown = computed(() => RANGES[props.stats.range]);
 
-// Bars are sized against the busiest month. A month with none shows no bar.
-const months = computed(() => {
-    const most = Math.max(1, ...props.stats.perMonth);
-    return props.stats.perMonth.map((count, index) => {
-        const date = new Date(props.stats.year, index, 1);
+// Bars are sized against the busiest one. A bar with none shows nothing.
+const bars = computed(() => {
+    const { perBar } = props.stats;
+    const most = Math.max(1, ...perBar.map((bar) => bar.count));
+    const step = shown.value.step(perBar.length);
+    const nameFormat = new Intl.DateTimeFormat(undefined, shown.value.name);
+    const axisFormat = new Intl.DateTimeFormat(undefined, shown.value.axis);
+    return perBar.map((bar, index) => {
+        // Keys look like 2026-10-01, 2026-10 or 2026.
+        const [year = 0, month = 1, day = 1] = bar.key.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        const isLabelled = (perBar.length - 1 - index) % step === 0;
         return {
-            count,
-            name: shortMonth.format(date),
-            initial: narrowMonth.format(date),
-            height: `${(count / most) * 100}%`,
+            key: bar.key,
+            count: bar.count,
+            name: nameFormat.format(date),
+            axis: isLabelled ? axisFormat.format(date) : '',
+            height: `${(bar.count / most) * 100}%`,
         };
     });
 });
@@ -67,21 +109,37 @@ const months = computed(() => {
 <template>
     <Card>
         <CardHeader>
-            <CardTitle>{{ stats.year }}</CardTitle>
+            <CardTitle>Stats</CardTitle>
+            <CardAction>
+                <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    :model-value="range"
+                    @update:model-value="onRange"
+                >
+                    <ToggleGroupItem
+                        v-for="(option, value) in RANGES"
+                        :key="value"
+                        :value="value"
+                    >
+                        {{ option.label }}
+                    </ToggleGroupItem>
+                </ToggleGroup>
+            </CardAction>
         </CardHeader>
         <CardContent class="grid gap-4">
-            <dl class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                <div v-for="tile in tiles" :key="tile.label" class="grid">
+            <dl class="flex gap-8">
+                <div class="grid">
                     <dt class="text-muted-foreground order-2 text-xs">
-                        {{ tile.label }}
+                        {{ readWord }}
                     </dt>
                     <dd class="text-xl font-semibold tabular-nums">
-                        {{ tile.value }}
+                        {{ stats.read }}
                     </dd>
                 </div>
                 <div class="grid">
                     <dt class="text-muted-foreground order-2 text-xs">
-                        average rating
+                        avg rating
                     </dt>
                     <dd
                         class="flex items-center gap-1 text-xl font-semibold tabular-nums"
@@ -96,46 +154,52 @@ const months = computed(() => {
             </dl>
 
             <div class="grid gap-1" aria-hidden="true">
-                <div class="flex h-20 items-end gap-0.5 border-b">
-                    <template v-for="month in months" :key="month.name">
-                        <!-- Only months with finishes have a bar to hover. -->
-                        <Tooltip v-if="month.count">
+                <div
+                    class="flex h-20 items-end justify-center gap-0.5 border-b"
+                >
+                    <template v-for="bar in bars" :key="bar.key">
+                        <!-- Only bars with finishes have something to hover. -->
+                        <Tooltip v-if="bar.count">
                             <TooltipTrigger as-child>
-                                <div class="flex h-full flex-1 items-end">
+                                <div
+                                    class="flex h-full max-w-10 flex-1 items-end"
+                                >
                                     <div
                                         class="bg-primary w-full rounded-t"
-                                        :style="{ height: month.height }"
+                                        :style="{ height: bar.height }"
                                     />
                                 </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                                {{ month.name }}: {{ month.count }}
+                                {{ bar.name }}: {{ bar.count }}
                                 {{ readWord }}
                             </TooltipContent>
                         </Tooltip>
-                        <div v-else class="flex-1" />
+                        <div v-else class="max-w-10 flex-1" />
                     </template>
                 </div>
-                <div class="flex gap-0.5">
+                <!-- Labels can be wider than their bar, so they center on it
+                     and spill over the unlabelled ones beside it. -->
+                <div class="flex justify-center gap-0.5">
                     <span
-                        v-for="month in months"
-                        :key="month.name"
-                        class="text-muted-foreground flex-1 text-center text-xs"
+                        v-for="bar in bars"
+                        :key="bar.key"
+                        class="text-muted-foreground flex max-w-10 flex-1 justify-center text-xs whitespace-nowrap"
                     >
-                        {{ month.initial }}
+                        {{ bar.axis }}
                     </span>
                 </div>
             </div>
             <table class="sr-only">
                 <caption>
                     {{ readWord }}
-                    each month in
-                    {{ stats.year }}
+                    each
+                    {{ shown.unit }}
                 </caption>
                 <tbody>
-                    <tr v-for="month in months" :key="month.name">
-                        <th scope="row">{{ month.name }}</th>
-                        <td>{{ month.count }}</td>
+                    <tr v-for="bar in bars" :key="bar.key">
+                        <th scope="row">{{ bar.name }}</th>
+                        <td>{{ bar.count }}</td>
                     </tr>
                 </tbody>
             </table>

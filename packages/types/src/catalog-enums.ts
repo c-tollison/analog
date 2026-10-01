@@ -30,6 +30,13 @@ export enum ProgressStatus {
     Completed = 'completed',
 }
 
+/** How far back the Log's stats look. */
+export enum LogRange {
+    ThirtyDays = '30_days',
+    TwelveMonths = '12_months',
+    AllTime = 'all_time',
+}
+
 export enum CollectionSort {
     Name = 'name',
     Newest = 'newest',

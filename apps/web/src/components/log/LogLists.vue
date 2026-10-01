@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MediaFormat, ProgressStatus } from '@analog/types';
+import { LogRange, MediaFormat, ProgressStatus } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
@@ -21,7 +21,12 @@ import {
     TabsList,
     TabsTrigger,
 } from '@/components/shadcn-components/tabs';
-import { useDiary, useLogGroups, useLogStats } from '@/composables/useLog';
+import {
+    useDiary,
+    useLogStats,
+    useReading,
+    useWantToRead,
+} from '@/composables/useLog';
 import { formatStatusLabels } from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
 
@@ -41,26 +46,21 @@ function onTab(value: unknown) {
     if (parsed.success) tab.value = parsed.data;
 }
 
-// The viewer's own year, so the stats turn over at their midnight.
+const range = ref<LogRange>(LogRange.ThirtyDays);
 const { data: stats, error: statsError } = useLogStats(
     () => props.username,
-    new Date().getFullYear()
+    range
 );
 
-const planned = useLogGroups(() => props.username, ProgressStatus.Planned, {
-    enabled: () => tab.value === ProgressStatus.Planned,
-});
-const reading = useLogGroups(() => props.username, ProgressStatus.InProgress, {
+const reading = useReading(() => props.username, {
     enabled: () => tab.value === ProgressStatus.InProgress,
+});
+const planned = useWantToRead(() => props.username, {
+    enabled: () => tab.value === ProgressStatus.Planned,
 });
 const diary = useDiary(() => props.username, {
     enabled: () => tab.value === ProgressStatus.Completed,
 });
-
-const groupLists = [
-    { status: ProgressStatus.InProgress, list: reading },
-    { status: ProgressStatus.Planned, list: planned },
-] as const;
 
 // A visitor can't add to someone else's Log, so "yet" is only for you.
 const emptyText = computed(() =>
@@ -84,7 +84,7 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
             v-if="stats"
             class="motion-safe:animate-in fade-in animation-duration-500 grid gap-4 sm:grid-cols-[2fr_1fr]"
         >
-            <LogStats :stats="stats" />
+            <LogStats v-model:range="range" :stats="stats" />
             <ReadingGoal :stats="stats" :is-me="isMe" />
         </div>
 
@@ -101,12 +101,51 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
                 </TabsTrigger>
             </TabsList>
 
-            <TabsContent
-                v-for="{ status, list } in groupLists"
-                :key="status"
-                :value="status"
-            >
-                <PagedList :list="list" :empty-text="emptyText">
+            <TabsContent :value="ProgressStatus.InProgress">
+                <PagedList :list="reading" :empty-text="emptyText">
+                    <template #default="{ items }">
+                        <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
+                            <li
+                                v-for="(entry, index) in items"
+                                v-bind="staggerIn(index)"
+                                :key="entry.id"
+                                class="group"
+                            >
+                                <RouterLink
+                                    :to="{ name: 'item', params: { id: entry.id } }"
+                                    class="grid gap-1"
+                                >
+                                    <CoverImage
+                                        size="md"
+                                        :src="entry.coverUrl"
+                                        :alt="entry.title"
+                                        class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
+                                    />
+                                    <p
+                                        class="line-clamp-2 min-h-8 text-xs font-medium"
+                                    >
+                                        {{ entry.title }}
+                                    </p>
+                                    <p
+                                        v-if="entry.seriesTitle"
+                                        class="text-muted-foreground line-clamp-1 text-xs"
+                                    >
+                                        <template
+                                            v-if="entry.position !== null"
+                                        >
+                                            #{{ entry.position }} in
+                                        </template>
+                                        {{ entry.seriesTitle }}
+                                    </p>
+                                </RouterLink>
+                            </li>
+                        </ul>
+                    </template>
+                </PagedList>
+            </TabsContent>
+
+            <TabsContent :value="ProgressStatus.Planned">
+                <PagedList :list="planned" :empty-text="emptyText">
                     <template #default="{ items }">
                         <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                             <li

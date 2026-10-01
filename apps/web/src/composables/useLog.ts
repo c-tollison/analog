@@ -1,37 +1,57 @@
 import type { InferResponseType } from '@analog/api/client';
-import type { ProgressStatus, ReadingGoalSchema } from '@analog/types';
+import type { LogRange, ReadingGoalSchema } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import {
     type PaginatedListOptions,
     usePaginatedList,
 } from './usePaginatedList';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import {
+    keepPreviousData,
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/vue-query';
 import { type MaybeRefOrGetter, toValue } from 'vue';
 import type { z } from 'zod';
 
 export const LOG_KEY = ['log'] as const;
-
-type GroupedStatus = ProgressStatus.Planned | ProgressStatus.InProgress;
 
 export type LogStats = InferResponseType<
     ApiClient['users'][':username']['log']['stats']['$get'],
     200
 >;
 
-/** Someone's Want to read or Reading list, grouped by series. */
-export function useLogGroups(
+/** Someone's Want to read list, grouped by series. */
+export function useWantToRead(
     username: MaybeRefOrGetter<string>,
-    status: MaybeRefOrGetter<GroupedStatus>,
     options: PaginatedListOptions = {}
 ) {
     return usePaginatedList(
-        () => [...LOG_KEY, toValue(username), toValue(status)],
+        () => [...LOG_KEY, toValue(username), 'planned'],
         async (offset) =>
             unwrap(
-                await api.users[':username'].log.$get({
+                await api.users[':username']['want-to-read'].$get({
                     param: { username: toValue(username) },
-                    query: { status: toValue(status), offset },
+                    query: { offset },
+                })
+            ),
+        options
+    );
+}
+
+/** Each volume someone is reading, most recently changed first. */
+export function useReading(
+    username: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [...LOG_KEY, toValue(username), 'reading'],
+        async (offset) =>
+            unwrap(
+                await api.users[':username'].reading.$get({
+                    param: { username: toValue(username) },
+                    query: { offset },
                 })
             ),
         options
@@ -56,24 +76,30 @@ export function useDiary(
     );
 }
 
-/** Someone's Log totals, finishes by month and goal for `year`. */
+/** Someone's Log totals, finishes over `range` and this year's goal. */
 export function useLogStats(
     username: MaybeRefOrGetter<string>,
-    year: MaybeRefOrGetter<number>
+    range: MaybeRefOrGetter<LogRange>
 ) {
     return useQuery({
-        queryKey: () => [...LOG_KEY, toValue(username), 'stats', toValue(year)],
+        queryKey: () => [
+            ...LOG_KEY,
+            toValue(username),
+            'stats',
+            toValue(range),
+        ],
         queryFn: async () =>
             unwrap(
                 await api.users[':username'].log.stats.$get({
                     param: { username: toValue(username) },
-                    // Months and years follow the viewer's clock.
+                    // Days, months and years follow the viewer's clock.
                     query: {
-                        year: String(toValue(year)),
+                        range: toValue(range),
                         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     },
                 })
             ),
+        placeholderData: keepPreviousData,
     });
 }
 
