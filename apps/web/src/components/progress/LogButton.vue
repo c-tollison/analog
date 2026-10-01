@@ -34,7 +34,8 @@ const props = defineProps<{
     title: string;
     status: ProgressStatus | null;
     labels: StatusLabels;
-    // Fills its container, like a card in a grid.
+    // Fills its container, like a card in a grid. Drops the icon so the
+    // label fits a narrow card.
     block?: boolean;
 }>();
 
@@ -110,8 +111,10 @@ function onMain() {
                 @click="onMain"
             >
                 <Spinner v-if="isPending" />
-                <CheckIcon v-else-if="shown" />
-                <BookmarkPlusIcon v-else />
+                <template v-else-if="!block">
+                    <CheckIcon v-if="shown" />
+                    <BookmarkPlusIcon v-else />
+                </template>
                 <span class="truncate">
                     {{ labels[shown ?? ProgressStatus.Planned] }}
                 </span>
@@ -120,6 +123,7 @@ function onMain() {
                 <Button
                     :variant="shown ? 'secondary' : 'outline'"
                     size="icon"
+                    :class="{ 'w-6': block }"
                     aria-label="More options"
                 >
                     <ChevronDownIcon />

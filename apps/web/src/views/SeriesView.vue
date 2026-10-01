@@ -207,7 +207,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                         v-for="(item, index) in items"
                         v-bind="staggerIn(index)"
                         :key="item.id"
-                        class="grid content-start gap-1.5"
+                        class="grid grid-cols-1 content-start gap-1.5"
                     >
                         <RouterLink
                             :to="{ name: 'item', params: { id: item.id } }"
