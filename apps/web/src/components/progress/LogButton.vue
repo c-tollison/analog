@@ -58,18 +58,19 @@ const hasOpenedReview = ref(false);
 watch(isReviewOpen, (isOpen) => {
     if (isOpen) hasOpenedReview.value = true;
 });
-const saved = ref<{ rating: number | null; review: string | null }>({
-    rating: null,
-    review: null,
-});
+const saved = ref<{
+    rating: number | null;
+    review: string | null;
+    completedAt: string | null;
+}>({ rating: null, review: null, completedAt: null });
 
 // Finishing something asks for a rating, unless there already is one.
 function setStatus(status: ProgressStatus | null) {
     mutate(
         { catalogItemId: props.catalogItemId, status },
         {
-            onSuccess: ({ rating, review }) => {
-                saved.value = { rating, review };
+            onSuccess: ({ rating, review, completedAt }) => {
+                saved.value = { rating, review, completedAt };
                 if (
                     status === ProgressStatus.Completed &&
                     rating === null &&
@@ -165,6 +166,7 @@ function onMain() {
         :title="title"
         :rating="saved.rating"
         :review="saved.review"
+        :completed-at="saved.completedAt"
     />
 
     <AddToShelfDialog

@@ -37,6 +37,7 @@ import {
 } from '@/composables/useItems';
 import { usePageTitle } from '@/composables/usePageTitle';
 import { useQueryParam } from '@/composables/useQueryParam';
+import { formatDate } from '@/lib/dates';
 import {
     FORMAT_LABELS,
     formatStatusLabels,
@@ -331,6 +332,13 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                             {{ hasReview ? 'Edit' : 'Rate' }}
                         </Button>
                     </div>
+                    <p class="text-muted-foreground text-sm">
+                        {{
+                            item.completedAt
+                                ? `Finished ${formatDate(item.completedAt)}`
+                                : 'No finish date'
+                        }}
+                    </p>
                     <StarRating
                         v-if="item.rating !== null"
                         readonly
@@ -404,6 +412,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
             :title="item.title"
             :rating="item.rating"
             :review="item.review"
+            :completed-at="item.completedAt"
         />
     </div>
 </template>

@@ -132,6 +132,7 @@ const items = new Hono<AppEnv>()
                     status: progress.status,
                     rating: progress.rating,
                     review: progress.review,
+                    completedAt: progress.completedAt,
                 })
                 .from(progress)
                 .where(
@@ -169,6 +170,7 @@ const items = new Hono<AppEnv>()
             status: mine?.status ?? null,
             rating: mine?.rating ?? null,
             review: mine?.review ?? null,
+            completedAt: mine?.completedAt ?? null,
             reviewCount: reviews?.count ?? 0,
             editionCount: editions?.count ?? 0,
             shelves,

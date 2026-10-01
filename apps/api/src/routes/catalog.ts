@@ -111,6 +111,7 @@ const catalog = new Hono<AppEnv>()
                     status: progress.status,
                     rating: progress.rating,
                     review: progress.review,
+                    completedAt: progress.completedAt,
                 });
             await refreshItemStats(id);
             return c.json(saved);
@@ -122,12 +123,17 @@ const catalog = new Hono<AppEnv>()
         schemaValidator('json', ReviewSchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { rating, review } = c.req.valid('json');
+            const { rating, review, completedAt } = c.req.valid('json');
             const user = c.get('user');
 
             const [saved] = await db()
                 .update(progress)
-                .set({ rating, review, updatedAt: new Date() })
+                .set({
+                    rating,
+                    review,
+                    completedAt: completedAt ? new Date(completedAt) : null,
+                    updatedAt: new Date(),
+                })
                 .where(
                     and(
                         eq(progress.userId, user.id),
@@ -138,6 +144,7 @@ const catalog = new Hono<AppEnv>()
                 .returning({
                     rating: progress.rating,
                     review: progress.review,
+                    completedAt: progress.completedAt,
                 });
             if (!saved) {
                 throw new HTTPException(400, {

@@ -40,4 +40,13 @@ export const ReviewSchema = z.object({
         )
         .transform((value) => value || null)
         .nullable(),
+    // With no date it counts as read but stays out of goals and charts. A day
+    // of slack covers time zones ahead of the server.
+    completedAt: z.iso
+        .datetime()
+        .refine(
+            (value) => Date.parse(value) <= Date.now() + 24 * 60 * 60 * 1000,
+            "Finish date can't be in the future"
+        )
+        .nullable(),
 });
