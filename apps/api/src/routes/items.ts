@@ -9,7 +9,7 @@ import {
     schema,
     sql,
 } from '@analog/db';
-import { PageQuerySchema } from '@analog/types';
+import { normalizeIsbn, PageQuerySchema } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { itemDetails } from '../lib/books.js';
@@ -37,8 +37,12 @@ const EditionsQuerySchema = PageQuerySchema.extend({
 });
 
 // Matches an ISBN typed with or without dashes, or part of a publisher or
-// edition title.
+// edition title. A full ISBN-10 matches its stored ISBN-13.
 function editionsMatching(q: string) {
+    const isbn = normalizeIsbn(q);
+    if (isbn) {
+        return eq(catalogItemIsbn.isbn, isbn);
+    }
     const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
     const digits = q.replace(/[\s-]/g, '');
     return or(
@@ -132,6 +136,7 @@ const items = new Hono<AppEnv>()
                     status: progress.status,
                     rating: progress.rating,
                     review: progress.review,
+                    completedAt: progress.completedAt,
                 })
                 .from(progress)
                 .where(
@@ -169,6 +174,7 @@ const items = new Hono<AppEnv>()
             status: mine?.status ?? null,
             rating: mine?.rating ?? null,
             review: mine?.review ?? null,
+            completedAt: mine?.completedAt ?? null,
             reviewCount: reviews?.count ?? 0,
             editionCount: editions?.count ?? 0,
             shelves,

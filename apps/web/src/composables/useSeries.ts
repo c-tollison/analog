@@ -11,6 +11,7 @@ import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
 import {
     type PaginatedListOptions,
+    pageLimit,
     usePaginatedList,
 } from './usePaginatedList';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
@@ -35,15 +36,18 @@ export function useSeriesSearch(
         limit,
         admin = false,
         ...options
-    }: PaginatedListOptions & { limit?: number; admin?: boolean } = {}
+    }: PaginatedListOptions & {
+        limit?: MaybeRefOrGetter<number | undefined>;
+        admin?: boolean;
+    } = {}
 ) {
     return usePaginatedList(
-        () => [...SERIES_KEY, 'search', toValue(q), limit, admin],
+        () => [...SERIES_KEY, 'search', toValue(q), toValue(limit), admin],
         async (offset) => {
             const query = {
                 q: toValue(q),
                 offset,
-                ...(limit ? { limit: String(limit) } : {}),
+                ...pageLimit(limit),
             };
             return unwrap(
                 admin
@@ -77,32 +81,59 @@ export function useDetailsSearch(
     });
 }
 
-/** A series' page, with your own counts. */
-export function useSeriesPage(id: MaybeRefOrGetter<string>) {
+function shelfQuery(shelfId: MaybeRefOrGetter<string | null>) {
+    const shelf = toValue(shelfId);
+    return shelf ? { shelf } : {};
+}
+
+/**
+ * A series' page, with your own counts. With a shelf, owning means on that
+ * shelf.
+ */
+export function useSeriesPage(
+    id: MaybeRefOrGetter<string>,
+    shelfId: MaybeRefOrGetter<string | null>
+) {
     return useQuery({
-        queryKey: () => [...SERIES_KEY, 'page', toValue(id)],
+        queryKey: () => [...SERIES_KEY, 'page', toValue(id), toValue(shelfId)],
         queryFn: async () =>
             unwrap(
-                await api.series[':id'].$get({ param: { id: toValue(id) } })
+                await api.series[':id'].$get({
+                    param: { id: toValue(id) },
+                    query: shelfQuery(shelfId),
+                })
             ),
     });
 }
 
 /**
  * A series' volumes you can see, with your status and ownership: the ones
- * you own, the ones you don't, or all of them.
+ * you own, the ones you don't, or all of them. With a shelf, owning means
+ * on that shelf.
  */
 export function useSeriesVolumes(
     id: MaybeRefOrGetter<string>,
-    show: MaybeRefOrGetter<SeriesVolumeFilter>
+    show: MaybeRefOrGetter<SeriesVolumeFilter>,
+    shelfId: MaybeRefOrGetter<string | null>
 ) {
     return usePaginatedList(
-        () => [...SERIES_KEY, 'page', toValue(id), 'items', toValue(show)],
+        () => [
+            ...SERIES_KEY,
+            'page',
+            toValue(id),
+            toValue(shelfId),
+            'items',
+            toValue(show),
+        ],
         async (offset) =>
             unwrap(
                 await api.series[':id'].items.$get({
                     param: { id: toValue(id) },
-                    query: { offset, show: toValue(show) },
+                    query: {
+                        offset,
+                        show: toValue(show),
+                        ...shelfQuery(shelfId),
+                    },
                 })
             )
     );

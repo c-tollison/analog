@@ -28,7 +28,45 @@ export const AdminSeriesFormSchema = z.object({
     kind: z.enum(SeriesKind),
 });
 
-export const IsbnTitleFormSchema = z.object({ title: ItemTitleSchema });
+// Publisher, format and language are cleaned up by the API.
+export const EditionFormSchema = z.object({
+    title: ItemTitleSchema,
+    publisher: z.string(),
+    format: z.string(),
+    language: z.string(),
+});
+
+// Empty means not known.
+const WholeNumberField = z
+    .unknown()
+    .optional()
+    .transform((value) =>
+        value === '' || value == null ? null : Number(value)
+    )
+    .pipe(
+        z
+            .number({ error: 'Enter a number' })
+            .int('Enter a whole number')
+            .nonnegative("Can't be negative")
+            .nullable()
+    );
+
+// Lists are typed with commas between names.
+export const ItemDetailsFormSchema = z.object({
+    kind: z.enum(SeriesKind).optional(),
+    authors: z.string(),
+    genres: z.string(),
+    characters: z.string(),
+    description: z.string(),
+    publishDate: z.string(),
+    firstPublishYear: WholeNumberField,
+    pageCount: WholeNumberField,
+    editionName: z.string(),
+    goodreadsId: z
+        .string()
+        .trim()
+        .regex(/^\d*$/, 'Use the number from the Goodreads link'),
+});
 
 export const SeriesItemsFormSchema = z.object({
     items: z.array(

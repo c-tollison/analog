@@ -13,6 +13,14 @@ export const GoogleSearchQuerySchema = z.object({
     q: z.string().trim().min(1).max(200),
 });
 
+// Google's ISBN search misses books its title search finds, so a book picked
+// from those results is fetched by its Google id.
+export const GoogleIdSchema = z.string().regex(/^[\w-]{1,40}$/);
+
+export const IsbnLookupQuerySchema = z.object({
+    googleId: GoogleIdSchema.optional(),
+});
+
 export const COLLECTION_NAME_MAX_LENGTH = 64;
 
 export const SeriesTitleSchema = z
@@ -60,12 +68,21 @@ export const SetVolumeCountSchema = z.object({
     volumeCount: VolumeCountSchema,
 });
 
-/** Which of a series' volumes to list: ones you own, ones you don't, or all. */
+/**
+ * Which of a series' volumes to list: ones you own, ones you don't, or all.
+ * With a shelf, owning means on that shelf.
+ */
 export const SERIES_VOLUME_FILTERS = ['owned', 'missing', 'all'] as const;
 
 export type SeriesVolumeFilter = (typeof SERIES_VOLUME_FILTERS)[number];
 
+/** A series page opened from one of your shelves counts only that shelf. */
+export const SeriesPageQuerySchema = z.object({
+    shelf: z.uuid('Invalid id').optional(),
+});
+
 export const SeriesVolumesQuerySchema = PageQuerySchema.extend({
+    ...SeriesPageQuerySchema.shape,
     show: z.enum(SERIES_VOLUME_FILTERS).default('all'),
 });
 

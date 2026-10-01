@@ -1,4 +1,6 @@
 import {
+    AddBookSchema,
+    GoogleIdSchema,
     GoogleSearchQuerySchema,
     SeriesChoiceSchema,
     SeriesTitleSchema,
@@ -48,8 +50,47 @@ export const ItemSubtitleSchema = z
     .max(CATALOG_TITLE_MAX_LENGTH)
     .transform((value) => value || null);
 
-/** An ISBN's own title, edited on the admin item page. */
-export const UpdateIsbnSchema = z.object({ title: ItemTitleSchema });
+// Short text a book's details hold. Empty clears it.
+const DetailTextSchema = z
+    .string()
+    .trim()
+    .max(CATALOG_TITLE_MAX_LENGTH)
+    .transform((value) => value || null);
+
+const DetailListSchema = z
+    .array(z.string().trim().min(1).max(CATALOG_TITLE_MAX_LENGTH))
+    .max(100);
+
+/** An ISBN's own facts, edited on the admin item page. */
+export const UpdateIsbnSchema = z.object({
+    title: ItemTitleSchema,
+    publisher: DetailTextSchema,
+    format: DetailTextSchema,
+    // A language code, like "en" or "zh-TW".
+    language: z
+        .string()
+        .regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/)
+        .nullable(),
+});
+
+/** A book's details that don't belong to one ISBN. */
+export const UpdateItemDetailsSchema = z.object({
+    // Only saved when the item isn't in a series, which sets it instead.
+    kind: z.enum(SeriesKind).optional(),
+    authors: DetailListSchema,
+    genres: DetailListSchema,
+    characters: DetailListSchema,
+    description: z
+        .string()
+        .trim()
+        .max(20_000)
+        .transform((value) => value || null),
+    publishDate: DetailTextSchema,
+    firstPublishYear: z.number().int().min(0).max(9999).nullable(),
+    pageCount: z.number().int().positive().max(100_000).nullable(),
+    editionName: DetailTextSchema,
+    goodreadsId: z.string().regex(/^\d+$/).nullable(),
+});
 
 export const UpdateCatalogItemSchema = z.object({
     title: ItemTitleSchema,
@@ -83,6 +124,10 @@ export const SetSeriesItemsSchema = z.object({
 });
 
 export const MergeSeriesSchema = z.object({ intoSeriesId: z.uuid() });
+
+export const AdminAddBookSchema = AddBookSchema.extend({
+    googleId: GoogleIdSchema.optional(),
+});
 
 export const AdminGoogleSearchQuerySchema = GoogleSearchQuerySchema.extend({
     // An ISO 639-1 code, like "en".

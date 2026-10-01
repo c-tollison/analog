@@ -43,6 +43,7 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
     - Destructive confirmations use `AlertDialog`.
     - Menus use `DropdownMenu`, with `DropdownMenuLabel` for the header.
     - Errors use `Alert`, through `FormError`. Loading uses `Spinner`.
+    - Searchable menus use `Command`. When the API does the matching, pass `:should-filter="false"` and read the text with `v-model:search`. Otherwise `Command` hides results the server matched.
 - Change spacing, sizing and position with the `class` prop and variants. tailwind-merge resolves conflicting classes.
 - Fix color and theme problems in the shadcn component or the global CSS, never with a `class` override in a view. For example, if an outline button has no dark-mode hover, fix it in `button/index.ts` instead of adding `dark:hover:` to each button.
 - `pnpm add-component` never overwrites existing components. It answers no to every overwrite prompt and rejects `--overwrite`.

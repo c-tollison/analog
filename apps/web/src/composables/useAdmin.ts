@@ -12,6 +12,7 @@ import {
     type SetVerifiedSchema,
     type UpdateCatalogItemSchema,
     type UpdateIsbnSchema,
+    type UpdateItemDetailsSchema,
     type UpdateSeriesSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
@@ -143,6 +144,23 @@ export function useUpdateAdminItem() {
         }: z.input<typeof UpdateCatalogItemSchema> & { itemId: string }) =>
             unwrap(
                 await api.admin.items[':id'].$put({
+                    param: { id: itemId },
+                    json,
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
+export function useUpdateItemDetails() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({
+            itemId,
+            ...json
+        }: z.input<typeof UpdateItemDetailsSchema> & { itemId: string }) =>
+            unwrap(
+                await api.admin.items[':id'].details.$put({
                     param: { id: itemId },
                     json,
                 })
@@ -366,6 +384,7 @@ export function useSaveAdminBook() {
 
 export interface NewVolume {
     isbn: string;
+    googleId: string;
     title: string;
     volume: number | null;
 }
@@ -401,6 +420,7 @@ export function useAddSeriesVolumes() {
                         await api.admin.items.$post({
                             json: {
                                 isbn: volume.isbn,
+                                googleId: volume.googleId,
                                 series: { id: seriesId },
                                 volume: volume.volume,
                             },

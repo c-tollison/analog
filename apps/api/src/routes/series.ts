@@ -3,6 +3,7 @@ import {
     DetailsSourceSchema,
     LinkDetailsSourceSchema,
     ProgressStatus,
+    SeriesPageQuerySchema,
     SeriesSearchQuerySchema,
     SeriesVolumesQuerySchema,
     SetVolumeCountSchema,
@@ -12,7 +13,7 @@ import {
 import type { AppEnv } from '../lib/app-env.js';
 import { discoverableItem, discoverableSeries } from '../lib/discovery.js';
 import { db } from '../lib/init.js';
-import { onShelfOf } from '../lib/items.js';
+import { myShelfEntries, onShelfOf } from '../lib/items.js';
 import { paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { whenCompleted } from '../lib/progress.js';
@@ -112,60 +113,66 @@ const series = new Hono<AppEnv>()
         );
     })
     // A series' page, the same for everyone, with the person's own counts.
-    .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
-        const { id } = c.req.valid('param');
-        const me = c.get('user').id;
+    .get(
+        '/:id',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('query', SeriesPageQuerySchema),
+        async (c) => {
+            const { id } = c.req.valid('param');
+            const { shelf } = c.req.valid('query');
+            const me = c.get('user').id;
 
-        const [found, [counted]] = await Promise.all([
-            db().query.series.findFirst({ where: eq(seriesTable.id, id) }),
-            db()
-                .select({
-                    itemCount: sql<number>`count(*)::int`,
-                    ownedCount: sql<number>`(count(*) filter (where ${onShelfOf(me)}))::int`,
-                    completedCount: statusCount(ProgressStatus.Completed),
-                    inProgressCount: statusCount(ProgressStatus.InProgress),
-                    plannedCount: statusCount(ProgressStatus.Planned),
-                    // Volume numbers in the app, for spotting ones that
-                    // aren't.
-                    positions: sql<number[]>`coalesce(
+            const [found, [counted]] = await Promise.all([
+                db().query.series.findFirst({ where: eq(seriesTable.id, id) }),
+                db()
+                    .select({
+                        itemCount: sql<number>`count(*)::int`,
+                        ownedCount: sql<number>`(count(*) filter (where ${onShelfOf(me, shelf)}))::int`,
+                        completedCount: statusCount(ProgressStatus.Completed),
+                        inProgressCount: statusCount(ProgressStatus.InProgress),
+                        plannedCount: statusCount(ProgressStatus.Planned),
+                        // Volume numbers in the app, for spotting ones that
+                        // aren't.
+                        positions: sql<number[]>`coalesce(
                         array_agg(distinct ${catalogItem.position}::float)
                             filter (where ${catalogItem.position} is not null),
                         '{}'
                     )`,
-                })
-                .from(catalogItem)
-                .leftJoin(progress, myProgress(me))
-                .where(visibleVolumes(id, me)),
-        ]);
-        // Anyone with the link can open it. Search is where unchecked series
-        // stay hidden.
-        if (!found) {
-            throw new HTTPException(404, { message: 'Series not found' });
-        }
+                    })
+                    .from(catalogItem)
+                    .leftJoin(progress, myProgress(me))
+                    .where(visibleVolumes(id, me)),
+            ]);
+            // Anyone with the link can open it. Search is where unchecked
+            // series stay hidden.
+            if (!found) {
+                throw new HTTPException(404, { message: 'Series not found' });
+            }
 
-        return c.json({
-            id: found.id,
-            title: found.title,
-            kind: found.kind,
-            coverUrl: found.coverUrl,
-            ...seriesDetails(found),
-            itemCount: counted?.itemCount ?? 0,
-            ownedCount: counted?.ownedCount ?? 0,
-            completedCount: counted?.completedCount ?? 0,
-            inProgressCount: counted?.inProgressCount ?? 0,
-            plannedCount: counted?.plannedCount ?? 0,
-            positions: counted?.positions ?? [],
-        });
-    })
+            return c.json({
+                id: found.id,
+                title: found.title,
+                kind: found.kind,
+                coverUrl: found.coverUrl,
+                ...seriesDetails(found),
+                itemCount: counted?.itemCount ?? 0,
+                ownedCount: counted?.ownedCount ?? 0,
+                completedCount: counted?.completedCount ?? 0,
+                inProgressCount: counted?.inProgressCount ?? 0,
+                plannedCount: counted?.plannedCount ?? 0,
+                positions: counted?.positions ?? [],
+            });
+        }
+    )
     .get(
         '/:id/items',
         schemaValidator('param', IdParamSchema),
         schemaValidator('query', SeriesVolumesQuerySchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { show, ...pageQuery } = c.req.valid('query');
+            const { show, shelf, ...pageQuery } = c.req.valid('query');
             const me = c.get('user').id;
-            const owned = onShelfOf(me);
+            const owned = onShelfOf(me, shelf);
             const shown = {
                 owned,
                 missing: not(owned),
@@ -182,7 +189,11 @@ const series = new Hono<AppEnv>()
                         position: catalogItem.position,
                         status: progress.status,
                         rating: whenCompleted<number>(progress.rating),
-                        owned: sql<boolean>`${onShelfOf(me)}`,
+                        owned: sql<boolean>`${owned}`,
+                        // The entry to take off the shelf the page came from.
+                        shelfItemId: shelf
+                            ? sql<string | null>`${myShelfEntries(me, shelf)}`
+                            : sql<string | null>`null`,
                     })
                     .from(catalogItem)
                     .leftJoin(progress, myProgress(me))

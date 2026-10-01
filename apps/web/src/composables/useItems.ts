@@ -5,6 +5,7 @@ import { type ApiClient, api, unwrap } from '@/lib/api';
 import { COLLECTIONS_KEY } from './useCollections';
 import {
     type PaginatedListOptions,
+    pageLimit,
     usePaginatedList,
 } from './usePaginatedList';
 import { SERIES_KEY } from './useSeries';
@@ -39,14 +40,23 @@ export type BookSearchResult = InferResponseType<
 /** Books matching `q`, closest first; nothing loads while it's empty. */
 export function useBookSearch(
     q: MaybeRefOrGetter<string>,
-    options: PaginatedListOptions = {}
+    {
+        limit,
+        ...options
+    }: PaginatedListOptions & {
+        limit?: MaybeRefOrGetter<number | undefined>;
+    } = {}
 ) {
     return usePaginatedList(
-        () => [...ITEMS_KEY, 'search', toValue(q)],
+        () => [...ITEMS_KEY, 'search', toValue(q), toValue(limit)],
         async (offset) =>
             unwrap(
                 await api.items.search.$get({
-                    query: { q: toValue(q), offset },
+                    query: {
+                        q: toValue(q),
+                        offset,
+                        ...pageLimit(limit),
+                    },
                 })
             ),
         { enabled: () => toValue(q) !== '', ...options }

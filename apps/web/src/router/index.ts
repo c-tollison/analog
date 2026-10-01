@@ -1,5 +1,6 @@
 import { hasRole, UserRole } from '@analog/types';
 import { trackVisits } from '@/lib/navigation';
+import { whenScrollable } from '@/lib/scroll';
 import { useSessionStore } from '@/stores/session';
 
 import {
@@ -24,8 +25,11 @@ const requireEmailQuery: NavigationGuard = (to) =>
 
 export const router = createRouter({
     history: createWebHistory(),
-    scrollBehavior: (to, from, savedPosition) => {
-        if (savedPosition) return savedPosition;
+    scrollBehavior: async (to, from, savedPosition) => {
+        if (savedPosition) {
+            await whenScrollable(savedPosition.top, to, from);
+            return savedPosition;
+        }
         // Switching a tab or sort on the same page stays put. A new page
         // number still goes to the top.
         if (to.path === from.path && to.query.page === from.query.page) {

@@ -23,6 +23,7 @@ const props = defineProps<{
     title: string;
     rating: number | null;
     review: string | null;
+    completedAt: string | null;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -46,6 +47,7 @@ const cancelText = computed(() =>
                 :catalog-item-id="catalogItemId"
                 :rating="rating"
                 :review="review"
+                :completed-at="completedAt"
                 :cancel-text="cancelText"
                 @done="open = false"
             />
@@ -62,6 +64,7 @@ const cancelText = computed(() =>
                 :catalog-item-id="catalogItemId"
                 :rating="rating"
                 :review="review"
+                :completed-at="completedAt"
                 :cancel-text="cancelText"
                 @done="open = false"
             />

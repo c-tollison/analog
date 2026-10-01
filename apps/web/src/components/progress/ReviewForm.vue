@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import FormError from '@/components/FormError.vue';
+import FinishDatePicker from '@/components/progress/FinishDatePicker.vue';
 import StarRating from '@/components/progress/StarRating.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -19,6 +21,7 @@ const props = defineProps<{
     catalogItemId: string;
     rating: number | null;
     review: string | null;
+    completedAt: string | null;
     cancelText: string;
 }>();
 
@@ -29,7 +32,11 @@ const saveReview = useSaveReview();
 const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
     useAppForm({
         schema: ReviewSchema,
-        initialValues: { rating: props.rating, review: props.review ?? '' },
+        initialValues: {
+            rating: props.rating,
+            review: props.review ?? '',
+            completedAt: props.completedAt,
+        },
         onSubmit: async (values) => {
             await saveReview.mutateAsync({
                 catalogItemId: props.catalogItemId,
@@ -65,6 +72,34 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                         @update:model-value="setFieldValue('rating', $event)"
                     />
                 </FormControl>
+                <FormMessage />
+            </FormItem>
+        </FormField>
+        <FormField name="completedAt">
+            <FormItem>
+                <div class="flex h-6 items-center justify-between">
+                    <FormLabel>Finished</FormLabel>
+                    <Button
+                        v-if="values.completedAt"
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        @click="setFieldValue('completedAt', null)"
+                    >
+                        No date
+                    </Button>
+                </div>
+                <FormControl>
+                    <FinishDatePicker
+                        :model-value="values.completedAt ?? null"
+                        @update:model-value="
+                            setFieldValue('completedAt', $event)
+                        "
+                    />
+                </FormControl>
+                <FormDescription v-if="!values.completedAt">
+                    Won't count toward your reading goal or charts.
+                </FormDescription>
                 <FormMessage />
             </FormItem>
         </FormField>

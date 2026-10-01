@@ -9,6 +9,7 @@ import { useSessionStore } from '@/stores/session';
 import { COLLECTIONS_KEY } from './useCollections';
 import {
     type PaginatedListOptions,
+    pageLimit,
     usePaginatedList,
 } from './usePaginatedList';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
@@ -20,12 +21,25 @@ export const USERS_KEY = ['users'] as const;
 /** People whose username starts with, or name contains, `q`. */
 export function useUserSearch(
     q: MaybeRefOrGetter<string>,
-    options: PaginatedListOptions = {}
+    {
+        limit,
+        ...options
+    }: PaginatedListOptions & {
+        limit?: MaybeRefOrGetter<number | undefined>;
+    } = {}
 ) {
     return usePaginatedList(
-        () => [...USERS_KEY, 'search', toValue(q)],
+        () => [...USERS_KEY, 'search', toValue(q), toValue(limit)],
         async (offset) =>
-            unwrap(await api.users.$get({ query: { q: toValue(q), offset } })),
+            unwrap(
+                await api.users.$get({
+                    query: {
+                        q: toValue(q),
+                        offset,
+                        ...pageLimit(limit),
+                    },
+                })
+            ),
         options
     );
 }
