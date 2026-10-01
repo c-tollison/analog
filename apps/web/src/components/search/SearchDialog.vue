@@ -9,6 +9,7 @@ import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -39,7 +40,7 @@ import type { ApiClient } from '@/lib/api';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
 import { useSearchStore } from '@/stores/search';
 
-import { PlusIcon } from '@lucide/vue';
+import { PlusIcon, XIcon } from '@lucide/vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { type RouteLocationRaw, useRoute } from 'vue-router';
@@ -114,6 +115,7 @@ watch(
         <!-- Full screen on phones, a large panel near the top on wider
              screens. -->
         <DialogContent
+            :show-close-button="false"
             class="top-0 left-0 flex h-svh max-w-none translate-x-0 translate-y-0 flex-col gap-3 rounded-none sm:top-[10%] sm:left-1/2 sm:h-[85svh] sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-xl"
         >
             <DialogHeader class="sr-only">
@@ -123,7 +125,17 @@ watch(
                 </DialogDescription>
             </DialogHeader>
 
-            <SearchInput v-model="query" placeholder="Title, series, person…" />
+            <div class="flex items-center gap-2">
+                <SearchInput
+                    v-model="query"
+                    placeholder="Title, series, person…"
+                />
+                <DialogClose as-child>
+                    <Button variant="ghost" size="icon" aria-label="Close">
+                        <XIcon />
+                    </Button>
+                </DialogClose>
+            </div>
 
             <Tabs
                 :model-value="tab"

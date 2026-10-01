@@ -192,7 +192,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 
 1. **Desktop top bar:** "Analog" on the left goes to Shelves. Next to it are Shelves, Log and Friends, with the current one outlined. The search bar sits in the middle, with the bell and profile menu on the right.
 2. **Phone:** the top bar has "Analog", the bell and the profile menu. The pill at the bottom has Shelves, Log, Search and Friends, and fits a narrow phone.
-3. Search on a phone fills the screen. On desktop it's a large panel near the top.
+3. Search on a phone fills the screen. On desktop it's a large panel near the top. The close button sits beside the search bar, not on top of it.
 4. **URLs:** shelves live at `/shelves`, `/shelves/:id` and `/shelves/:id/series/:seriesId`. Old `/collections` links don't work.
 5. **Wording:** every page says shelf or shelves, not collection. That covers titles, buttons, settings, profile settings, invites, confirm dialogs and error messages.
 6. **Scan page:** a shelf's Add button and a series' "Add more" open `/shelves/:id/scan`. `/lookup` is gone.
