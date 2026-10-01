@@ -88,7 +88,8 @@ const rows = computed(() => {
     });
 });
 
-const selected = ref(new Set<string>());
+// Picked rows by ISBN. They stay picked when the search changes.
+const selected = ref(new Map<string, GoogleResult>());
 // Typed volume numbers by ISBN. Rows start with the number in the title.
 const typedVolumes = ref<Record<string, string>>({});
 const have = computed(() => new Set(props.volumes));
@@ -114,11 +115,11 @@ function inSeries(result: GoogleResult): boolean {
     return volume != null && have.value.has(volume);
 }
 
-function toggle(isbn: string, on: boolean | 'indeterminate') {
+function toggle(result: GoogleResult, on: boolean | 'indeterminate') {
     if (on === true) {
-        selected.value.add(isbn);
+        selected.value.set(result.isbn, result);
     } else {
-        selected.value.delete(isbn);
+        selected.value.delete(result.isbn);
     }
 }
 
@@ -130,15 +131,19 @@ const formError = ref<string | null>(null);
 
 async function onAdd() {
     formError.value = null;
-    const picked = rows.value.filter((row) => selected.value.has(row.isbn));
     const volumes: NewVolume[] = [];
-    for (const row of picked) {
+    for (const row of selected.value.values()) {
         const volume = volumeOf(row);
         if (volume === undefined) {
             formError.value = `Check the volume number for ${row.title}`;
             return;
         }
-        volumes.push({ isbn: row.isbn, title: row.title, volume });
+        volumes.push({
+            isbn: row.isbn,
+            googleId: row.googleId,
+            title: row.title,
+            volume,
+        });
     }
     const last = Number.POSITIVE_INFINITY;
     volumes.sort((a, b) => (a.volume ?? last) - (b.volume ?? last));
@@ -237,7 +242,7 @@ async function onAdd() {
                                 :aria-label="`Add ${result.title}`"
                                 :model-value="selected.has(result.isbn)"
                                 :disabled="add.isPending.value"
-                                @update:model-value="toggle(result.isbn, $event)"
+                                @update:model-value="toggle(result, $event)"
                             />
                             <CoverImage
                                 :src="result.coverUrl"

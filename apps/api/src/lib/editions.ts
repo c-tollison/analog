@@ -246,9 +246,10 @@ export async function upsertBook(
     isbn: string,
     seriesChoice: SeriesChoice | null,
     volume: number | null,
-    picker: SeriesPicker
+    picker: SeriesPicker,
+    googleId?: string
 ): Promise<CatalogItem> {
-    const { item } = await findOrCreateBook(isbn, picker.userId);
+    const { item } = await findOrCreateBook(isbn, picker.userId, googleId);
     if (item.seriesId || item.verifiedAt) {
         return item;
     }

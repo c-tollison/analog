@@ -101,7 +101,7 @@ async function pick(result: GoogleResult) {
     pickError.value = null;
     lastSaved.value = null;
     try {
-        picked.value = await lookupIsbn(result.isbn);
+        picked.value = await lookupIsbn(result.isbn, result.googleId);
     } catch (err) {
         pickError.value = err instanceof Error ? err.message : null;
     } finally {

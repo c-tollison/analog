@@ -2,6 +2,7 @@ import { and, eq, schema, sql } from '@analog/db';
 import {
     AddBookSchema,
     CheckTrigger,
+    IsbnLookupQuerySchema,
     IsbnSchema,
     ProgressStatus,
     ReviewSchema,
@@ -169,11 +170,17 @@ const catalog = new Hono<AppEnv>()
     .get(
         '/isbn/:isbn',
         schemaValidator('param', IsbnParamSchema),
+        schemaValidator('query', IsbnLookupQuerySchema),
         async (c) => {
             const { isbn } = c.req.valid('param');
+            const { googleId } = c.req.valid('query');
             const user = c.get('user');
 
-            const { item, fetched } = await findOrCreateBook(isbn, user.id);
+            const { item, fetched } = await findOrCreateBook(
+                isbn,
+                user.id,
+                googleId
+            );
             const book =
                 fetched ?? toBookLookup(item, item.series, isbn, item.edition);
 

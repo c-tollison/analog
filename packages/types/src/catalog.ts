@@ -13,6 +13,14 @@ export const GoogleSearchQuerySchema = z.object({
     q: z.string().trim().min(1).max(200),
 });
 
+// Google's ISBN search misses books its title search finds, so a book picked
+// from those results is fetched by its Google id.
+export const GoogleIdSchema = z.string().regex(/^[\w-]{1,40}$/);
+
+export const IsbnLookupQuerySchema = z.object({
+    googleId: GoogleIdSchema.optional(),
+});
+
 export const COLLECTION_NAME_MAX_LENGTH = 64;
 
 export const SeriesTitleSchema = z

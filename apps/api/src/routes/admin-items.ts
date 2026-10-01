@@ -11,13 +11,15 @@ import {
     sql,
 } from '@analog/db';
 import {
-    AddBookSchema,
+    AdminAddBookSchema,
     AdminItemListQuerySchema,
     IsbnSchema,
+    languageName,
     MergeItemSchema,
     SetVerifiedSchema,
     UpdateCatalogItemSchema,
     UpdateIsbnSchema,
+    UpdateItemDetailsSchema,
     VerifiedFilter,
 } from '@analog/types';
 
@@ -163,12 +165,20 @@ const adminItems = new Hono<AppEnv>()
     })
     // Adds a book to the shared catalog without a collection. Any series can
     // be picked.
-    .post('/', schemaValidator('json', AddBookSchema), async (c) => {
-        const { isbn, series: seriesChoice, volume } = c.req.valid('json');
-        const item = await upsertBook(isbn, seriesChoice, volume, {
-            userId: c.get('user').id,
-            admin: true,
-        });
+    .post('/', schemaValidator('json', AdminAddBookSchema), async (c) => {
+        const {
+            isbn,
+            series: seriesChoice,
+            volume,
+            googleId,
+        } = c.req.valid('json');
+        const item = await upsertBook(
+            isbn,
+            seriesChoice,
+            volume,
+            { userId: c.get('user').id, admin: true },
+            googleId
+        );
         return c.json({ id: item.id, seriesId: item.seriesId }, 201);
     })
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
@@ -182,6 +192,7 @@ const adminItems = new Hono<AppEnv>()
                     kind: catalogItem.kind,
                     coverUrl: catalogItem.coverUrl,
                     position: catalogItem.position,
+                    saveCount: catalogItem.saveCount,
                     seriesId: catalogItem.seriesId,
                     seriesTitle: series.title,
                     addedBy: addedByUser.username,
@@ -231,7 +242,7 @@ const adminItems = new Hono<AppEnv>()
         const { metadata, externalSource, externalId, ...item } = row;
         return c.json({
             ...item,
-            subtitle: readMetadata(row).subtitle,
+            ...readMetadata(row),
             collectionCount,
             isbns,
             links: itemLinks(row),
@@ -281,6 +292,24 @@ const adminItems = new Hono<AppEnv>()
         }
     )
     .put(
+        '/:id/details',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('json', UpdateItemDetailsSchema),
+        async (c) => {
+            const item = await requireItem(c.req.valid('param').id);
+            const { kind, ...details } = c.req.valid('json');
+            await db()
+                .update(catalogItem)
+                .set({
+                    metadata: { ...readMetadata(item), ...details },
+                    ...(kind && !item.seriesId ? { kind } : {}),
+                    updatedAt: new Date(),
+                })
+                .where(eq(catalogItem.id, item.id));
+            return c.body(null, 204);
+        }
+    )
+    .put(
         '/:id/verified',
         schemaValidator('param', IdParamSchema),
         schemaValidator('json', SetVerifiedSchema),
@@ -326,19 +355,38 @@ const adminItems = new Hono<AppEnv>()
         schemaValidator('json', UpdateIsbnSchema),
         async (c) => {
             const { id, isbn } = c.req.valid('param');
-            const { title } = c.req.valid('json');
+            const edition = c.req.valid('json');
             const [updated] = await db()
                 .update(catalogItemIsbn)
-                .set({ title })
+                .set(edition)
                 .where(
                     and(
                         eq(catalogItemIsbn.catalogItemId, id),
                         eq(catalogItemIsbn.isbn, isbn)
                     )
                 )
-                .returning({ isbn: catalogItemIsbn.isbn });
+                .returning({ main: catalogItemIsbn.main });
             if (!updated) {
                 throw new HTTPException(404, { message: 'ISBN not found' });
+            }
+            // The item's own copy is shown when the main ISBN has none.
+            if (updated.main) {
+                const item = await requireItem(id);
+                const language = languageName(edition.language);
+                await db()
+                    .update(catalogItem)
+                    .set({
+                        metadata: {
+                            ...readMetadata(item),
+                            publishers: edition.publisher
+                                ? [edition.publisher]
+                                : [],
+                            physicalFormat: edition.format,
+                            languages: language ? [language] : [],
+                        },
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(catalogItem.id, id));
             }
             return c.body(null, 204);
         }

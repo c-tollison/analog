@@ -2,7 +2,8 @@
 import { MediaFormat } from '@analog/types';
 import AdminItemForm from '@/components/admin/AdminItemForm.vue';
 import CheckList from '@/components/admin/CheckList.vue';
-import IsbnTitleDialog from '@/components/admin/IsbnTitleDialog.vue';
+import EditionDialog from '@/components/admin/EditionDialog.vue';
+import ItemDetailsForm from '@/components/admin/ItemDetailsForm.vue';
 import MergeItemDialog from '@/components/admin/MergeItemDialog.vue';
 import VerifiedBy from '@/components/admin/VerifiedBy.vue';
 import BackButton from '@/components/BackButton.vue';
@@ -59,19 +60,23 @@ const { upload: uploadCover, choose: chooseCover } = useUploadCover();
 
 const confirmingDelete = ref(false);
 const isMergeOpen = ref(false);
-// The ISBN whose title is being edited.
-const editing = ref<{ isbn: string; title: string | null } | null>(null);
-const isTitleOpen = ref(false);
+type AdminEdition = NonNullable<typeof item.value>['isbns'][number];
 
-function editTitle(edition: { isbn: string; title: string | null }) {
+// The ISBN being edited.
+const editing = ref<AdminEdition | null>(null);
+const isEditionOpen = ref(false);
+
+function editEdition(edition: AdminEdition) {
     editing.value = edition;
-    isTitleOpen.value = true;
+    isEditionOpen.value = true;
 }
 
 const facts = computed(() => {
     if (!item.value) return [];
     const { value } = item;
     const facts = [
+        { label: 'Saves', value: String(value.saveCount) },
+        { label: 'On shelves', value: String(value.collectionCount) },
         { label: 'Format', value: FORMAT_LABELS[value.format] },
         // In a series, the series picker shows the kind.
         {
@@ -83,7 +88,6 @@ const facts = computed(() => {
         },
         { label: 'Added by', value: value.addedBy },
         { label: 'Added', value: formatDate(value.createdAt) },
-        { label: 'On shelves', value: String(value.collectionCount) },
     ];
     if (value.format === MediaFormat.Book) {
         facts.push(
@@ -169,12 +173,11 @@ function onDelete() {
                 :item-id="item.id"
                 :item-title="item.title"
             />
-            <IsbnTitleDialog
+            <EditionDialog
                 v-if="editing"
-                v-model:open="isTitleOpen"
+                v-model:open="isEditionOpen"
                 :item-id="item.id"
-                :isbn="editing.isbn"
-                :title="editing.title"
+                :edition="editing"
             />
 
             <div class="grid gap-6 sm:grid-cols-[12rem_1fr]">
@@ -251,6 +254,19 @@ function onDelete() {
                 </div>
             </div>
 
+            <template v-if="item.format === MediaFormat.Book">
+                <Separator />
+
+                <section class="grid gap-3">
+                    <h2 class="font-semibold">Details</h2>
+                    <!-- Rebuilt when a refresh brings new details. -->
+                    <ItemDetailsForm
+                        :key="`${item.id}:${item.googleBooksFetchedAt}:${item.openLibraryFetchedAt}`"
+                        :item="item"
+                    />
+                </section>
+            </template>
+
             <template v-if="item.isbns.length">
                 <Separator />
 
@@ -266,10 +282,10 @@ function onDelete() {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                @click="editTitle(edition)"
+                                @click="editEdition(edition)"
                             >
                                 <PencilIcon />
-                                Edit title
+                                Edit
                             </Button>
                             <Button
                                 variant="outline"

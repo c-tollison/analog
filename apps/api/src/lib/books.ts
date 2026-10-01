@@ -443,8 +443,8 @@ function combine(
     };
 }
 
-async function lookupGoogleBooks(isbn: string) {
-    const result = await settle(lookupGoogleBooksIsbn(isbn));
+async function lookupGoogleBooks(isbn: string, googleId?: string) {
+    const result = await settle(lookupGoogleBooksIsbn(isbn, googleId));
     if (result.error) {
         logger().warn(
             { error: result.error, isbn },
@@ -469,6 +469,8 @@ type LookupOptions = {
     // The book as it's stored, when looking it up again.
     stored: BookLookup | null;
     google: boolean;
+    // The book's Google id, when an admin picked it from a Google search.
+    googleId?: string;
     openLibrary: boolean;
     refresh: boolean;
 };
@@ -486,7 +488,9 @@ type LookupOptions = {
 async function lookupSources(isbn: string, options: LookupOptions) {
     const { stored, refresh } = options;
     const openLibrary = options.openLibrary ? lookupOpenLibrary(isbn) : null;
-    const google = options.google ? await lookupGoogleBooks(isbn) : null;
+    const google = options.google
+        ? await lookupGoogleBooks(isbn, options.googleId)
+        : null;
     if (google?.error && refresh) {
         throw google.error;
     }
@@ -688,7 +692,11 @@ async function insertBook(
  * we haven't seen it. `fetched` is the source's data when it was just
  * fetched, which still has its series name and volume guesses.
  */
-export async function findOrCreateBook(isbn: string, userId: string) {
+export async function findOrCreateBook(
+    isbn: string,
+    userId: string,
+    googleId?: string
+) {
     const existing = await findBookByIsbn(isbn);
     if (existing) {
         return { item: existing, fetched: null };
@@ -697,6 +705,7 @@ export async function findOrCreateBook(isbn: string, userId: string) {
     const lookup = await lookupBook(isbn, {
         stored: null,
         google: true,
+        googleId,
         openLibrary: true,
         refresh: false,
     });

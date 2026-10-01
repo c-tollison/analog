@@ -19,6 +19,7 @@ import { z } from 'zod';
 
 const BASE_URL = 'https://www.googleapis.com/books/v1';
 const TIMEOUT_MS = 8_000;
+const RETRY_DELAY_MS = 1_000;
 
 const VolumeSchema = z.object({
     id: z.string(),
@@ -46,16 +47,24 @@ type Volume = z.infer<typeof VolumeSchema>;
 
 const SearchSchema = z.object({ items: z.array(VolumeSchema).optional() });
 
-async function getJson(path: string, apiKey: string): Promise<unknown> {
-    const url = new URL(`${BASE_URL}${path}`);
-    url.searchParams.set('key', apiKey);
-    let res: Response;
+async function fetchGoogle(url: URL): Promise<Response> {
     try {
-        res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+        return await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch {
         throw new HTTPException(502, {
             message: 'Google Books is unreachable. Try again shortly.',
         });
+    }
+}
+
+async function getJson(path: string, apiKey: string): Promise<unknown> {
+    const url = new URL(`${BASE_URL}${path}`);
+    url.searchParams.set('key', apiKey);
+    let res = await fetchGoogle(url);
+    // Google sometimes fails a request that works a moment later.
+    if (res.status >= 500) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        res = await fetchGoogle(url);
     }
     if (res.status === 404) {
         return null;
@@ -108,19 +117,34 @@ function displayNumber(volume: Volume): number | null {
     return Number.isFinite(number) && number > 0 ? number : null;
 }
 
-/**
- * Looks up an ISBN on Google Books with one request. Returns null when
- * there's no match.
- */
-export async function lookupGoogleBooksIsbn(
-    isbn: string
-): Promise<BookLookup | null> {
+async function findVolume(
+    isbn: string,
+    googleId: string | undefined
+): Promise<Volume | null> {
     const { apiKey } = config().googleBooks;
-
+    if (googleId) {
+        const byId = VolumeSchema.safeParse(
+            await getJson(`/volumes/${googleId}`, apiKey)
+        );
+        if (byId.data && hasIsbn(byId.data, isbn)) {
+            return byId.data;
+        }
+    }
     const search = SearchSchema.safeParse(
         await getJson(`/volumes?q=isbn:${isbn}`, apiKey)
     );
-    const volume = search.data?.items?.find((item) => hasIsbn(item, isbn));
+    return search.data?.items?.find((item) => hasIsbn(item, isbn)) ?? null;
+}
+
+/**
+ * Looks up an ISBN on Google Books, by its Google id when we have one.
+ * Returns null when there's no match.
+ */
+export async function lookupGoogleBooksIsbn(
+    isbn: string,
+    googleId?: string
+): Promise<BookLookup | null> {
+    const volume = await findVolume(isbn, googleId);
     if (!volume) {
         return null;
     }
@@ -208,6 +232,7 @@ function searchResult(volume: Volume, isbn: string) {
     const info = volume.volumeInfo;
     return {
         isbn,
+        googleId: volume.id,
         title: info.title,
         author: info.authors?.[0] ?? null,
         language: languageName(info.language),

@@ -69,12 +69,16 @@ export function useAdminGoogleSearch(
 export function useIsbnLookup() {
     const queryClient = useQueryClient();
 
-    return (isbn: string) =>
+    // `googleId` is set when the book was picked from a Google search.
+    return (isbn: string, googleId?: string) =>
         queryClient.fetchQuery({
             queryKey: [...CATALOG_KEY, 'isbn', isbn],
             queryFn: async () =>
                 unwrap(
-                    await api.catalog.isbn[':isbn'].$get({ param: { isbn } })
+                    await api.catalog.isbn[':isbn'].$get({
+                        param: { isbn },
+                        query: { googleId },
+                    })
                 ),
         });
 }
