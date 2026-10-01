@@ -163,15 +163,12 @@ const userLog = new Hono<AppEnv>()
                         id: catalogItem.id,
                         title: catalogItem.title,
                         coverUrl: catalogItem.coverUrl,
-                        position: catalogItem.position,
-                        seriesTitle: series.title,
                     })
                     .from(progress)
                     .innerJoin(
                         catalogItem,
                         eq(catalogItem.id, progress.catalogItemId)
                     )
-                    .leftJoin(series, eq(series.id, catalogItem.seriesId))
                     .where(inLog(id, isMe, ProgressStatus.InProgress))
                     .orderBy(desc(progress.updatedAt), asc(catalogItem.id))
                     .limit(limit)
@@ -199,7 +196,6 @@ const userLog = new Hono<AppEnv>()
                         format: catalogItem.format,
                         title: catalogItem.title,
                         coverUrl: catalogItem.coverUrl,
-                        position: catalogItem.position,
                         seriesTitle: series.title,
                         rating: progress.rating,
                         completedAt: progress.completedAt,

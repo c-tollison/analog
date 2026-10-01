@@ -126,17 +126,6 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
                                     >
                                         {{ entry.title }}
                                     </p>
-                                    <p
-                                        v-if="entry.seriesTitle"
-                                        class="text-muted-foreground line-clamp-1 text-xs"
-                                    >
-                                        <template
-                                            v-if="entry.position !== null"
-                                        >
-                                            #{{ entry.position }} in
-                                        </template>
-                                        {{ entry.seriesTitle }}
-                                    </p>
                                 </RouterLink>
                             </li>
                         </ul>

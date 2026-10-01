@@ -93,7 +93,7 @@ function onRemove() {
 }
 
 const inviting = ref(false);
-const tab = ref('shelves');
+const tab = ref('log');
 
 const error = computed(
     () =>
@@ -240,9 +240,15 @@ const error = computed(
 
             <Tabs v-if="canSeeCollections" v-model="tab" class="gap-4">
                 <TabsList>
-                    <TabsTrigger value="shelves">Shelves</TabsTrigger>
                     <TabsTrigger value="log">Log</TabsTrigger>
+                    <TabsTrigger value="shelves">Shelves</TabsTrigger>
                 </TabsList>
+                <TabsContent value="log">
+                    <LogLists
+                        :username="person.username"
+                        :is-me="person.relationship === Relationship.Self"
+                    />
+                </TabsContent>
                 <TabsContent value="shelves">
                     <PagedList :list="collections" empty-text="No shelves yet.">
                         <template #default="{ items }">
@@ -257,12 +263,6 @@ const error = computed(
                             </ItemGroup>
                         </template>
                     </PagedList>
-                </TabsContent>
-                <TabsContent value="log">
-                    <LogLists
-                        :username="person.username"
-                        :is-me="person.relationship === Relationship.Self"
-                    />
                 </TabsContent>
             </Tabs>
             <Empty

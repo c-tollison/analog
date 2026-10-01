@@ -40,8 +40,14 @@ function setShowProgress(showCollectionProgress: boolean) {
 
 <template>
     <div class="flex flex-col gap-4">
-        <div class="flex items-center justify-between">
-            <h1 class="text-lg font-semibold">Shelves</h1>
+        <div class="flex items-start justify-between gap-4">
+            <div class="grid gap-0.5">
+                <h1 class="text-lg font-semibold">Shelves</h1>
+                <p class="text-muted-foreground text-sm">
+                    Keep track of the physical copies you own. Group them into
+                    shelves to organize your collection.
+                </p>
+            </div>
             <Button size="sm" @click="isCreateOpen = true">
                 <PlusIcon />
                 New shelf
