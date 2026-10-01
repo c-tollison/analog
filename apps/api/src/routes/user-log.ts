@@ -169,6 +169,7 @@ const userLog = new Hono<AppEnv>()
                         catalogItem,
                         eq(catalogItem.id, progress.catalogItemId)
                     )
+                    .leftJoin(series, eq(series.id, catalogItem.seriesId))
                     .where(inLog(id, isMe, ProgressStatus.InProgress))
                     .orderBy(desc(progress.updatedAt), asc(catalogItem.id))
                     .limit(limit)
