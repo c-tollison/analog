@@ -181,7 +181,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
 
         <div
             v-if="series"
-            class="flex flex-wrap items-center justify-between gap-2"
+            class="motion-safe:animate-in fade-in animation-duration-500 flex flex-wrap items-center justify-between gap-2"
         >
             <ToggleGroup
                 type="single"

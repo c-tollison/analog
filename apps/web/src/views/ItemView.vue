@@ -40,6 +40,7 @@ import {
     formatStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 
 import { LibraryBigIcon, PencilIcon, PlusIcon, StarIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -248,7 +249,8 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                 class="grid gap-2"
                             >
                                 <Item
-                                    v-for="shelf in item.shelves"
+                                    v-for="(shelf, index) in item.shelves"
+                                    v-bind="staggerIn(index)"
                                     :key="shelf.id"
                                     variant="outline"
                                     size="sm"
@@ -294,7 +296,8 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                     <template #default="{ items }">
                         <ItemGroup class="grid gap-2">
                             <EditionItem
-                                v-for="edition in items"
+                                v-for="(edition, index) in items"
+                                v-bind="staggerIn(index)"
                                 :key="edition.isbn"
                                 :edition="edition"
                                 :fallback-title="item.title"
@@ -343,7 +346,8 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                     <template #default="{ items: page }">
                         <ItemGroup class="grid gap-2 sm:grid-cols-2">
                             <Item
-                                v-for="review in page"
+                                v-for="(review, index) in page"
+                                v-bind="staggerIn(index)"
                                 :key="review.id"
                                 variant="outline"
                                 class="items-start"

@@ -53,6 +53,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import { CreateCollectionSchema } from '@/lib/catalog-schemas';
 import { isPendingFor } from '@/lib/editions';
 import { MEDIA_TYPES } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import { HistoryIcon, ScanBarcodeIcon, XIcon } from '@lucide/vue';
@@ -312,7 +313,8 @@ const error = computed(
                             <template #default="{ items }">
                                 <ItemGroup class="grid gap-2">
                                     <EditionItem
-                                        v-for="edition in items"
+                                        v-for="(edition, index) in items"
+                                        v-bind="staggerIn(index)"
                                         :key="edition.isbn"
                                         :edition="edition"
                                         :fallback-title="title"

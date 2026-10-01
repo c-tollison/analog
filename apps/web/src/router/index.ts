@@ -33,7 +33,7 @@ export const router = createRouter({
                 {
                     path: '',
                     name: 'home',
-                    redirect: { name: 'collections' },
+                    redirect: { name: 'log' },
                 },
                 {
                     path: 'shelves',

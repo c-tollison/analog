@@ -33,8 +33,8 @@ Only the UI and web URLs say "shelf". The database, API and composables keep "co
 
 ### Top nav
 
-- **Desktop:** "Analog" text on the left, linking to Shelves. Then Shelves, Log and Friends. The search bar sits in the middle. Notifications and the profile menu are on the right.
-- **Mobile pill:** Shelves, Log, Search and Friends. The notifications bell moves to a mobile top bar.
+- **Desktop:** "Analog" text on the left, linking to the Log. Then Log, Shelves and Friends. The search bar sits in the middle. Notifications and the profile menu are on the right.
+- **Mobile pill:** Log, Shelves, Search and Friends, with a highlight that slides to the current tab. The notifications bell moves to a mobile top bar.
 
 ### Search
 
@@ -151,7 +151,7 @@ Each step is its own branch from `main` and its own PR. Each one passes `pnpm ch
 - [x] Mobile pill and mobile top bar with the bell.
 - [x] `/log` page, and the Log on the profile.
 - [x] `/shelves/:id/scan` route, and delete `/lookup`.
-- [x] `/` goes to Shelves.
+- [x] `/` goes to the Log. It started as Shelves, and was changed on 2026-10-01.
 - [x] Search is full screen on phones.
 - [x] Stats and a yearly goal at the top of the Log.
 
@@ -205,8 +205,8 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 
 ### Step 4
 
-1. **Desktop top bar:** "Analog" on the left goes to Shelves. Next to it are Shelves, Log and Friends, with the current one outlined. The search bar sits in the middle, with the bell and profile menu on the right.
-2. **Phone:** the top bar has "Analog", the bell and the profile menu. The pill at the bottom has Shelves, Log, Search and Friends, and fits a narrow phone.
+1. **Desktop top bar:** "Analog" on the left goes to the Log. Next to it are Log, Shelves and Friends, with the current one outlined. The search bar sits in the middle, with the bell and profile menu on the right.
+2. **Phone:** the top bar has "Analog", the bell and the profile menu. The pill at the bottom has Log, Shelves, Search and Friends, and fits a narrow phone. The highlight slides smoothly to the tab you tap, sits on Search while search is open, and fades out on pages outside the four tabs, like a book page. With reduced motion turned on, it jumps instead of sliding.
 3. Search on a phone fills the screen. On desktop it's a large panel near the top. The close button sits beside the search bar, not on top of it.
 4. **URLs:** shelves live at `/shelves`, `/shelves/:id` and `/shelves/:id/series/:seriesId`. Old `/collections` links don't work.
 5. **Wording:** every page says shelf or shelves, not collection. That covers titles, buttons, settings, profile settings, invites, confirm dialogs and error messages.
@@ -241,6 +241,12 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 7. On a friend's shelf, the series card still opens their read-only shelf series page. It has their volumes and progress and no buttons.
 8. Pasting your own shelf's old series link sends you to the shared page.
 9. Owning an edition, or changing a status, updates the counts, the bar and the toggle counts.
+
+### Log first and motion
+
+1. Signing in, opening `/`, or clicking "Analog" lands on the Log.
+2. Rows in search, the book page's shelves, editions and reviews, and the Add to shelf editions list fade in one after another, like other lists.
+3. On the series page, the toggle row fades in with the header after loading.
 
 ## Not now
 

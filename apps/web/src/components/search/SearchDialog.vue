@@ -38,6 +38,7 @@ import { useSeriesSearch } from '@/composables/useSeries';
 import { useUserSearch } from '@/composables/useUsers';
 import type { ApiClient } from '@/lib/api';
 import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { staggerIn } from '@/lib/motion';
 import { useSearchStore } from '@/stores/search';
 
 import { PlusIcon, XIcon } from '@lucide/vue';
@@ -156,7 +157,8 @@ watch(
                             <template #default="{ items }">
                                 <ItemGroup class="grid gap-2">
                                     <BookSearchItem
-                                        v-for="book in items"
+                                        v-for="(book, index) in items"
+                                        v-bind="staggerIn(index)"
                                         :key="book.id"
                                         :book="book"
                                     />
@@ -170,7 +172,8 @@ watch(
                             <template #default="{ items }">
                                 <ItemGroup class="grid gap-2">
                                     <Item
-                                        v-for="result in items"
+                                        v-for="(result, index) in items"
+                                        v-bind="staggerIn(index)"
                                         :key="result.id"
                                         variant="outline"
                                         size="sm"
@@ -232,7 +235,8 @@ watch(
                             <template #default="{ items }">
                                 <ItemGroup class="grid gap-2">
                                     <UserItem
-                                        v-for="person in items"
+                                        v-for="(person, index) in items"
+                                        v-bind="staggerIn(index)"
                                         :key="person.id"
                                         :user="person"
                                     >
@@ -266,7 +270,8 @@ watch(
                             <template #default="{ items }">
                                 <ItemGroup class="grid gap-2">
                                     <Item
-                                        v-for="result in items"
+                                        v-for="(result, index) in items"
+                                        v-bind="staggerIn(index)"
                                         :key="result.id"
                                         variant="outline"
                                         size="sm"
