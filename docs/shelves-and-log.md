@@ -169,6 +169,8 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 11. The series link on a book opens `/series/:id`. It shows the lowest volume's cover, the AniList details, your owned and read counts, and every volume with Owned and status marks.
 12. A friend's shelf links to the same book page, and it shows your own status there, not theirs.
 13. The shelf scan page still scans like before.
+14. Add to shelf explains what to do: pick a shelf, check your editions, or search, type or scan one that's missing.
+15. A shelf's series page says "Back to" and the shelf's name when you came from that shelf.
 
 ## Not now
 

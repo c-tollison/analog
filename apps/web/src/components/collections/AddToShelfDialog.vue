@@ -176,7 +176,10 @@ const error = computed(
         <DialogContent class="flex max-h-[85svh] flex-col sm:max-w-md">
             <DialogHeader>
                 <DialogTitle>Add to shelf</DialogTitle>
-                <DialogDescription>{{ title }}</DialogDescription>
+                <DialogDescription>
+                    Pick a shelf and check the editions of {{ title }} you own.
+                    Don't see yours? Search for it, type its ISBN or scan it.
+                </DialogDescription>
             </DialogHeader>
 
             <FormError :message="error" />

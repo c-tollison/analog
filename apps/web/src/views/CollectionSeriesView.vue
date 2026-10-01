@@ -113,7 +113,9 @@ const headerError = computed(
         <div class="flex items-center justify-between">
             <BackButton
                 :to="{ name: 'collection', params: { id } }"
-                text="Back to collection"
+                :text="
+                    collection ? `Back to ${collection.name}` : 'Back to collection'
+                "
             />
             <Button v-if="isMember" variant="outline" size="sm" as-child>
                 <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
