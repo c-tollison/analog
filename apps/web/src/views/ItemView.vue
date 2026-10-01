@@ -36,6 +36,7 @@ import {
     useItemReviews,
 } from '@/composables/useItems';
 import { usePageTitle } from '@/composables/usePageTitle';
+import { useQueryParam } from '@/composables/useQueryParam';
 import {
     FORMAT_LABELS,
     formatStatusLabels,
@@ -45,31 +46,16 @@ import { staggerIn } from '@/lib/motion';
 
 import { LibraryBigIcon, PencilIcon, PlusIcon, StarIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
-import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router';
-
-const TABS = ['details', 'editions', 'reviews'] as const;
-type Tab = (typeof TABS)[number];
-
-function isTab(value: unknown): value is Tab {
-    return TABS.some((tab) => tab === value);
-}
+import type { RouteLocationRaw } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
-
-const route = useRoute();
-const router = useRouter();
 
 const { data: item, error: loadError } = useItem(() => props.id);
 usePageTitle(() => item.value?.title);
 
 // The open tab lives in the URL so coming back from a profile lands on
 // Reviews.
-const tab = computed({
-    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'details'),
-    set: (value) => {
-        router.replace({ query: { ...route.query, tab: value } });
-    },
-});
+const tab = useQueryParam('tab', ['details', 'editions', 'reviews'], 'details');
 
 // Each list loads when its tab is first opened.
 const editions = useItemEditions(() => props.id, {

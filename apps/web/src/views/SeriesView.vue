@@ -17,6 +17,7 @@ import {
 } from '@/components/shadcn-components/toggle-group';
 import { useCollection } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
+import { useQueryParam } from '@/composables/useQueryParam';
 import { useSeriesPage, useSeriesVolumes } from '@/composables/useSeries';
 import {
     completedWord,
@@ -28,12 +29,11 @@ import { missingVolumes } from '@/lib/volumes';
 import { useSearchStore } from '@/stores/search';
 
 import { computed } from 'vue';
-import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router';
+import { type RouteLocationRaw, useRoute } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
 
 const route = useRoute();
-const router = useRouter();
 const search = useSearchStore();
 
 const { data: series, error: loadError } = useSeriesPage(() => props.id);
@@ -54,17 +54,9 @@ function isFilter(value: unknown): value is SeriesVolumeFilter {
 
 // From a shelf you see what you own; from anywhere else, everything. The
 // choice lives in the URL so going back keeps it.
-const show = computed({
-    get: (): SeriesVolumeFilter =>
-        isFilter(route.query.show)
-            ? route.query.show
-            : shelfId.value
-              ? 'owned'
-              : 'all',
-    set: (value) => {
-        router.replace({ query: { ...route.query, show: value } });
-    },
-});
+const show = useQueryParam('show', SERIES_VOLUME_FILTERS, () =>
+    shelfId.value ? 'owned' : 'all'
+);
 
 function onShow(value: unknown) {
     if (isFilter(value)) show.value = value;

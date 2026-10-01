@@ -27,34 +27,22 @@ import {
     useRemoveMember,
     useUpdateCollection,
 } from '@/composables/useCollections';
+import { useQueryParam } from '@/composables/useQueryParam';
 import { useSessionStore } from '@/stores/session';
 
 import { LogOutIcon, Trash2Icon, UserPlusIcon, XIcon } from '@lucide/vue';
 import { storeToRefs } from 'pinia';
 import { computed, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-
-const TABS = ['general', 'members'] as const;
-type Tab = (typeof TABS)[number];
-
-function isTab(value: unknown): value is Tab {
-    return TABS.some((tab) => tab === value);
-}
+import { useRouter } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
 
-const route = useRoute();
 const router = useRouter();
 const { session } = storeToRefs(useSessionStore());
 
 // The open tab lives in the URL so coming back from the invite page lands
 // on Members.
-const tab = computed({
-    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'general'),
-    set: (value) => {
-        router.replace({ query: { ...route.query, tab: value } });
-    },
-});
+const tab = useQueryParam('tab', ['general', 'members'], 'general');
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 const isOwner = computed(() => collection.value?.role === CollectionRole.Owner);
