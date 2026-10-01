@@ -10,6 +10,7 @@ import MediaDetails from '@/components/media/MediaDetails.vue';
 import LogButton from '@/components/progress/LogButton.vue';
 import ReviewSheet from '@/components/progress/ReviewSheet.vue';
 import StarRating from '@/components/progress/StarRating.vue';
+import ReturnLink from '@/components/ReturnLink.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
@@ -170,7 +171,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
 
                     <div class="grid min-w-0 content-start gap-4">
                         <div class="grid gap-1">
-                            <RouterLink
+                            <ReturnLink
                                 v-if="item.seriesId"
                                 :to="{
                                     name: 'series',
@@ -185,7 +186,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                         of {{ item.volumeCount }}
                                     </template>
                                 </template>
-                            </RouterLink>
+                            </ReturnLink>
                             <h1 class="text-2xl font-semibold text-balance">
                                 {{ item.title }}
                             </h1>
@@ -268,7 +269,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                     size="sm"
                                     as-child
                                 >
-                                    <RouterLink
+                                    <ReturnLink
                                         :to="{
                                             name: 'collection',
                                             params: { id: shelf.id },
@@ -290,7 +291,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                                 }}
                                             </ItemDescription>
                                         </ItemContent>
-                                    </RouterLink>
+                                    </ReturnLink>
                                 </Item>
                             </ItemGroup>
                         </section>

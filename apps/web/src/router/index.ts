@@ -1,4 +1,5 @@
 import { hasRole, UserRole } from '@analog/types';
+import { trackVisits } from '@/lib/navigation';
 import { useSessionStore } from '@/stores/session';
 
 import {
@@ -203,6 +204,8 @@ export const router = createRouter({
         },
     ],
 });
+
+trackVisits(router);
 
 router.beforeEach(async (to) => {
     if (!to.meta.requiresAuth && !to.meta.guestOnly) {
