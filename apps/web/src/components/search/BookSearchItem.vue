@@ -52,7 +52,7 @@ stays clickable. -->
                 size="sm"
                 :src="book.coverUrl"
                 :alt="book.title"
-                class="aspect-2/3 w-12"
+                class="aspect-2/3 w-14 sm:w-12"
             />
         </ItemMedia>
         <ItemContent class="min-w-0 gap-1">
@@ -67,7 +67,7 @@ stays clickable. -->
             <ItemTitle class="w-full">
                 <RouterLink
                     :to="{ name: 'item', params: { id: book.id } }"
-                    class="line-clamp-2 after:absolute after:inset-0"
+                    class="line-clamp-3 after:absolute after:inset-0 sm:line-clamp-2"
                 >
                     {{ book.title }}
                 </RouterLink>
@@ -91,8 +91,7 @@ stays clickable. -->
                 </span>
             </ItemDescription>
         </ItemContent>
-        <!-- Under the text on phones so the title gets the full width. -->
-        <ItemActions class="relative w-full pl-14.5 sm:w-auto sm:pl-0">
+        <ItemActions class="relative">
             <LogButton
                 :catalog-item-id="book.id"
                 :title="book.title"
