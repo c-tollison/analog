@@ -28,11 +28,11 @@ watch(
 </script>
 
 <!-- The muted box shows while the cover loads, then the cover fades in over
-it. -->
+it. The slot draws on top of the cover. -->
 <template>
     <div
         v-if="sources && !failed"
-        :class="cn('bg-muted overflow-hidden rounded-sm', props.class)"
+        :class="cn('bg-muted relative overflow-hidden rounded-sm', props.class)"
     >
         <img
             :src="sources.src"
@@ -44,6 +44,7 @@ it. -->
             @load="loaded = true"
             @error="failed = true"
         />
+        <slot />
     </div>
     <div
         v-else
@@ -51,11 +52,12 @@ it. -->
         :aria-label="alt"
         :class="
             cn(
-                'bg-muted flex items-center justify-center rounded-sm',
+                'bg-muted relative flex items-center justify-center overflow-hidden rounded-sm',
                 props.class
             )
         "
     >
         <BookIcon class="text-muted-foreground size-6" />
+        <slot />
     </div>
 </template>

@@ -5,6 +5,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import CoverRating from '@/components/progress/CoverRating.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
@@ -229,7 +230,12 @@ const headerError = computed(
                                 :src="entry.coverUrl"
                                 :alt="entry.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
-                            />
+                            >
+                                <CoverRating
+                                    v-if="entry.rating !== null"
+                                    :rating="entry.rating"
+                                />
+                            </CoverImage>
                             <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.title }}
                             </p>

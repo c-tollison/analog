@@ -4,6 +4,7 @@ import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
+import CoverRating from '@/components/progress/CoverRating.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Progress } from '@/components/shadcn-components/progress';
@@ -194,7 +195,12 @@ const headerError = computed(
                                 :src="item.coverUrl"
                                 :alt="item.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
-                            />
+                            >
+                                <CoverRating
+                                    v-if="item.rating !== null"
+                                    :rating="item.rating"
+                                />
+                            </CoverImage>
                             <p class="text-xs font-medium">
                                 Vol. {{ item.position ?? '?' }}
                             </p>

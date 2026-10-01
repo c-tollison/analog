@@ -6,8 +6,8 @@ import CollectionProgressBar from '@/components/collections/CollectionProgressBa
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
+import CoverRating from '@/components/progress/CoverRating.vue';
 import LogButton from '@/components/progress/LogButton.vue';
-import StarRating from '@/components/progress/StarRating.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import { Spinner } from '@/components/shadcn-components/spinner';
@@ -226,7 +226,12 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                 :src="item.coverUrl"
                                 :alt="item.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
-                            />
+                            >
+                                <CoverRating
+                                    v-if="item.rating !== null"
+                                    :rating="item.rating"
+                                />
+                            </CoverImage>
                             <div class="flex items-center gap-1">
                                 <p class="text-xs font-medium">
                                     Vol. {{ item.position ?? '?' }}
@@ -240,16 +245,6 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                             >
                                 {{ item.title }}
                             </p>
-                            <!-- Keeps its height when empty, so every
-                                 Log button lines up. -->
-                            <div class="flex h-5 items-center">
-                                <StarRating
-                                    v-if="item.rating !== null"
-                                    readonly
-                                    small
-                                    :model-value="item.rating"
-                                />
-                            </div>
                         </RouterLink>
                         <LogButton
                             v-if="labels"
