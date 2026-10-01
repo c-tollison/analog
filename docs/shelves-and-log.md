@@ -116,11 +116,12 @@ Each step is its own branch from `main` and its own PR. Each one passes `pnpm ch
 
 ### 2. Shared pages
 
-- [ ] `/items/:id` shared book page.
-- [ ] `/series/:id` shared series page.
-- [ ] Split button.
-- [ ] Add to shelf dialog with the paged editions list.
-- [ ] Delete the `collections/:id/items/:itemId` route and point shelf series pages at `/items/:id`.
+- [x] `/items/:id` shared book page.
+- [x] `/series/:id` shared series page.
+- [x] Split button.
+- [x] Add to shelf dialog with the paged editions list.
+- [x] Delete the `collections/:id/items/:itemId` route and point shelf series pages at `/items/:id`.
+- [x] The scan page and the Add to shelf dialog share one camera, `BarcodeCamera`.
 
 ### 3. Search
 
@@ -147,11 +148,27 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 1. A shelf with two editions of one book says 2 items on the shelf list. The progress bar still counts it as one book.
 2. A series card in the shelf grid shows the cover of the lowest volume you own on that shelf.
 3. The shelf series page header shows that same cover.
-4. On a book with two editions, removing one keeps you on the page. Removing the last one asks first, then goes back and the counts update.
+4. Unchecking an edition in Add to shelf updates the shelf's count. Unchecking the last one takes the book off that shelf. This replaced the old item page in step 2.
 5. The series page's "Add more" button opens the scan page.
 6. The scan page has no tabs and scans like before.
 7. Setting a status or a review still works.
 8. On prod after deploy, no shelf entry is missing an edition, and series covers show volume 1 where it has a cover.
+
+### Step 2
+
+1. Clicking any book on a shelf, on a shelf series page or in shelf search opens `/items/:id`.
+2. The book page shows saves and the average rating, your status, your shelves with their edition counts, and the details.
+3. The Log button with no status adds "Want to read". With a status, it opens the menu. The menu changes the status, removes it from the Log, and opens Add to shelf.
+4. Marking it read with no rating opens the review sheet.
+5. Add to shelf starts on a shelf that already holds the book. Switching shelves updates which editions are checked. Owned editions are listed first.
+6. Typing in the filter narrows the list by ISBN, publisher or title. Typing a full ISBN that isn't listed shows "Add this edition". It joins as unreviewed and lands on the shelf.
+7. The scan button opens the camera in the dialog. A scan fills in the filter.
+8. A brand new account with no shelves can name a first shelf right in the dialog.
+9. The Editions tab pages through editions and marks each with the shelves that own it, plus "Unreviewed" on pending ones.
+10. The Reviews tab shows your review and everyone else's.
+11. The series link on a book opens `/series/:id`. It shows the lowest volume's cover, the AniList details, your owned and read counts, and every volume with Owned and status marks.
+12. A friend's shelf links to the same book page, and it shows your own status there, not theirs.
+13. The shelf scan page still scans like before.
 
 ## Not now
 

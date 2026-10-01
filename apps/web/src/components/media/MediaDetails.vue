@@ -3,16 +3,16 @@ import ExternalLinks from '@/components/media/ExternalLinks.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import type { AdminItem } from '@/composables/useAdmin';
-import type { CollectionItemDetail } from '@/composables/useCollections';
+import type { ItemPage } from '@/composables/useItems';
 
 import { computed, ref } from 'vue';
 
 const LONG_DESCRIPTION = 400;
 
 const props = defineProps<{
-    description: CollectionItemDetail['description'];
+    description: ItemPage['description'];
     genres?: string[];
-    facts: CollectionItemDetail['facts'];
+    facts: ItemPage['facts'];
     links?: AdminItem['links'];
 }>();
 

@@ -9,6 +9,7 @@ import catalog from './routes/catalog.js';
 import collections from './routes/collections.js';
 import friends from './routes/friends.js';
 import invites from './routes/invites.js';
+import items from './routes/items.js';
 import notifications from './routes/notifications.js';
 import series from './routes/series.js';
 import users from './routes/users.js';
@@ -58,6 +59,7 @@ export function createApp(config: Config) {
     return api
         .use(requireAuth)
         .route('/catalog', catalog)
+        .route('/items', items)
         .route('/collections', collections)
         .route('/series', series)
         .route('/friends', friends)

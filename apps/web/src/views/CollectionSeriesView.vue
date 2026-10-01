@@ -210,8 +210,8 @@ const headerError = computed(
                     >
                         <RouterLink
                             :to="{
-                                name: 'collection-item',
-                                params: { id, itemId: item.id },
+                                name: 'item',
+                                params: { id: item.catalogItemId },
                             }"
                             class="grid gap-1"
                         >

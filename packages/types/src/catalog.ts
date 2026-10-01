@@ -32,7 +32,7 @@ export const AddBookSchema = z.object({
     volume: z.number().nonnegative().nullable(),
 });
 
-export const OwnedIsbnSchema = z.object({ isbn: IsbnSchema });
+export const OwnEditionSchema = z.object({ catalogItemId: z.uuid() });
 
 export const CollectionNameSchema = z
     .string()

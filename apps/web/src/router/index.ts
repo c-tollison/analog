@@ -89,10 +89,17 @@ export const router = createRouter({
                     props: true,
                 },
                 {
-                    path: 'collections/:id/items/:itemId',
-                    name: 'collection-item',
+                    path: 'items/:id',
+                    name: 'item',
                     meta: { title: 'Media' },
-                    component: () => import('@/views/CollectionItemView.vue'),
+                    component: () => import('@/views/ItemView.vue'),
+                    props: true,
+                },
+                {
+                    path: 'series/:id',
+                    name: 'series',
+                    meta: { title: 'Series' },
+                    component: () => import('@/views/SeriesView.vue'),
                     props: true,
                 },
                 {

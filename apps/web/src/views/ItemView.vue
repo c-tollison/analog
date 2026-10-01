@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { ProgressStatus } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
-import AddEditionDialog from '@/components/collections/AddEditionDialog.vue';
+import AddToShelfDialog from '@/components/collections/AddToShelfDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import EditionItem from '@/components/media/EditionItem.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
+import LogButton from '@/components/progress/LogButton.vue';
 import ReviewSheet from '@/components/progress/ReviewSheet.vue';
 import StarRating from '@/components/progress/StarRating.vue';
-import StatusPicker from '@/components/progress/StatusPicker.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
     Item,
     ItemContent,
+    ItemDescription,
     ItemGroup,
     ItemMedia,
     ItemTitle,
@@ -30,22 +30,18 @@ import {
 } from '@/components/shadcn-components/tabs';
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import {
-    useAddOwnedEdition,
-    useCollection,
-    useCollectionItem,
-    useCollectionItemReviews,
-    useRemoveOwnedEdition,
-} from '@/composables/useCollections';
+    useItem,
+    useItemEditions,
+    useItemReviews,
+} from '@/composables/useItems';
 import { usePageTitle } from '@/composables/usePageTitle';
-import { useSetProgressStatus } from '@/composables/useProgress';
-import { isPendingFor } from '@/lib/editions';
 import {
     FORMAT_LABELS,
     formatStatusLabels,
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 
-import { PencilIcon, PlusIcon, StarIcon } from '@lucide/vue';
+import { LibraryBigIcon, PencilIcon, PlusIcon, StarIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router';
 
@@ -56,24 +52,13 @@ function isTab(value: unknown): value is Tab {
     return TABS.some((tab) => tab === value);
 }
 
-const props = defineProps<{ id: string; itemId: string }>();
+const props = defineProps<{ id: string }>();
 
 const route = useRoute();
 const router = useRouter();
 
-const { data: item, error: loadError } = useCollectionItem(
-    () => props.id,
-    () => props.itemId
-);
+const { data: item, error: loadError } = useItem(() => props.id);
 usePageTitle(() => item.value?.title);
-
-// Visitors get a read-only page with the owner's progress. Edit controls
-// wait for the role to load.
-const { data: collection } = useCollection(() => props.id);
-const isMember = computed(() => !!collection.value?.role);
-const ownerName = computed(() =>
-    collection.value?.role === null ? collection.value.ownerName : null
-);
 
 // The open tab lives in the URL so coming back from a profile lands on
 // Reviews.
@@ -84,44 +69,17 @@ const tab = computed({
     },
 });
 
-// Loads when the Reviews tab is first opened.
-const reviews = useCollectionItemReviews(
-    () => props.id,
-    () => props.itemId,
-    { enabled: () => tab.value === 'reviews' }
-);
+// Each list loads when its tab is first opened.
+const editions = useItemEditions(() => props.id, {
+    enabled: () => tab.value === 'editions',
+});
+const reviews = useItemReviews(() => props.id, {
+    enabled: () => tab.value === 'reviews',
+});
 
 const labels = computed(() =>
     item.value ? formatStatusLabels(item.value.format) : null
 );
-
-const {
-    mutate: setStatus,
-    isPending: isSettingStatus,
-    variables: statusVariables,
-    error: statusError,
-} = useSetProgressStatus();
-
-// Show the picked status while it saves.
-const shownStatus = computed(() =>
-    isSettingStatus.value && statusVariables.value
-        ? statusVariables.value.status
-        : (item.value?.status ?? null)
-);
-
-function onStatus(status: ProgressStatus | null) {
-    if (!item.value) return;
-    setStatus(
-        { catalogItemId: item.value.catalogItemId, status },
-        {
-            onSuccess: () => {
-                if (status === ProgressStatus.Completed && !hasReview.value) {
-                    isReviewOpen.value = true;
-                }
-            },
-        }
-    );
-}
 
 const isCompleted = computed(
     () => item.value?.status === ProgressStatus.Completed
@@ -130,68 +88,35 @@ const hasReview = computed(
     () => !!item.value && (item.value.rating !== null || !!item.value.review)
 );
 const isReviewOpen = ref(false);
-const isAddEditionOpen = ref(false);
+const isAddOpen = ref(false);
+
+// Finishing something asks for a rating, unless there already is one.
+function onStatusChanged(status: ProgressStatus | null) {
+    if (status === ProgressStatus.Completed && !hasReview.value) {
+        isReviewOpen.value = true;
+    }
+}
+
+// Out of 5 stars, like the rating picker.
+const averageStars = computed(() =>
+    item.value?.ratingAverage != null
+        ? (item.value.ratingAverage / 2).toFixed(1)
+        : null
+);
+
+function shelvesOwning(isbn: string): string[] {
+    return (item.value?.shelves ?? [])
+        .filter((shelf) => shelf.isbns.includes(isbn))
+        .map((shelf) => shelf.name);
+}
 
 const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
     item.value?.seriesId
         ? {
-              to: {
-                  name: 'collection-series',
-                  params: { id: props.id, seriesId: item.value.seriesId },
-              },
+              to: { name: 'series', params: { id: item.value.seriesId } },
               text: 'Back to series',
           }
-        : {
-              to: { name: 'collection', params: { id: props.id } },
-              text: 'Back to collection',
-          }
-);
-
-const addOwned = useAddOwnedEdition();
-const removeOwned = useRemoveOwnedEdition();
-const isChangingOwned = computed(
-    () => addOwned.isPending.value || removeOwned.isPending.value
-);
-
-function editionVariables(isbn: string) {
-    return { collectionId: props.id, itemId: props.itemId, isbn };
-}
-
-// Removing the last edition takes the item out of the collection, so it asks
-// first.
-const removingLast = ref<string | null>(null);
-const confirmingRemoveLast = computed({
-    get: () => removingLast.value !== null,
-    set: (open) => {
-        if (!open) removingLast.value = null;
-    },
-});
-
-function removeEdition(isbn: string) {
-    removeOwned.mutate(editionVariables(isbn), {
-        onSuccess: ({ removedEntry }) => {
-            if (removedEntry) router.replace(back.value.to);
-        },
-        onSettled: () => (removingLast.value = null),
-    });
-}
-
-function onRemoveOwned(isbn: string) {
-    if (item.value?.ownedIsbns.length === 1) {
-        removingLast.value = isbn;
-    } else {
-        removeEdition(isbn);
-    }
-}
-
-const error = computed(
-    () =>
-        (
-            loadError.value ??
-            statusError.value ??
-            addOwned.error.value ??
-            removeOwned.error.value
-        )?.message ?? null
+        : { to: { name: 'collections' }, text: 'Back to collections' }
 );
 </script>
 
@@ -201,16 +126,7 @@ const error = computed(
             <BackButton :to="back.to" :text="back.text" />
         </div>
 
-        <FormError :message="error" />
-
-        <ConfirmDialog
-            v-model:open="confirmingRemoveLast"
-            :title="`Remove ${item?.title ?? 'item'}?`"
-            description="It's your only edition, so it'll be taken out of this collection."
-            confirm-text="Remove"
-            :pending="removeOwned.isPending.value"
-            @confirm="removingLast && removeEdition(removingLast)"
-        />
+        <FormError :message="loadError?.message ?? null" />
 
         <div v-if="!item && !loadError" class="flex justify-center p-8">
             <Spinner class="size-6" />
@@ -223,8 +139,8 @@ const error = computed(
         >
             <TabsList>
                 <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger v-if="item.editions.length" value="editions">
-                    Editions ({{ item.editions.length }})
+                <TabsTrigger v-if="item.editionCount" value="editions">
+                    Editions ({{ item.editionCount }})
                 </TabsTrigger>
                 <TabsTrigger value="reviews">
                     Reviews
@@ -248,14 +164,17 @@ const error = computed(
                             <RouterLink
                                 v-if="item.seriesId"
                                 :to="{
-                                name: 'collection-series',
-                                params: { id, seriesId: item.seriesId },
-                            }"
+                                    name: 'series',
+                                    params: { id: item.seriesId },
+                                }"
                                 class="text-muted-foreground text-sm hover:underline"
                             >
                                 {{ item.seriesTitle }}
                                 <template v-if="item.position !== null">
                                     · Vol. {{ item.position }}
+                                    <template v-if="item.volumeCount">
+                                        of {{ item.volumeCount }}
+                                    </template>
                                 </template>
                             </RouterLink>
                             <h1 class="text-2xl font-semibold text-balance">
@@ -273,49 +192,103 @@ const error = computed(
                             <div class="flex flex-wrap items-center gap-2 pt-1">
                                 <Badge variant="secondary">
                                     {{
-                                    item.kind
-                                        ? SERIES_KIND_LABELS[item.kind]
-                                        : FORMAT_LABELS[item.format]
+                                        item.kind
+                                            ? SERIES_KIND_LABELS[item.kind]
+                                            : FORMAT_LABELS[item.format]
                                     }}
                                 </Badge>
-                                <StarRating
-                                    v-if="
-                                        isMember &&
-                                        isCompleted &&
-                                        item.rating !== null
-                                    "
-                                    readonly
-                                    :model-value="item.rating"
-                                />
+                                <span
+                                    class="text-muted-foreground flex items-center gap-1 text-xs"
+                                >
+                                    {{ item.saveCount }}
+                                    {{ item.saveCount === 1 ? 'save' : 'saves' }}
+                                    <template
+                                        v-if="
+                                            averageStars &&
+                                            item.ratingAverage !== null
+                                        "
+                                    >
+                                        ·
+                                        <StarRating
+                                            readonly
+                                            :model-value="
+                                                Math.round(item.ratingAverage)
+                                            "
+                                        />
+                                        {{ averageStars }}
+                                        ({{ item.ratingCount }})
+                                    </template>
+                                </span>
                             </div>
                         </div>
 
-                        <div
-                            v-if="ownerName && item.status"
-                            class="flex flex-wrap items-center gap-2 text-sm"
-                        >
-                            <span class="text-muted-foreground">
-                                {{ ownerName }}
-                            </span>
-                            <Badge variant="outline">
-                                {{ labels[item.status] }}
-                            </Badge>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <LogButton
+                                :catalog-item-id="item.id"
+                                :title="item.title"
+                                :status="item.status"
+                                :labels="labels"
+                                :shelf-id="item.shelves[0]?.id"
+                                @changed="onStatusChanged"
+                            />
                             <StarRating
                                 v-if="isCompleted && item.rating !== null"
                                 readonly
-                                small
                                 :model-value="item.rating"
                             />
                         </div>
 
-                        <StatusPicker
-                            v-if="isMember"
-                            :labels="labels"
-                            :model-value="shownStatus"
-                            :disabled="isSettingStatus"
-                            class="sm:max-w-md"
-                            @update:model-value="onStatus"
-                        />
+                        <section class="grid gap-2">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-sm font-semibold">
+                                    On your shelves
+                                </h2>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    @click="isAddOpen = true"
+                                >
+                                    <PlusIcon />
+                                    Add to shelf
+                                </Button>
+                            </div>
+                            <ItemGroup
+                                v-if="item.shelves.length"
+                                class="grid gap-2"
+                            >
+                                <Item
+                                    v-for="shelf in item.shelves"
+                                    :key="shelf.id"
+                                    variant="outline"
+                                    size="sm"
+                                    as-child
+                                >
+                                    <RouterLink
+                                        :to="{
+                                            name: 'collection',
+                                            params: { id: shelf.id },
+                                        }"
+                                    >
+                                        <ItemMedia variant="icon">
+                                            <LibraryBigIcon />
+                                        </ItemMedia>
+                                        <ItemContent>
+                                            <ItemTitle
+                                                >{{ shelf.name }}</ItemTitle
+                                            >
+                                            <ItemDescription>
+                                                {{ shelf.isbns.length }}
+                                                {{
+                                                    shelf.isbns.length === 1
+                                                        ? 'edition'
+                                                        : 'editions'
+                                                }}
+                                            </ItemDescription>
+                                        </ItemContent>
+                                    </RouterLink>
+                                </Item>
+                            </ItemGroup>
+                        </section>
 
                         <MediaDetails
                             :description="item.description"
@@ -326,66 +299,33 @@ const error = computed(
             </TabsContent>
 
             <TabsContent value="editions" class="grid gap-3">
-                <div v-if="isMember" class="flex justify-end">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        @click="isAddEditionOpen = true"
-                    >
-                        <PlusIcon />
-                        Add an edition
-                    </Button>
-                </div>
-                <ItemGroup class="grid gap-2">
-                    <EditionItem
-                        v-for="edition in item.editions"
-                        :key="edition.isbn"
-                        :edition="edition"
-                        :fallback-title="item.title"
-                    >
-                        <Badge
-                            v-if="
-                                !isMember && item.ownedIsbns.includes(edition.isbn)
-                            "
-                            variant="secondary"
-                        >
-                            Owned
-                        </Badge>
-                        <template
-                            v-else-if="item.ownedIsbns.includes(edition.isbn)"
-                        >
-                            <Badge variant="secondary">Yours</Badge>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                :disabled="isChangingOwned"
-                                @click="onRemoveOwned(edition.isbn)"
+                <PagedList :list="editions" empty-text="No editions yet.">
+                    <template #default="{ items }">
+                        <ItemGroup class="grid gap-2">
+                            <EditionItem
+                                v-for="edition in items"
+                                :key="edition.isbn"
+                                :edition="edition"
+                                :fallback-title="item.title"
                             >
-                                <Spinner
-                                    v-if="isPendingFor(removeOwned, edition.isbn)"
-                                />
-                                Remove
-                            </Button>
-                        </template>
-                        <Button
-                            v-else-if="isMember"
-                            variant="outline"
-                            size="sm"
-                            :disabled="isChangingOwned"
-                            @click="addOwned.mutate(editionVariables(edition.isbn))"
-                        >
-                            <Spinner
-                                v-if="isPendingFor(addOwned, edition.isbn)"
-                            />
-                            I own this
-                        </Button>
-                    </EditionItem>
-                </ItemGroup>
+                                <Badge v-if="edition.pending" variant="outline">
+                                    Unreviewed
+                                </Badge>
+                                <Badge
+                                    v-for="name in shelvesOwning(edition.isbn)"
+                                    :key="name"
+                                    variant="secondary"
+                                >
+                                    {{ name }}
+                                </Badge>
+                            </EditionItem>
+                        </ItemGroup>
+                    </template>
+                </PagedList>
             </TabsContent>
 
             <TabsContent value="reviews" class="grid gap-4">
-                <!-- A visitor finds the owner's review in the list below. -->
-                <section v-if="isMember && isCompleted" class="grid gap-3">
+                <section v-if="isCompleted" class="grid gap-3">
                     <div class="flex items-center justify-between">
                         <h2 class="font-semibold">Your review</h2>
                         <Button
@@ -407,7 +347,7 @@ const error = computed(
                         {{ item.review }}
                     </p>
                 </section>
-                <Separator v-if="isMember && isCompleted" />
+                <Separator v-if="isCompleted" />
                 <PagedList :list="reviews" empty-text="No reviews yet.">
                     <template #default="{ items: page }">
                         <ItemGroup class="grid gap-2 sm:grid-cols-2">
@@ -456,18 +396,18 @@ const error = computed(
             </TabsContent>
         </Tabs>
 
-        <AddEditionDialog
-            v-if="item && isMember"
-            v-model:open="isAddEditionOpen"
-            :collection-id="id"
-            :item-id="itemId"
+        <AddToShelfDialog
+            v-if="item"
+            v-model:open="isAddOpen"
+            :catalog-item-id="item.id"
             :title="item.title"
+            :start-shelf-id="item.shelves[0]?.id"
         />
 
         <ReviewSheet
-            v-if="item && isMember && isCompleted"
+            v-if="item && isCompleted"
             v-model:open="isReviewOpen"
-            :catalog-item-id="item.catalogItemId"
+            :catalog-item-id="item.id"
             :title="item.title"
             :rating="item.rating"
             :review="item.review"

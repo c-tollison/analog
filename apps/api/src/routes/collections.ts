@@ -43,7 +43,7 @@ import { whenCompleted } from '../lib/progress.js';
 import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
 import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
-import collectionItems from './collection-items.js';
+import collectionItems, { collectionEditions } from './collection-items.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -91,6 +91,7 @@ const FriendsQuerySchema = PageQuerySchema.extend({
 
 const itemColumns = {
     id: collectionItem.id,
+    catalogItemId: catalogItem.id,
     format: catalogItem.format,
     kind: catalogItem.kind,
     title: catalogItem.title,
@@ -297,6 +298,8 @@ const collections = new Hono<AppEnv>()
                         status: sql<ProgressStatus | null>`min(${progress.status}::text)`,
                         rating: sql<number | null>`min(${myRating})`,
                         id: sql<string>`min(${collectionItem.id}::text)`,
+                        // Only meaningful for items not in a series.
+                        catalogItemId: sql<string>`min(${catalogItem.id}::text)`,
                         format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         kind: sql<SeriesKind | null>`min(${catalogItem.kind}::text)`,
                         title: itemTitle,
@@ -480,6 +483,7 @@ const collections = new Hono<AppEnv>()
         }
     )
     .route('/:id/items', collectionItems)
+    .route('/:id/editions', collectionEditions)
     .get(
         '/:id/members',
         schemaValidator('param', CollectionParamSchema),

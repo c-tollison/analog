@@ -76,6 +76,31 @@ export function useDetailsSearch(
     });
 }
 
+/** A series' page, with your own counts. */
+export function useSeriesPage(id: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: () => [...SERIES_KEY, 'page', toValue(id)],
+        queryFn: async () =>
+            unwrap(
+                await api.series[':id'].$get({ param: { id: toValue(id) } })
+            ),
+    });
+}
+
+/** Every volume of a series you can see, with your status and ownership. */
+export function useSeriesVolumes(id: MaybeRefOrGetter<string>) {
+    return usePaginatedList(
+        () => [...SERIES_KEY, 'page', toValue(id), 'items'],
+        async (offset) =>
+            unwrap(
+                await api.series[':id'].items.$get({
+                    param: { id: toValue(id) },
+                    query: { offset },
+                })
+            )
+    );
+}
+
 // Series pages live under collection and admin keys, so all refresh.
 function useInvalidateSeries() {
     const queryClient = useQueryClient();

@@ -222,8 +222,8 @@ const headerError = computed(
                         <RouterLink
                             v-else
                             :to="{
-                                name: 'collection-item',
-                                params: { id, itemId: entry.id },
+                                name: 'item',
+                                params: { id: entry.catalogItemId },
                             }"
                             class="grid gap-1"
                         >

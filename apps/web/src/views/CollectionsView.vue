@@ -64,7 +64,7 @@ function resultLink(result: SearchResult): RouteLocationRaw {
               name: 'collection-series',
               params: { id, seriesId: result.seriesId },
           }
-        : { name: 'collection-item', params: { id, itemId: result.id } };
+        : { name: 'item', params: { id: result.catalogItemId } };
 }
 </script>
 

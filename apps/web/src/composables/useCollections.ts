@@ -3,7 +3,6 @@ import type {
     AddBookSchema,
     CollectionSort,
     CreateCollectionSchema,
-    OwnedIsbnSchema,
     UpdateCollectionSchema,
     UserIdSchema,
 } from '@analog/types';
@@ -164,119 +163,6 @@ export type CollectionSummary = InferResponseType<
     ApiClient['collections'][':id']['$get'],
     200
 >;
-
-export type CollectionItemDetail = InferResponseType<
-    ApiClient['collections'][':id']['items'][':itemId']['$get'],
-    200
->;
-
-/** One item in a collection, with everyone's status and reviews. */
-export function useCollectionItem(
-    id: MaybeRefOrGetter<string>,
-    itemId: MaybeRefOrGetter<string>
-) {
-    return useQuery({
-        queryKey: () => [
-            ...collectionKey(toValue(id)),
-            'item',
-            toValue(itemId),
-        ],
-        queryFn: async () =>
-            unwrap(
-                await api.collections[':id'].items[':itemId'].$get({
-                    param: { id: toValue(id), itemId: toValue(itemId) },
-                })
-            ),
-    });
-}
-
-type OwnedEdition = z.input<typeof OwnedIsbnSchema> & {
-    collectionId: string;
-    itemId: string;
-};
-
-/** Marks another edition of an item as owned by a collection entry. */
-export function useAddOwnedEdition() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async ({ collectionId, itemId, ...json }: OwnedEdition) =>
-            unwrap(
-                await api.collections[':id'].items[':itemId'].isbns.$post({
-                    param: { id: collectionId, itemId },
-                    json,
-                })
-            ),
-        // Shelf lists count editions, so they change too.
-        onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
-    });
-}
-
-/**
- * Stops a collection entry owning one edition of an item. Removing the last
- * one removes the entry, and `removedEntry` says so.
- */
-export function useRemoveOwnedEdition() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async ({ collectionId, itemId, isbn }: OwnedEdition) =>
-            unwrap(
-                await api.collections[':id'].items[':itemId'].isbns[
-                    ':isbn'
-                ].$delete({ param: { id: collectionId, itemId, isbn } })
-            ),
-        onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
-    });
-}
-
-/** Editions of an item that a collection entry doesn't own yet. */
-export function useUnownedEditions(
-    id: MaybeRefOrGetter<string>,
-    itemId: MaybeRefOrGetter<string>,
-    options: PaginatedListOptions = {}
-) {
-    return usePaginatedList(
-        () => [
-            ...collectionKey(toValue(id)),
-            'item',
-            toValue(itemId),
-            'editions',
-        ],
-        async (offset) =>
-            unwrap(
-                await api.collections[':id'].items[':itemId'].editions.$get({
-                    param: { id: toValue(id), itemId: toValue(itemId) },
-                    query: { offset },
-                })
-            ),
-        options
-    );
-}
-
-/** Everyone else's reviews of an item, a page at a time. */
-export function useCollectionItemReviews(
-    id: MaybeRefOrGetter<string>,
-    itemId: MaybeRefOrGetter<string>,
-    options: PaginatedListOptions = {}
-) {
-    return usePaginatedList(
-        () => [
-            ...collectionKey(toValue(id)),
-            'item',
-            toValue(itemId),
-            'reviews',
-        ],
-        async (offset) =>
-            unwrap(
-                await api.collections[':id'].items[':itemId'].reviews.$get({
-                    param: { id: toValue(id), itemId: toValue(itemId) },
-                    query: { offset },
-                })
-            ),
-        options
-    );
-}
 
 /** Everyone in a collection, owner first. */
 export function useCollectionMembers(id: MaybeRefOrGetter<string>) {

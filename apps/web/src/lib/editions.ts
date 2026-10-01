@@ -1,8 +1,8 @@
 import { languageName } from '@analog/types';
-import type { CollectionItemDetail } from '@/composables/useCollections';
+import type { ItemEdition } from '@/composables/useItems';
 
 export type EditionRow = Pick<
-    CollectionItemDetail['editions'][number],
+    ItemEdition,
     'isbn' | 'title' | 'coverUrl' | 'language' | 'format' | 'publisher'
 >;
 
