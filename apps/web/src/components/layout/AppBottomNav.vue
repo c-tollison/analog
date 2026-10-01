@@ -16,9 +16,11 @@ const route = useRoute();
 const search = useSearchStore();
 
 // The sliding highlight shows the current tab, so links don't get their own
-// background.
+// background. Phones keep hover after a tap, and closing search hands focus
+// back to its button, so those would leave a second tab lit. Keyboard focus
+// still shows its ring.
 const linkClass =
-    'relative w-20 flex-col gap-0.5 rounded-full py-1.5 font-medium data-active:bg-transparent data-active:hover:bg-transparent data-active:focus:bg-transparent';
+    'relative w-20 flex-col gap-0.5 rounded-full py-1.5 font-medium hover:bg-transparent focus:bg-transparent data-active:bg-transparent data-active:hover:bg-transparent data-active:focus:bg-transparent';
 
 // Search sits between Shelves and Friends.
 const beforeSearch = navLinks.slice(0, 2);
