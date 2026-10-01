@@ -91,6 +91,8 @@ const bars = computed(() => {
     const nameFormat = new Intl.DateTimeFormat(undefined, shown.value.name);
     const axisFormat = new Intl.DateTimeFormat(undefined, shown.value.axis);
     return perBar.map((bar, index) => {
+        // Bars rise one after another, all within a third of a second.
+        const delay = `${Math.round((index / perBar.length) * 300)}ms`;
         // Keys look like 2026-10-01, 2026-10 or 2026.
         const [year = 0, month = 1, day = 1] = bar.key.split('-').map(Number);
         const date = new Date(year, month - 1, day);
@@ -101,6 +103,7 @@ const bars = computed(() => {
             name: nameFormat.format(date),
             axis: isLabelled ? axisFormat.format(date) : '',
             height: `${(bar.count / most) * 100}%`,
+            delay,
         };
     });
 });
@@ -162,11 +165,14 @@ const bars = computed(() => {
                         <Tooltip v-if="bar.count">
                             <TooltipTrigger as-child>
                                 <div
-                                    class="flex h-full max-w-10 flex-1 items-end"
+                                    class="flex h-full max-w-10 flex-1 items-end overflow-hidden"
                                 >
                                     <div
-                                        class="bg-primary w-full rounded-t"
-                                        :style="{ height: bar.height }"
+                                        class="bg-primary motion-safe:animate-in slide-in-from-bottom-full animation-duration-700 fill-mode-backwards w-full rounded-t transition-[height] duration-500 ease-out"
+                                        :style="{
+                                            height: bar.height,
+                                            animationDelay: bar.delay,
+                                        }"
                                     />
                                 </div>
                             </TooltipTrigger>
