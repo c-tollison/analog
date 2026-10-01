@@ -87,6 +87,16 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 - Biome can't read `.vue` templates, so its unused-import rules are off for `.vue` files. `vue-tsc`, run by the web `build`, catches unused imports there.
 - Changing an import that's only used in type positions to `import type` unregisters a component at runtime, and `vue-tsc` still passes. For template refs, type the ref by the methods you call, like `ref<{ focus: () => void }>`, instead of `InstanceType<typeof Component>`.
 
+## Product words
+
+`docs/shelves-and-log.md` has the full plan for shelves, the Log and search.
+
+- **Shelf** is the UI word for a collection. Web URLs say `/shelves`. The database, API and composables keep `collection`.
+- **Log** is the UI word for a person's statuses, ratings and reviews, stored in `progress`.
+- **Edition** is the UI word for one ISBN of a catalog item, stored in `catalog_item_isbn`. Only say "ISBN" where people type or scan one.
+- A shelf entry owns at least one edition. Shelves count editions, series progress counts volumes, and the Log counts catalog items.
+- UI text is media-neutral. Say "items" or "media", not "books". Never show "catalog" outside admin pages. Status labels may name the format, like "Want to read".
+
 ## Writing
 
 - Use plain English in chat, commits, PRs and comments. Keep sentences short. Say what a thing does, not the name of the technique.

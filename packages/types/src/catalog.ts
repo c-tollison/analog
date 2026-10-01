@@ -47,15 +47,6 @@ export const CreateCollectionSchema = z.object({ name: CollectionNameSchema });
 
 export const UpdateCollectionSchema = z.object({ isPublic: z.boolean() });
 
-export const MAX_BULK_ADD = 100;
-
-export const AddCatalogItemsSchema = z.object({
-    catalogItemIds: z
-        .array(z.uuid())
-        .min(1, 'Pick at least one item')
-        .max(MAX_BULK_ADD, `Add at most ${MAX_BULK_ADD} items at a time`),
-});
-
 export const MAX_VOLUME_COUNT = 1000;
 
 const VolumeCountSchema = z

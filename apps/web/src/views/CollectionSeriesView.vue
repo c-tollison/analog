@@ -2,7 +2,6 @@
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
-import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
@@ -32,8 +31,6 @@ import { computed, ref } from 'vue';
 
 const props = defineProps<{ id: string; seriesId: string }>();
 
-const isAddOpen = ref(false);
-
 const { data: detail, error: detailError } = useCollectionSeries(
     () => props.id,
     () => props.seriesId
@@ -43,7 +40,6 @@ usePageTitle(() => detail.value?.series.title);
 const { data: collection, error: collectionError } = useCollection(
     () => props.id
 );
-const collectionName = computed(() => collection.value?.name ?? null);
 // Visitors get a read-only page. Edit controls wait for the role to load.
 const isMember = computed(() => !!collection.value?.role);
 // A visitor sees the owner's progress, so say whose it is.
@@ -119,25 +115,13 @@ const headerError = computed(
                 :to="{ name: 'collection', params: { id } }"
                 text="Back to collection"
             />
-            <Button
-                v-if="isMember"
-                variant="outline"
-                size="sm"
-                :disabled="!detail || !collectionName"
-                @click="isAddOpen = true"
-            >
-                <PlusIcon />
-                {{ detail ? addMoreLabel(detail.series.kind) : 'Add more' }}
+            <Button v-if="isMember" variant="outline" size="sm" as-child>
+                <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
+                    <PlusIcon />
+                    {{ detail ? addMoreLabel(detail.series.kind) : 'Add more' }}
+                </RouterLink>
             </Button>
         </div>
-
-        <AddFromCatalogDialog
-            v-if="detail && collectionName"
-            v-model:open="isAddOpen"
-            :collection-id="id"
-            :collection-name="collectionName"
-            :series="detail.series"
-        />
 
         <div
             v-if="detail && labels"

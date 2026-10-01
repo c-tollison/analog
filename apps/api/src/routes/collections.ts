@@ -4,9 +4,7 @@ import {
     desc,
     eq,
     ilike,
-    inArray,
     isNotNull,
-    isNull,
     notExists,
     or,
     schema,
@@ -14,7 +12,6 @@ import {
 } from '@analog/db';
 import {
     AddBookSchema,
-    AddCatalogItemsSchema,
     CollectionRole,
     CollectionSort,
     CreateCollectionSchema,
@@ -36,19 +33,14 @@ import {
     requireMember,
     requireViewer,
 } from '../lib/collections.js';
-import { discoverableItem, visibleToVisitors } from '../lib/discovery.js';
+import { visibleToVisitors } from '../lib/discovery.js';
 import { upsertBook } from '../lib/editions.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { whenCompleted } from '../lib/progress.js';
-import {
-    catalogItemsMatching,
-    matchesAllTerms,
-    relevance,
-    searchTerms,
-} from '../lib/search.js';
+import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
 import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import collectionItems from './collection-items.js';
@@ -96,10 +88,6 @@ const SearchQuerySchema = PageQuerySchema.extend({
 const FriendsQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().max(100).optional(),
 });
-const CatalogQuerySchema = PageQuerySchema.extend({
-    q: z.string().trim().max(200).optional(),
-    seriesId: z.uuid('Invalid id').optional(),
-});
 
 const itemColumns = {
     id: collectionItem.id,
@@ -109,6 +97,13 @@ const itemColumns = {
     coverUrl: catalogItem.coverUrl,
     position: catalogItem.position,
 };
+
+// The cover of the lowest volume a collection owns, in a query grouped by
+// series.
+const lowestOwnedCover = sql<string | null>`(
+    array_agg(${catalogItem.coverUrl} order by ${catalogItem.position} asc nulls last)
+        filter (where ${catalogItem.coverUrl} is not null)
+)[1]`;
 
 const ownerFirst = [
     sql`${collectionMember.role} = ${CollectionRole.Owner} desc`,
@@ -305,9 +300,7 @@ const collections = new Hono<AppEnv>()
                         format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         kind: sql<SeriesKind | null>`min(${catalogItem.kind}::text)`,
                         title: itemTitle,
-                        coverUrl: sql<
-                            string | null
-                        >`min(${catalogItem.coverUrl})`,
+                        coverUrl: lowestOwnedCover,
                         position: sql<
                             number | null
                         >`min(${catalogItem.position})::float`,
@@ -353,6 +346,7 @@ const collections = new Hono<AppEnv>()
                     .select({
                         ownedCount: sql<number>`count(*)::int`,
                         completedCount,
+                        coverUrl: lowestOwnedCover,
                         ownedPositions: sql<number[]>`coalesce(
                             array_agg(distinct ${catalogItem.position}::float)
                                 filter (where ${catalogItem.position} is not null),
@@ -383,7 +377,7 @@ const collections = new Hono<AppEnv>()
                     id: found.id,
                     title: found.title,
                     kind: found.kind,
-                    coverUrl: found.coverUrl,
+                    coverUrl: counted?.coverUrl ?? found.coverUrl,
                 },
                 ownedCount: counted?.ownedCount ?? 0,
                 completedCount: counted?.completedCount ?? 0,
@@ -434,101 +428,6 @@ const collections = new Hono<AppEnv>()
             );
 
             return c.json(page);
-        }
-    )
-    .get(
-        '/:id/catalog',
-        schemaValidator('param', CollectionParamSchema),
-        schemaValidator('query', CatalogQuerySchema),
-        async (c) => {
-            const { id } = c.req.valid('param');
-            const { q, seriesId, ...pageQuery } = c.req.valid('query');
-            const me = c.get('user').id;
-            await requireMember(id, me);
-
-            const terms = searchTerms(q ?? '');
-            const titles = [catalogItem.title, series.title];
-            const page = await paginate(pageQuery, (limit, offset) =>
-                db()
-                    .select({
-                        id: catalogItem.id,
-                        format: catalogItem.format,
-                        title: catalogItem.title,
-                        coverUrl: catalogItem.coverUrl,
-                        position: catalogItem.position,
-                        inCollection: sql<boolean>`${collectionItem.id} is not null`,
-                    })
-                    .from(catalogItem)
-                    .leftJoin(
-                        collectionItem,
-                        and(
-                            eq(collectionItem.catalogItemId, catalogItem.id),
-                            eq(collectionItem.collectionId, id)
-                        )
-                    )
-                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                    .where(
-                        and(
-                            // Listing a series is for adding the rest of it,
-                            // so what the collection has is left out.
-                            seriesId
-                                ? and(
-                                      eq(catalogItem.seriesId, seriesId),
-                                      isNull(collectionItem.id)
-                                  )
-                                : undefined,
-                            catalogItemsMatching(terms),
-                            discoverableItem(me)
-                        )
-                    )
-                    .orderBy(
-                        ...(terms.length
-                            ? [desc(relevance(terms.join(' '), titles))]
-                            : []),
-                        sql`${catalogItem.position} asc nulls last`,
-                        asc(catalogItem.title),
-                        asc(catalogItem.id)
-                    )
-                    .limit(limit)
-                    .offset(offset)
-            );
-            return c.json(page);
-        }
-    )
-    .post(
-        '/:id/items',
-        schemaValidator('param', CollectionParamSchema),
-        schemaValidator('json', AddCatalogItemsSchema),
-        async (c) => {
-            const { id } = c.req.valid('param');
-            const { catalogItemIds } = c.req.valid('json');
-            const user = c.get('user');
-            await requireMember(id, user.id);
-
-            const uniqueIds = [...new Set(catalogItemIds)];
-            const found = await db()
-                .select({ id: catalogItem.id })
-                .from(catalogItem)
-                .where(inArray(catalogItem.id, uniqueIds));
-            if (found.length !== uniqueIds.length) {
-                throw new HTTPException(404, {
-                    message: 'Some items no longer exist in the catalog',
-                });
-            }
-
-            const added = await db()
-                .insert(collectionItem)
-                .values(
-                    uniqueIds.map((catalogItemId) => ({
-                        collectionId: id,
-                        catalogItemId,
-                        addedByUserId: user.id,
-                    }))
-                )
-                .onConflictDoNothing()
-                .returning({ id: collectionItem.id });
-
-            return c.json({ added: added.length }, 201);
         }
     )
     .post(

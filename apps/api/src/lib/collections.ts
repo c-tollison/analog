@@ -26,6 +26,7 @@ const {
     catalogItem,
     collection,
     collectionItem,
+    collectionItemIsbn,
     collectionMember,
     progress,
     series,
@@ -129,13 +130,18 @@ type MemberPreview = Pick<typeof user.$inferSelect, 'id' | 'name' | 'image'>;
 
 /**
  * Item totals for each collection in the outer query, read in one pass over
- * its items: how many there are, the status counts and the formats. Members
- * get their own counts; visitors get the owner's and only what they can see.
+ * its items: how many items and owned editions there are, the status counts
+ * and the formats. Members get their own counts; visitors get the owner's and
+ * only what they can see.
  */
 function itemStats() {
     return db()
         .select({
             itemCount: sql<number>`count(*)::int`.as('item_count'),
+            editionCount: sql<number>`coalesce(sum((
+                select count(*) from ${collectionItemIsbn}
+                where ${collectionItemIsbn.collectionItemId} = ${collectionItem.id}
+            )), 0)::int`.as('edition_count'),
             completedCount: completedCount.as('completed_count'),
             inProgressCount: statusCount(ProgressStatus.InProgress).as(
                 'in_progress_count'
@@ -184,6 +190,7 @@ export function collectionSummaries(userId: string, where: SQL | undefined) {
             ownerName: owner.name,
             ownerUsername: owner.username,
             itemCount: stats.itemCount,
+            editionCount: stats.editionCount,
             completedCount: stats.completedCount,
             inProgressCount: stats.inProgressCount,
             plannedCount: stats.plannedCount,

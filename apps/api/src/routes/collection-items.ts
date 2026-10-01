@@ -6,6 +6,7 @@ import {
     isNotNull,
     isNull,
     ne,
+    notExists,
     or,
     schema,
     sql,
@@ -223,19 +224,45 @@ const collectionItems = new Hono<AppEnv>()
             await requireMember(id, c.get('user').id);
             await requireEntry(id, itemId);
 
-            const [removed] = await db()
-                .delete(collectionItemIsbn)
-                .where(
-                    and(
-                        eq(collectionItemIsbn.collectionItemId, itemId),
-                        eq(collectionItemIsbn.isbn, isbn)
+            // An entry needs an edition, so removing the last one removes
+            // the entry too.
+            const removedEntry = await db().transaction(async (tx) => {
+                const [removed] = await tx
+                    .delete(collectionItemIsbn)
+                    .where(
+                        and(
+                            eq(collectionItemIsbn.collectionItemId, itemId),
+                            eq(collectionItemIsbn.isbn, isbn)
+                        )
                     )
-                )
-                .returning({ isbn: collectionItemIsbn.isbn });
-            if (!removed) {
-                throw new HTTPException(404, { message: 'Edition not found' });
-            }
-            return c.body(null, 204);
+                    .returning({ isbn: collectionItemIsbn.isbn });
+                if (!removed) {
+                    throw new HTTPException(404, {
+                        message: 'Edition not found',
+                    });
+                }
+                const [emptied] = await tx
+                    .delete(collectionItem)
+                    .where(
+                        and(
+                            eq(collectionItem.id, itemId),
+                            notExists(
+                                tx
+                                    .select({ isbn: collectionItemIsbn.isbn })
+                                    .from(collectionItemIsbn)
+                                    .where(
+                                        eq(
+                                            collectionItemIsbn.collectionItemId,
+                                            itemId
+                                        )
+                                    )
+                            )
+                        )
+                    )
+                    .returning({ id: collectionItem.id });
+                return !!emptied;
+            });
+            return c.json({ removedEntry });
         }
     )
     // Editions of the item that this entry doesn't own yet, to pick from.

@@ -196,7 +196,7 @@ const headerError = computed(
                         >
                             <CoverImage
                                 size="md"
-                                :src="entry.series.coverUrl"
+                                :src="entry.coverUrl ?? entry.series.coverUrl"
                                 :alt="entry.series.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
                             />

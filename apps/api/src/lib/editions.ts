@@ -27,6 +27,7 @@ import {
 } from './books.js';
 import { checkInBackground } from './check-runs.js';
 import { db } from './init.js';
+import { refreshItemStats } from './progress.js';
 import { HTTPException } from 'hono/http-exception';
 import type { z } from 'zod';
 
@@ -141,6 +142,7 @@ async function moveItemInto(
         .set({ catalogItemId: intoId, main: false, pending })
         .where(eq(catalogItemIsbn.catalogItemId, fromId));
     await tx.delete(catalogItem).where(eq(catalogItem.id, fromId));
+    await refreshItemStats(intoId, tx);
 }
 
 /**
@@ -449,6 +451,8 @@ async function moveIsbnToNewItem(
                     )
                 );
         }
+        await refreshItemStats(fromId, tx);
+        await refreshItemStats(created, tx);
         return created;
     });
 }

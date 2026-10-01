@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ProgressStatus } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddEditionDialog from '@/components/collections/AddEditionDialog.vue';
 import FormError from '@/components/FormError.vue';
@@ -156,6 +157,33 @@ function editionVariables(isbn: string) {
     return { collectionId: props.id, itemId: props.itemId, isbn };
 }
 
+// Removing the last edition takes the item out of the collection, so it asks
+// first.
+const removingLast = ref<string | null>(null);
+const confirmingRemoveLast = computed({
+    get: () => removingLast.value !== null,
+    set: (open) => {
+        if (!open) removingLast.value = null;
+    },
+});
+
+function removeEdition(isbn: string) {
+    removeOwned.mutate(editionVariables(isbn), {
+        onSuccess: ({ removedEntry }) => {
+            if (removedEntry) router.replace(back.value.to);
+        },
+        onSettled: () => (removingLast.value = null),
+    });
+}
+
+function onRemoveOwned(isbn: string) {
+    if (item.value?.ownedIsbns.length === 1) {
+        removingLast.value = isbn;
+    } else {
+        removeEdition(isbn);
+    }
+}
+
 const error = computed(
     () =>
         (
@@ -174,6 +202,15 @@ const error = computed(
         </div>
 
         <FormError :message="error" />
+
+        <ConfirmDialog
+            v-model:open="confirmingRemoveLast"
+            :title="`Remove ${item?.title ?? 'item'}?`"
+            description="It's your only edition, so it'll be taken out of this collection."
+            confirm-text="Remove"
+            :pending="removeOwned.isPending.value"
+            @confirm="removingLast && removeEdition(removingLast)"
+        />
 
         <div v-if="!item && !loadError" class="flex justify-center p-8">
             <Spinner class="size-6" />
@@ -322,11 +359,7 @@ const error = computed(
                                 variant="ghost"
                                 size="sm"
                                 :disabled="isChangingOwned"
-                                @click="
-                                    removeOwned.mutate(
-                                        editionVariables(edition.isbn)
-                                    )
-                                "
+                                @click="onRemoveOwned(edition.isbn)"
                             >
                                 <Spinner
                                     v-if="isPendingFor(removeOwned, edition.isbn)"

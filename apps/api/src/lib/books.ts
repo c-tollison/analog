@@ -256,7 +256,7 @@ export async function matchSeriesKind(
 }
 
 /**
- * Sets a series' cover to its earliest-released item's cover. Series linked
+ * Sets a series' cover to its lowest volume's cover. Series linked
  * to an external source keep the cover that source provided.
  */
 export async function refreshSeriesCover(seriesId: string): Promise<void> {
@@ -268,8 +268,8 @@ export async function refreshSeriesCover(seriesId: string): Promise<void> {
                 select ${catalogItem.coverUrl} from ${catalogItem}
                 where ${catalogItem.seriesId} = ${seriesId}
                     and ${catalogItem.coverUrl} is not null
-                order by ${catalogItem.releaseDate} asc nulls last,
-                    ${catalogItem.position} asc nulls last
+                order by ${catalogItem.position} asc nulls last,
+                    ${catalogItem.releaseDate} asc nulls last
                 limit 1
             )`,
             updatedAt: new Date(),

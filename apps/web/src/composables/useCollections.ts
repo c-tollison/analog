@@ -1,13 +1,11 @@
 import type { InferResponseType } from '@analog/api/client';
-import {
-    type AddBookSchema,
-    type AddCatalogItemsSchema,
-    type CollectionSort,
-    type CreateCollectionSchema,
-    MAX_PAGE_SIZE,
-    type OwnedIsbnSchema,
-    type UpdateCollectionSchema,
-    type UserIdSchema,
+import type {
+    AddBookSchema,
+    CollectionSort,
+    CreateCollectionSchema,
+    OwnedIsbnSchema,
+    UpdateCollectionSchema,
+    UserIdSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
@@ -208,14 +206,16 @@ export function useAddOwnedEdition() {
                     json,
                 })
             ),
-        onSuccess: (_data, { collectionId }) =>
-            queryClient.invalidateQueries({
-                queryKey: collectionKey(collectionId),
-            }),
+        // Shelf lists count editions, so they change too.
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
     });
 }
 
-/** Stops a collection entry owning one edition of an item. */
+/**
+ * Stops a collection entry owning one edition of an item. Removing the last
+ * one removes the entry, and `removedEntry` says so.
+ */
 export function useRemoveOwnedEdition() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -225,10 +225,8 @@ export function useRemoveOwnedEdition() {
                     ':isbn'
                 ].$delete({ param: { id: collectionId, itemId, isbn } })
             ),
-        onSuccess: (_data, { collectionId }) =>
-            queryClient.invalidateQueries({
-                queryKey: collectionKey(collectionId),
-            }),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
     });
 }
 
@@ -277,46 +275,6 @@ export function useCollectionItemReviews(
                 })
             ),
         options
-    );
-}
-
-/**
- * Catalog items whose title matches `q`, flagged with whether the collection
- * has them, or the items in `seriesId` it doesn't have yet. Nothing loads
- * until one of the two is set.
- */
-export function useCatalogItems(
-    id: MaybeRefOrGetter<string>,
-    q: MaybeRefOrGetter<string>,
-    seriesId: MaybeRefOrGetter<string | undefined>,
-    options: PaginatedListOptions = {}
-) {
-    return usePaginatedList(
-        () => [
-            ...collectionKey(toValue(id)),
-            'catalog',
-            toValue(q),
-            toValue(seriesId),
-        ],
-        async (offset) => {
-            const search = toValue(q);
-            const series = toValue(seriesId);
-            return unwrap(
-                await api.collections[':id'].catalog.$get({
-                    param: { id: toValue(id) },
-                    query: {
-                        limit: String(MAX_PAGE_SIZE),
-                        offset,
-                        ...(search ? { q: search } : {}),
-                        ...(series ? { seriesId: series } : {}),
-                    },
-                })
-            );
-        },
-        {
-            enabled: () => toValue(q) !== '' || toValue(seriesId) !== undefined,
-            ...options,
-        }
     );
 }
 
@@ -485,26 +443,6 @@ export function useDeleteCollection() {
                 queryKey: COLLECTIONS_KEY,
             });
         },
-    });
-}
-
-/** Add catalog items to a collection by id. */
-export function useAddCollectionItems() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({
-            collectionId,
-            ...json
-        }: z.output<typeof AddCatalogItemsSchema> & { collectionId: string }) =>
-            unwrap(
-                await api.collections[':id'].items.$post({
-                    param: { id: collectionId },
-                    json,
-                })
-            ),
-        onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
     });
 }
 

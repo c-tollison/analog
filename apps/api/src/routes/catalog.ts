@@ -1,7 +1,6 @@
 import { and, eq, schema, sql } from '@analog/db';
 import {
     CheckTrigger,
-    GoogleSearchQuerySchema,
     IsbnSchema,
     ProgressStatus,
     ReviewSchema,
@@ -18,10 +17,9 @@ import {
     toBookLookup,
 } from '../lib/books.js';
 import { checkInBackground } from '../lib/check-runs.js';
-import { searchGoogleBooks } from '../lib/google-books.js';
 import { db } from '../lib/init.js';
 import { IdParamSchema } from '../lib/params.js';
-import { isCompleted } from '../lib/progress.js';
+import { isCompleted, refreshItemStats } from '../lib/progress.js';
 import { schemaValidator } from '../lib/validator.js';
 import { requireRole } from '../middleware/require-role.js';
 import { Hono } from 'hono';
@@ -106,6 +104,7 @@ const catalog = new Hono<AppEnv>()
                     },
                 })
                 .returning({ status: progress.status });
+            await refreshItemStats(id);
             return c.json(saved);
         }
     )
@@ -137,6 +136,7 @@ const catalog = new Hono<AppEnv>()
                     message: 'Mark it finished before reviewing it',
                 });
             }
+            await refreshItemStats(id);
             return c.json(saved);
         }
     )
@@ -180,15 +180,6 @@ const catalog = new Hono<AppEnv>()
                 savedSeriesTitle: item.series?.title ?? null,
                 savedVolume: item.series ? item.position : null,
             });
-        }
-    )
-    .get(
-        '/search/google',
-        schemaValidator('query', GoogleSearchQuerySchema),
-        async (c) => {
-            const { q } = c.req.valid('query');
-            const { items } = await searchGoogleBooks(q, {});
-            return c.json(items);
         }
     )
     // A cover an admin uploaded. Its URL changes with each upload.

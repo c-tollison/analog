@@ -6,11 +6,7 @@ import {
 
 import { z } from 'zod';
 
-export {
-    AddCatalogItemsSchema,
-    CreateCollectionSchema,
-    ReviewSchema,
-} from '@analog/types';
+export { CreateCollectionSchema, ReviewSchema } from '@analog/types';
 
 export const IsbnLookupFormSchema = z.object({
     isbn: z.string().trim().min(1, 'Enter an ISBN').pipe(IsbnSchema),
