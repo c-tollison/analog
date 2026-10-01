@@ -60,6 +60,15 @@ export const SetVolumeCountSchema = z.object({
     volumeCount: VolumeCountSchema,
 });
 
+/** Which of a series' volumes to list: ones you own, ones you don't, or all. */
+export const SERIES_VOLUME_FILTERS = ['owned', 'missing', 'all'] as const;
+
+export type SeriesVolumeFilter = (typeof SERIES_VOLUME_FILTERS)[number];
+
+export const SeriesVolumesQuerySchema = PageQuerySchema.extend({
+    show: z.enum(SERIES_VOLUME_FILTERS).default('all'),
+});
+
 export const MAX_READING_GOAL = 10_000;
 
 /** A yearly goal: how many items to finish. */

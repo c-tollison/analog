@@ -1,13 +1,21 @@
 <script setup lang="ts">
+import { SERIES_VOLUME_FILTERS, type SeriesVolumeFilter } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
 import CoverImage from '@/components/CoverImage.vue';
+import CollectionProgressBar from '@/components/collections/CollectionProgressBar.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import LogButton from '@/components/progress/LogButton.vue';
 import StarRating from '@/components/progress/StarRating.vue';
 import { Badge } from '@/components/shadcn-components/badge';
+import { Button } from '@/components/shadcn-components/button';
 import { Spinner } from '@/components/shadcn-components/spinner';
+import {
+    ToggleGroup,
+    ToggleGroupItem,
+} from '@/components/shadcn-components/toggle-group';
+import { useCollection } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
 import { useSeriesPage, useSeriesVolumes } from '@/composables/useSeries';
 import {
@@ -16,18 +24,88 @@ import {
     SERIES_KIND_LABELS,
 } from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
+import { missingVolumes } from '@/lib/volumes';
+import { useSearchStore } from '@/stores/search';
 
 import { computed } from 'vue';
+import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
+
+const route = useRoute();
+const router = useRouter();
+const search = useSearchStore();
 
 const { data: series, error: loadError } = useSeriesPage(() => props.id);
 usePageTitle(() => series.value?.title);
 
-const volumes = useSeriesVolumes(() => props.id);
+// Opened from one of your shelves. It only changes where Back goes and which
+// volumes show first.
+const shelfId = computed(() =>
+    typeof route.query.shelf === 'string' ? route.query.shelf : null
+);
+const { data: shelf } = useCollection(() => shelfId.value ?? '', {
+    enabled: () => shelfId.value !== null,
+});
+
+function isFilter(value: unknown): value is SeriesVolumeFilter {
+    return SERIES_VOLUME_FILTERS.some((filter) => filter === value);
+}
+
+// From a shelf you see what you own; from anywhere else, everything. The
+// choice lives in the URL so going back keeps it.
+const show = computed({
+    get: (): SeriesVolumeFilter =>
+        isFilter(route.query.show)
+            ? route.query.show
+            : shelfId.value
+              ? 'owned'
+              : 'all',
+    set: (value) => {
+        router.replace({ query: { ...route.query, show: value } });
+    },
+});
+
+function onShow(value: unknown) {
+    if (isFilter(value)) show.value = value;
+}
+
+const volumes = useSeriesVolumes(() => props.id, show);
 
 const labels = computed(() =>
     series.value ? kindStatusLabels(series.value.kind) : null
+);
+
+// The series' size: its set volume count, or what the app has.
+const total = computed(() =>
+    series.value
+        ? Math.max(series.value.volumeCount ?? 0, series.value.itemCount)
+        : 0
+);
+
+const counts = computed<Record<SeriesVolumeFilter, number>>(() => ({
+    owned: series.value?.ownedCount ?? 0,
+    missing: (series.value?.itemCount ?? 0) - (series.value?.ownedCount ?? 0),
+    all: series.value?.itemCount ?? 0,
+}));
+
+const FILTER_LABELS: Record<SeriesVolumeFilter, string> = {
+    owned: 'Owned',
+    missing: 'Missing',
+    all: 'All',
+};
+
+const EMPTY_TEXT: Record<SeriesVolumeFilter, string> = {
+    owned: "You don't own any of these yet.",
+    missing: 'You own every volume here.',
+    all: 'Nothing in this series yet.',
+};
+
+// Volume numbers the series has that no item in the app covers yet.
+const notInApp = computed(() =>
+    series.value?.volumeCount
+        ? missingVolumes(series.value.positions, series.value.volumeCount)
+        : null
 );
 
 const hasDetails = computed(
@@ -37,12 +115,21 @@ const hasDetails = computed(
             series.value.genres.length > 0 ||
             series.value.facts.length > 0)
 );
+
+const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
+    shelfId.value
+        ? {
+              to: { name: 'collection', params: { id: shelfId.value } },
+              text: shelf.value ? `Back to ${shelf.value.name}` : 'Back',
+          }
+        : { to: { name: 'collections' }, text: 'Back to shelves' }
+);
 </script>
 
 <template>
     <div class="flex flex-col gap-4">
         <div>
-            <BackButton :to="{ name: 'collections' }" text="Back to shelves" />
+            <BackButton :to="back.to" :text="back.text" />
         </div>
 
         <FormError :message="loadError?.message ?? null" />
@@ -68,12 +155,20 @@ const hasDetails = computed(
                         {{ SERIES_KIND_LABELS[series.kind] }}
                     </Badge>
                     <span class="text-muted-foreground text-xs">
-                        {{ series.ownedCount }} of
-                        {{ series.volumeCount ?? series.itemCount }} owned ·
+                        {{ series.ownedCount }} of {{ total }} owned ·
                         {{ series.completedCount }}
                         {{ completedWord(labels) }}
                     </span>
                 </div>
+                <CollectionProgressBar
+                    v-if="total"
+                    class="pt-1 sm:max-w-sm"
+                    :total="total"
+                    :completed="series.completedCount"
+                    :in-progress="series.inProgressCount"
+                    :planned="series.plannedCount"
+                    :labels="labels"
+                />
             </div>
         </div>
         <MediaDetails
@@ -84,7 +179,36 @@ const hasDetails = computed(
             :facts="series.facts"
         />
 
-        <PagedList :list="volumes" empty-text="Nothing in this series yet.">
+        <div
+            v-if="series"
+            class="flex flex-wrap items-center justify-between gap-2"
+        >
+            <ToggleGroup
+                type="single"
+                variant="outline"
+                :model-value="show"
+                @update:model-value="onShow"
+            >
+                <ToggleGroupItem
+                    v-for="filter in SERIES_VOLUME_FILTERS"
+                    :key="filter"
+                    :value="filter"
+                >
+                    {{ FILTER_LABELS[filter] }} {{ counts[filter] }}
+                </ToggleGroupItem>
+            </ToggleGroup>
+            <p
+                v-if="notInApp"
+                class="text-muted-foreground flex items-center gap-2 text-xs"
+            >
+                Not in Analog yet: {{ notInApp }}
+                <Button variant="outline" size="sm" @click="search.openAdd()">
+                    Add by ISBN
+                </Button>
+            </p>
+        </div>
+
+        <PagedList :list="volumes" :empty-text="EMPTY_TEXT[show]">
             <template #default="{ items }">
                 <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <li

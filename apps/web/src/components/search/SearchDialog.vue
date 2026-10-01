@@ -89,8 +89,9 @@ type ShelfResult = InferResponseType<
 function shelfLink(result: ShelfResult): RouteLocationRaw {
     return result.seriesId
         ? {
-              name: 'collection-series',
-              params: { id: result.collectionId, seriesId: result.seriesId },
+              name: 'series',
+              params: { id: result.seriesId },
+              query: { shelf: result.collectionId },
           }
         : { name: 'item', params: { id: result.catalogItemId } };
 }

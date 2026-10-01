@@ -57,6 +57,18 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
         : { to: { name: 'collections' }, text: 'Shelves' }
 );
 
+// Members manage a series on its own page; visitors see what this shelf
+// holds.
+function seriesLink(seriesId: string): RouteLocationRaw {
+    return isMember.value
+        ? {
+              name: 'series',
+              params: { id: seriesId },
+              query: { shelf: props.id },
+          }
+        : { name: 'collection-series', params: { id: props.id, seriesId } };
+}
+
 const SORT_LABELS: Record<CollectionSort, string> = {
     [CollectionSort.Name]: 'Name',
     [CollectionSort.Newest]: 'Recently added',
@@ -176,10 +188,7 @@ const headerError = computed(
                     >
                         <RouterLink
                             v-if="entry.series"
-                            :to="{
-                                name: 'collection-series',
-                                params: { id, seriesId: entry.series.id },
-                            }"
+                            :to="seriesLink(entry.series.id)"
                             class="grid gap-1"
                         >
                             <CoverImage

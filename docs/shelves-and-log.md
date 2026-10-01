@@ -71,14 +71,27 @@ Only the UI and web URLs say "shelf". The database, API and composables keep "co
 
 ### Shared series page: `/series/:id`
 
-- The cover is the lowest volume in the app.
-- Shows the AniList details and every volume in the app, with your Log status and owned marker on each.
-- There are no bulk actions for now.
+This is the one series page for you and your shelves. Agreed 2026-10-01.
 
-### Shelf series page
+- **Header:**
+    - The cover is the lowest volume in the app, with the AniList details.
+    - "5 of 12 owned · 3 read", and a bar for read, reading and want to read.
+    - The total is the series' volume count, or the number of volumes in the app when no count is set.
+- **Owned** means owned on any shelf you're a member of, including shared ones.
+- **Toggle:** Owned, Missing and All, each with its count. Missing means volumes in the app you don't own.
+    - It starts on Owned when you came from a shelf, and on All from search or a book page.
+    - The choice is kept in the URL.
+- **Not in Analog yet:** a line lists volume numbers with no book in the app, like "7, 9", with an Add by ISBN button. It only shows when the series has a volume count.
+- **Each volume** has its cover, Owned badge, stars and a Log button. There are no bulk actions for now.
+- **Coming from a shelf:** members link to `/series/:id?shelf=:shelfId`. The `shelf` part only sets "Back to Manga" and the starting toggle.
+- **No X on this page.** Taking a book off a shelf goes through Add to shelf, and bulk scanning stays on the shelf page.
 
-- The cover is the lowest volume you own on that shelf.
-- Each volume links to the shared book page.
+### Shelf series page: visitors only
+
+- Someone viewing a friend's shelf gets a read-only page: the shelf's volumes, the owner's progress, and no buttons.
+- The cover is the lowest volume on that shelf.
+- A member who opens it is sent to the shared series page.
+- Series cards in a shelf grid still count only that shelf, like "3 owned · 1 read".
 
 ### Log: `/log`
 
@@ -150,7 +163,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 
 1. A shelf with two editions of one book says 2 items on the shelf list. The progress bar still counts it as one book.
 2. A series card in the shelf grid shows the cover of the lowest volume you own on that shelf.
-3. The shelf series page header shows that same cover.
+3. A visitor's view of a friend's shelf series shows that shelf's lowest volume as the cover.
 4. Unchecking an edition in Add to shelf updates the shelf's count. Unchecking the last one takes the book off that shelf. This replaced the old item page in step 2.
 5. The series page's "Add more" button opens the scan page.
 6. The scan page has no tabs and scans like before.
@@ -173,7 +186,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 12. A friend's shelf links to the same book page, and it shows your own status there, not theirs.
 13. The shelf scan page still scans like before.
 14. Add to shelf explains what to do: pick a shelf, check your editions, or search, type or scan one that's missing.
-15. A shelf's series page says "Back to" and the shelf's name when you came from that shelf.
+15. Opening a series from your shelf goes to the shared series page, and its back button says "Back to" and the shelf's name.
 16. On the shared series page, each volume has the Log button under its cover, and all the buttons line up whether or not a volume has stars. It sets or changes the status and opens Add to shelf, without leaving the page. The label cuts off cleanly in narrow cards.
 
 ### Step 3
@@ -216,6 +229,18 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 3. The pencil on the goal card lets you change the goal or remove it. Typing 0 or nothing shows "Enter a number above 0".
 4. Changing a status updates the stats and the goal right away.
 5. On someone else's Log, both cards are read-only, and their goal shows if they set one. A visitor's counts leave out books that haven't been reviewed, like the rest of the Log.
+
+### One series page
+
+1. On your own shelf or a shared one, a series card opens `/series/:id`, not the shelf's series page. So do series results in the search Shelves tab.
+2. The header shows "N of total owned · N read" and a bar for read, reading and want to read, counted across the whole series.
+3. The toggle shows Owned, Missing and All with counts. From a shelf it starts on Owned, and from search or a book page it starts on All. Switching changes the URL, and going back keeps it.
+4. Missing lists the volumes in the app you don't own on any shelf. Each one has a Log button, so you can mark it "Want to read" or open Add to shelf right there.
+5. With a volume count set and gaps in the app, "Not in Analog yet: 7, 9" shows with an Add by ISBN button that opens the ISBN dialog.
+6. Coming from a shelf, Back says "Back to" and the shelf's name, and goes there.
+7. On a friend's shelf, the series card still opens their read-only shelf series page. It has their volumes and progress and no buttons.
+8. Pasting your own shelf's old series link sends you to the shared page.
+9. Owning an edition, or changing a status, updates the counts, the bar and the toggle counts.
 
 ## Not now
 

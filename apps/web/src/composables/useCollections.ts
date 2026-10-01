@@ -75,8 +75,12 @@ export function useCollectionSearch(
     );
 }
 
-export function useCollection(id: MaybeRefOrGetter<string>) {
+export function useCollection(
+    id: MaybeRefOrGetter<string>,
+    { enabled = true }: { enabled?: MaybeRefOrGetter<boolean> } = {}
+) {
     return useQuery({
+        enabled: () => toValue(enabled),
         queryKey: () => collectionKey(toValue(id)),
         queryFn: async () =>
             unwrap(

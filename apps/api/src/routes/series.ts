@@ -1,9 +1,10 @@
-import { and, asc, eq, or, schema, sql } from '@analog/db';
+import { and, asc, eq, not, or, schema, sql } from '@analog/db';
 import {
     DetailsSourceSchema,
     LinkDetailsSourceSchema,
-    PageQuerySchema,
+    ProgressStatus,
     SeriesSearchQuerySchema,
+    SeriesVolumesQuerySchema,
     SetVolumeCountSchema,
     UserRole,
 } from '@analog/types';
@@ -14,7 +15,7 @@ import { db } from '../lib/init.js';
 import { onShelfOf } from '../lib/items.js';
 import { paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
-import { isCompleted, whenCompleted } from '../lib/progress.js';
+import { whenCompleted } from '../lib/progress.js';
 import { searchSeries } from '../lib/search.js';
 import {
     linkDetailsSource,
@@ -39,6 +40,10 @@ function visibleVolumes(seriesId: string, userId: string) {
         eq(catalogItem.seriesId, seriesId),
         or(discoverableItem(userId), onShelfOf(userId))
     );
+}
+
+function statusCount(status: ProgressStatus) {
+    return sql<number>`(count(*) filter (where ${progress.status} = ${status}))::int`;
 }
 
 function myProgress(userId: string) {
@@ -117,7 +122,16 @@ const series = new Hono<AppEnv>()
                 .select({
                     itemCount: sql<number>`count(*)::int`,
                     ownedCount: sql<number>`(count(*) filter (where ${onShelfOf(me)}))::int`,
-                    completedCount: sql<number>`(count(*) filter (where ${isCompleted}))::int`,
+                    completedCount: statusCount(ProgressStatus.Completed),
+                    inProgressCount: statusCount(ProgressStatus.InProgress),
+                    plannedCount: statusCount(ProgressStatus.Planned),
+                    // Volume numbers in the app, for spotting ones that
+                    // aren't.
+                    positions: sql<number[]>`coalesce(
+                        array_agg(distinct ${catalogItem.position}::float)
+                            filter (where ${catalogItem.position} is not null),
+                        '{}'
+                    )`,
                 })
                 .from(catalogItem)
                 .leftJoin(progress, myProgress(me))
@@ -141,17 +155,27 @@ const series = new Hono<AppEnv>()
             itemCount: counted?.itemCount ?? 0,
             ownedCount: counted?.ownedCount ?? 0,
             completedCount: counted?.completedCount ?? 0,
+            inProgressCount: counted?.inProgressCount ?? 0,
+            plannedCount: counted?.plannedCount ?? 0,
+            positions: counted?.positions ?? [],
         });
     })
     .get(
         '/:id/items',
         schemaValidator('param', IdParamSchema),
-        schemaValidator('query', PageQuerySchema),
+        schemaValidator('query', SeriesVolumesQuerySchema),
         async (c) => {
             const { id } = c.req.valid('param');
+            const { show, ...pageQuery } = c.req.valid('query');
             const me = c.get('user').id;
+            const owned = onShelfOf(me);
+            const shown = {
+                owned,
+                missing: not(owned),
+                all: undefined,
+            }[show];
 
-            const page = await paginate(c.req.valid('query'), (limit, offset) =>
+            const page = await paginate(pageQuery, (limit, offset) =>
                 db()
                     .select({
                         id: catalogItem.id,
@@ -165,7 +189,7 @@ const series = new Hono<AppEnv>()
                     })
                     .from(catalogItem)
                     .leftJoin(progress, myProgress(me))
-                    .where(visibleVolumes(id, me))
+                    .where(and(visibleVolumes(id, me), shown))
                     .orderBy(
                         sql`${catalogItem.position} asc nulls last`,
                         asc(catalogItem.title),

@@ -53,20 +53,6 @@ const KIND_VERBS: Record<SeriesKind, MediaVerb> = {
     [SeriesKind.Film]: 'watch',
 };
 
-// What a series is made of, for buttons that add the rest of one.
-const KIND_PARTS: Record<SeriesKind, string> = {
-    [SeriesKind.Manga]: 'volumes',
-    [SeriesKind.LightNovel]: 'volumes',
-    [SeriesKind.Book]: 'volumes',
-    [SeriesKind.Tv]: 'seasons',
-    [SeriesKind.Film]: 'films',
-};
-
-/** "Add more volumes", "Add more seasons". */
-export function addMoreLabel(kind: SeriesKind): string {
-    return `Add more ${KIND_PARTS[kind]}`;
-}
-
 export type StatusLabels = Record<ProgressStatus, string>;
 
 const STATUS_LABELS: Record<MediaVerb | 'mixed', StatusLabels> = {

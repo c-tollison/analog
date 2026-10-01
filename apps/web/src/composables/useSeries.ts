@@ -2,6 +2,7 @@ import type { InferResponseType } from '@analog/api/client';
 import type {
     DetailsSource,
     LinkDetailsSourceSchema,
+    SeriesVolumeFilter,
     SetVolumeCountSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
@@ -87,15 +88,21 @@ export function useSeriesPage(id: MaybeRefOrGetter<string>) {
     });
 }
 
-/** Every volume of a series you can see, with your status and ownership. */
-export function useSeriesVolumes(id: MaybeRefOrGetter<string>) {
+/**
+ * A series' volumes you can see, with your status and ownership: the ones
+ * you own, the ones you don't, or all of them.
+ */
+export function useSeriesVolumes(
+    id: MaybeRefOrGetter<string>,
+    show: MaybeRefOrGetter<SeriesVolumeFilter>
+) {
     return usePaginatedList(
-        () => [...SERIES_KEY, 'page', toValue(id), 'items'],
+        () => [...SERIES_KEY, 'page', toValue(id), 'items', toValue(show)],
         async (offset) =>
             unwrap(
                 await api.series[':id'].items.$get({
                     param: { id: toValue(id) },
-                    query: { offset },
+                    query: { offset, show: toValue(show) },
                 })
             )
     );
