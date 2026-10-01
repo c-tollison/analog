@@ -97,20 +97,24 @@ const months = computed(() => {
 
             <div class="grid gap-1" aria-hidden="true">
                 <div class="flex h-20 items-end gap-0.5 border-b">
-                    <Tooltip v-for="month in months" :key="month.name">
-                        <TooltipTrigger as-child>
-                            <div class="flex h-full flex-1 items-end">
-                                <div
-                                    v-if="month.count"
-                                    class="bg-primary w-full rounded-t"
-                                    :style="{ height: month.height }"
-                                />
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            {{ month.name }}: {{ month.count }} {{ readWord }}
-                        </TooltipContent>
-                    </Tooltip>
+                    <template v-for="month in months" :key="month.name">
+                        <!-- Only months with finishes have a bar to hover. -->
+                        <Tooltip v-if="month.count">
+                            <TooltipTrigger as-child>
+                                <div class="flex h-full flex-1 items-end">
+                                    <div
+                                        class="bg-primary w-full rounded-t"
+                                        :style="{ height: month.height }"
+                                    />
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {{ month.name }}: {{ month.count }}
+                                {{ readWord }}
+                            </TooltipContent>
+                        </Tooltip>
+                        <div v-else class="flex-1" />
+                    </template>
                 </div>
                 <div class="flex gap-0.5">
                     <span
