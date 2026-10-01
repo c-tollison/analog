@@ -97,26 +97,35 @@ export function othersReviewed(catalogItemId: string, me: string) {
 }
 
 /**
- * True when the item in the outer query is on one of the person's shelves.
- * The outer query must join another table, so its columns keep their table
- * names.
+ * The person's shelf entries for the item in the outer query, on any of
+ * their shelves or only on `shelfId`. The outer query must join another
+ * table, so its columns keep their table names.
  */
-export function onShelfOf(userId: string) {
+export function myShelfEntries(userId: string, shelfId?: string) {
     const { catalogItem, collectionItem, collectionMember } = schema;
-    return exists(
-        db()
-            .select({ id: collectionItem.id })
-            .from(collectionItem)
-            .innerJoin(
-                collectionMember,
-                and(
-                    eq(
-                        collectionMember.collectionId,
-                        collectionItem.collectionId
-                    ),
-                    eq(collectionMember.userId, userId)
-                )
+    return db()
+        .select({ id: collectionItem.id })
+        .from(collectionItem)
+        .innerJoin(
+            collectionMember,
+            and(
+                eq(collectionMember.collectionId, collectionItem.collectionId),
+                eq(collectionMember.userId, userId)
             )
-            .where(eq(collectionItem.catalogItemId, catalogItem.id))
-    );
+        )
+        .where(
+            and(
+                eq(collectionItem.catalogItemId, catalogItem.id),
+                shelfId ? eq(collectionItem.collectionId, shelfId) : undefined
+            )
+        );
+}
+
+/**
+ * True when the item in the outer query is on one of the person's shelves,
+ * or on `shelfId` when given. The outer query must join another table, so
+ * its columns keep their table names.
+ */
+export function onShelfOf(userId: string, shelfId?: string) {
+    return exists(myShelfEntries(userId, shelfId));
 }

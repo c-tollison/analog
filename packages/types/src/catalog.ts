@@ -60,12 +60,21 @@ export const SetVolumeCountSchema = z.object({
     volumeCount: VolumeCountSchema,
 });
 
-/** Which of a series' volumes to list: ones you own, ones you don't, or all. */
+/**
+ * Which of a series' volumes to list: ones you own, ones you don't, or all.
+ * With a shelf, owning means on that shelf.
+ */
 export const SERIES_VOLUME_FILTERS = ['owned', 'missing', 'all'] as const;
 
 export type SeriesVolumeFilter = (typeof SERIES_VOLUME_FILTERS)[number];
 
+/** A series page opened from one of your shelves counts only that shelf. */
+export const SeriesPageQuerySchema = z.object({
+    shelf: z.uuid('Invalid id').optional(),
+});
+
 export const SeriesVolumesQuerySchema = PageQuerySchema.extend({
+    ...SeriesPageQuerySchema.shape,
     show: z.enum(SERIES_VOLUME_FILTERS).default('all'),
 });
 
