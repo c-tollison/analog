@@ -4,7 +4,8 @@ import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
-import ProgressMark from '@/components/progress/ProgressMark.vue';
+import LogButton from '@/components/progress/LogButton.vue';
+import StarRating from '@/components/progress/StarRating.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { usePageTitle } from '@/composables/usePageTitle';
@@ -90,11 +91,11 @@ const hasDetails = computed(
                         v-for="(item, index) in items"
                         v-bind="staggerIn(index)"
                         :key="item.id"
-                        class="group"
+                        class="grid content-start gap-1.5"
                     >
                         <RouterLink
                             :to="{ name: 'item', params: { id: item.id } }"
-                            class="grid gap-1"
+                            class="group grid gap-1"
                         >
                             <CoverImage
                                 size="md"
@@ -115,13 +116,21 @@ const hasDetails = computed(
                             >
                                 {{ item.title }}
                             </p>
-                            <ProgressMark
-                                v-if="labels"
-                                :status="item.status"
-                                :rating="item.rating"
-                                :labels="labels"
+                            <StarRating
+                                v-if="item.rating !== null"
+                                readonly
+                                small
+                                :model-value="item.rating"
                             />
                         </RouterLink>
+                        <LogButton
+                            v-if="labels"
+                            block
+                            :catalog-item-id="item.id"
+                            :title="item.title"
+                            :status="item.status"
+                            :labels="labels"
+                        />
                     </li>
                 </ul>
             </template>

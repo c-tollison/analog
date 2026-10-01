@@ -174,6 +174,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 13. The shelf scan page still scans like before.
 14. Add to shelf explains what to do: pick a shelf, check your editions, or search, type or scan one that's missing.
 15. A shelf's series page says "Back to" and the shelf's name when you came from that shelf.
+16. On the shared series page, each volume has the Log button under its cover. It sets or changes the status and opens Add to shelf, without leaving the page. The label cuts off cleanly in narrow cards, and a rated volume shows its stars above the button.
 
 ### Step 3
 

@@ -35,6 +35,8 @@ const props = defineProps<{
     labels: StatusLabels;
     // The shelf the Add to shelf dialog starts on.
     shelfId?: string | null;
+    // Fills its container, like a card in a grid.
+    block?: boolean;
 }>();
 
 const emit = defineEmits<{ changed: [status: ProgressStatus | null] }>();
@@ -77,16 +79,19 @@ function onMain() {
 <template>
     <FormError :message="error?.message ?? null" />
     <DropdownMenu v-model:open="isMenuOpen">
-        <ButtonGroup>
+        <ButtonGroup :class="{ 'w-full': block }">
             <Button
                 :variant="shown ? 'secondary' : 'outline'"
+                :class="{ 'min-w-0 flex-1': block }"
                 :disabled="isPending"
                 @click="onMain"
             >
                 <Spinner v-if="isPending" />
                 <CheckIcon v-else-if="shown" />
                 <BookmarkPlusIcon v-else />
-                {{ labels[shown ?? ProgressStatus.Planned] }}
+                <span class="truncate">
+                    {{ labels[shown ?? ProgressStatus.Planned] }}
+                </span>
             </Button>
             <DropdownMenuTrigger as-child>
                 <Button
