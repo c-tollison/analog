@@ -2,6 +2,7 @@
 import { ProgressStatus } from '@analog/types';
 import AddToShelfDialog from '@/components/collections/AddToShelfDialog.vue';
 import FormError from '@/components/FormError.vue';
+import ReviewSheet from '@/components/progress/ReviewSheet.vue';
 import { Button } from '@/components/shadcn-components/button';
 import { ButtonGroup } from '@/components/shadcn-components/button-group';
 import {
@@ -39,8 +40,6 @@ const props = defineProps<{
     block?: boolean;
 }>();
 
-const emit = defineEmits<{ changed: [status: ProgressStatus | null] }>();
-
 const isMenuOpen = ref(false);
 const isAddOpen = ref(false);
 
@@ -51,10 +50,28 @@ const shown = computed(() =>
     isPending.value && variables.value ? variables.value.status : props.status
 );
 
+const isReviewOpen = ref(false);
+const saved = ref<{ rating: number | null; review: string | null }>({
+    rating: null,
+    review: null,
+});
+
+// Finishing something asks for a rating, unless there already is one.
 function setStatus(status: ProgressStatus | null) {
     mutate(
         { catalogItemId: props.catalogItemId, status },
-        { onSuccess: () => emit('changed', status) }
+        {
+            onSuccess: ({ rating, review }) => {
+                saved.value = { rating, review };
+                if (
+                    status === ProgressStatus.Completed &&
+                    rating === null &&
+                    !review
+                ) {
+                    isReviewOpen.value = true;
+                }
+            },
+        }
     );
 }
 
@@ -128,6 +145,14 @@ function onMain() {
             </DropdownMenuItem>
         </DropdownMenuContent>
     </DropdownMenu>
+
+    <ReviewSheet
+        v-model:open="isReviewOpen"
+        :catalog-item-id="catalogItemId"
+        :title="title"
+        :rating="saved.rating"
+        :review="saved.review"
+    />
 
     <AddToShelfDialog
         v-model:open="isAddOpen"

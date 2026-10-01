@@ -105,7 +105,13 @@ const catalog = new Hono<AppEnv>()
                         updatedAt: new Date(),
                     },
                 })
-                .returning({ status: progress.status });
+                // The stored rating and review, so the app can ask for one
+                // when there's none yet.
+                .returning({
+                    status: progress.status,
+                    rating: progress.rating,
+                    review: progress.review,
+                });
             await refreshItemStats(id);
             return c.json(saved);
         }

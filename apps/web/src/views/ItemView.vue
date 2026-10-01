@@ -90,13 +90,6 @@ const hasReview = computed(
 const isReviewOpen = ref(false);
 const isAddOpen = ref(false);
 
-// Finishing something asks for a rating, unless there already is one.
-function onStatusChanged(status: ProgressStatus | null) {
-    if (status === ProgressStatus.Completed && !hasReview.value) {
-        isReviewOpen.value = true;
-    }
-}
-
 // Out of 5 stars, like the rating picker.
 const averageStars = computed(() =>
     item.value?.ratingAverage != null
@@ -229,7 +222,6 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                 :status="item.status"
                                 :labels="labels"
                                 :shelf-id="item.shelves[0]?.id"
-                                @changed="onStatusChanged"
                             />
                             <StarRating
                                 v-if="isCompleted && item.rating !== null"

@@ -162,7 +162,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 1. Clicking any book on a shelf, on a shelf series page or in shelf search opens `/items/:id`.
 2. The book page shows saves and the average rating, your status, your shelves with their edition counts, and the details.
 3. The Log button with no status adds "Want to read". With a status, it opens the menu. The menu changes the status, removes it from the Log, and opens Add to shelf.
-4. Marking it read with no rating opens the review sheet.
+4. Marking something read that has no rating or review opens the review sheet. This works from every Log button: the book page, search rows and series volumes. Something you rated before, un-marked and marked read again doesn't ask again.
 5. Add to shelf starts on a shelf that already holds the book. Switching shelves updates which editions are checked. Owned editions are listed first.
 6. Typing in the filter narrows the list by ISBN, publisher or title. Typing a full ISBN that isn't listed shows "Add this edition". It joins as unreviewed and lands on the shelf.
 7. The scan button opens the camera in the dialog. A scan fills in the filter.
