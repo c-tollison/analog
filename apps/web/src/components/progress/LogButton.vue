@@ -34,8 +34,6 @@ const props = defineProps<{
     title: string;
     status: ProgressStatus | null;
     labels: StatusLabels;
-    // The shelf the Add to shelf dialog starts on.
-    shelfId?: string | null;
     // Fills its container, like a card in a grid.
     block?: boolean;
 }>();
@@ -158,6 +156,5 @@ function onMain() {
         v-model:open="isAddOpen"
         :catalog-item-id="catalogItemId"
         :title="title"
-        :start-shelf-id="shelfId"
     />
 </template>

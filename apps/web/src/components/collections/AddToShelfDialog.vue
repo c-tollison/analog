@@ -55,15 +55,14 @@ import { isPendingFor } from '@/lib/editions';
 import { MEDIA_TYPES } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
-import { ScanBarcodeIcon, XIcon } from '@lucide/vue';
+import { HistoryIcon, ScanBarcodeIcon, XIcon } from '@lucide/vue';
+import { useLocalStorage } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
     catalogItemId: string;
     // Shown for editions with no title of their own.
     title: string;
-    // The shelf to start on, like one that already holds the item.
-    startShelfId?: string | null;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -72,20 +71,23 @@ const MAX_SHELVES = 100;
 const shelves = useCollections(MAX_SHELVES);
 const shelfId = ref<string | null>(null);
 
-// Start on the given shelf, or the first one once they load.
+// Someone with one shelf starts on it. With more, they pick each time, and
+// the last shelf they added to is one click away.
+watch(open, (isOpen) => {
+    if (isOpen) shelfId.value = null;
+});
 watch(
     [open, () => shelves.items],
     ([isOpen, items]) => {
-        if (!isOpen) return;
-        const known = items.some((shelf) => shelf.id === shelfId.value);
-        if (!known) {
-            shelfId.value =
-                items.find((shelf) => shelf.id === props.startShelfId)?.id ??
-                items[0]?.id ??
-                null;
-        }
+        const [only, ...others] = items;
+        if (isOpen && only && !others.length) shelfId.value = only.id;
     },
     { immediate: true }
+);
+
+const lastShelfId = useLocalStorage<string | null>('analog:last-shelf', null);
+const lastShelf = computed(
+    () => shelves.items.find((shelf) => shelf.id === lastShelfId.value) ?? null
 );
 
 const hasNoShelves = computed(
@@ -129,7 +131,10 @@ function setOwned(isbn: string, owned: boolean) {
     if (!shelfId.value) return;
     const variables = { collectionId: shelfId.value, isbn };
     if (owned) {
-        own.mutate({ ...variables, catalogItemId: props.catalogItemId });
+        own.mutate(
+            { ...variables, catalogItemId: props.catalogItemId },
+            { onSuccess: () => (lastShelfId.value = variables.collectionId) }
+        );
     } else {
         disown.mutate(variables);
     }
@@ -222,7 +227,18 @@ const error = computed(
 
             <template v-else>
                 <div class="grid gap-1.5">
-                    <Label for="shelf">Shelf</Label>
+                    <div class="flex items-center justify-between gap-2">
+                        <Label for="shelf">Shelf</Label>
+                        <Button
+                            v-if="lastShelf && shelfId !== lastShelf.id"
+                            variant="outline"
+                            size="sm"
+                            @click="shelfId = lastShelf.id"
+                        >
+                            <HistoryIcon />
+                            Use {{ lastShelf.name }}
+                        </Button>
+                    </div>
                     <Select v-model="shelfId">
                         <SelectTrigger id="shelf" class="w-full">
                             <SelectValue placeholder="Pick a shelf" />
@@ -239,87 +255,89 @@ const error = computed(
                     </Select>
                 </div>
 
-                <div class="flex gap-2">
-                    <SearchInput
-                        v-model="filter"
-                        placeholder="ISBN or publisher"
+                <template v-if="shelfId">
+                    <div class="flex gap-2">
+                        <SearchInput
+                            v-model="filter"
+                            placeholder="ISBN or publisher"
+                        />
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            :aria-label="isScanning ? 'Stop scanning' : 'Scan'"
+                            @click="isScanning = !isScanning"
+                        >
+                            <XIcon v-if="isScanning" />
+                            <ScanBarcodeIcon v-else />
+                        </Button>
+                    </div>
+
+                    <BarcodeCamera
+                        v-if="isScanning && bookFormats"
+                        :formats="bookFormats"
+                        @detect="onScan"
                     />
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        :aria-label="isScanning ? 'Stop scanning' : 'Scan'"
-                        @click="isScanning = !isScanning"
-                    >
-                        <XIcon v-if="isScanning" />
-                        <ScanBarcodeIcon v-else />
-                    </Button>
-                </div>
 
-                <BarcodeCamera
-                    v-if="isScanning && bookFormats"
-                    :formats="bookFormats"
-                    @detect="onScan"
-                />
-
-                <div class="min-h-0 overflow-y-auto">
-                    <ItemGroup v-if="canAddTyped && typedIsbn" class="mb-2">
-                        <Item variant="outline" size="sm">
-                            <ItemContent>
-                                <ItemTitle>{{ typedIsbn }}</ItemTitle>
-                                <ItemDescription>
-                                    Not listed yet
-                                </ItemDescription>
-                            </ItemContent>
-                            <ItemActions>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    :disabled="isChanging"
-                                    @click="setOwned(typedIsbn, true)"
-                                >
-                                    <Spinner
-                                        v-if="isPendingFor(own, typedIsbn)"
-                                    />
-                                    Add this edition
-                                </Button>
-                            </ItemActions>
-                        </Item>
-                    </ItemGroup>
-
-                    <PagedList
-                        :list="editions"
-                        :empty-text="
-                            term ? 'No editions match.' : 'No editions yet.'
-                        "
-                    >
-                        <template #default="{ items }">
-                            <ItemGroup class="grid gap-2">
-                                <EditionItem
-                                    v-for="edition in items"
-                                    :key="edition.isbn"
-                                    :edition="edition"
-                                    :fallback-title="title"
-                                >
-                                    <Spinner
-                                        v-if="
-                                            isPendingFor(own, edition.isbn) ||
-                                            isPendingFor(disown, edition.isbn)
-                                        "
-                                    />
-                                    <Checkbox
-                                        v-else
-                                        :model-value="edition.owned"
+                    <div class="min-h-0 overflow-y-auto">
+                        <ItemGroup v-if="canAddTyped && typedIsbn" class="mb-2">
+                            <Item variant="outline" size="sm">
+                                <ItemContent>
+                                    <ItemTitle>{{ typedIsbn }}</ItemTitle>
+                                    <ItemDescription>
+                                        Not listed yet
+                                    </ItemDescription>
+                                </ItemContent>
+                                <ItemActions>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         :disabled="isChanging"
-                                        :aria-label="`Own ${edition.isbn}`"
-                                        @update:model-value="
-                                            setOwned(edition.isbn, $event === true)
-                                        "
-                                    />
-                                </EditionItem>
-                            </ItemGroup>
-                        </template>
-                    </PagedList>
-                </div>
+                                        @click="setOwned(typedIsbn, true)"
+                                    >
+                                        <Spinner
+                                            v-if="isPendingFor(own, typedIsbn)"
+                                        />
+                                        Add this edition
+                                    </Button>
+                                </ItemActions>
+                            </Item>
+                        </ItemGroup>
+
+                        <PagedList
+                            :list="editions"
+                            :empty-text="
+                                term ? 'No editions match.' : 'No editions yet.'
+                            "
+                        >
+                            <template #default="{ items }">
+                                <ItemGroup class="grid gap-2">
+                                    <EditionItem
+                                        v-for="edition in items"
+                                        :key="edition.isbn"
+                                        :edition="edition"
+                                        :fallback-title="title"
+                                    >
+                                        <Spinner
+                                            v-if="
+                                                isPendingFor(own, edition.isbn) ||
+                                                isPendingFor(disown, edition.isbn)
+                                            "
+                                        />
+                                        <Checkbox
+                                            v-else
+                                            :model-value="edition.owned"
+                                            :disabled="isChanging"
+                                            :aria-label="`Own ${edition.isbn}`"
+                                            @update:model-value="
+                                                setOwned(edition.isbn, $event === true)
+                                            "
+                                        />
+                                    </EditionItem>
+                                </ItemGroup>
+                            </template>
+                        </PagedList>
+                    </div>
+                </template>
             </template>
         </DialogContent>
     </Dialog>

@@ -221,7 +221,6 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                 :title="item.title"
                                 :status="item.status"
                                 :labels="labels"
-                                :shelf-id="item.shelves[0]?.id"
                             />
                             <StarRating
                                 v-if="isCompleted && item.rating !== null"
@@ -393,7 +392,6 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
             v-model:open="isAddOpen"
             :catalog-item-id="item.id"
             :title="item.title"
-            :start-shelf-id="item.shelves[0]?.id"
         />
 
         <ReviewSheet

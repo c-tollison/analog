@@ -163,7 +163,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 2. The book page shows saves and the average rating, your status, your shelves with their edition counts, and the details.
 3. The Log button with no status adds "Want to read". With a status, it opens the menu. The menu changes the status, removes it from the Log, and opens Add to shelf.
 4. Marking something read that has no rating or review opens the review sheet. This works from every Log button: the book page, search rows and series volumes. Something you rated before, un-marked and marked read again doesn't ask again.
-5. Add to shelf starts on a shelf that already holds the book. Switching shelves updates which editions are checked. Owned editions are listed first.
+5. Add to shelf picks a shelf for you only when you have exactly one. With more, it starts empty and the editions list shows once you pick. After you've added to a shelf, a "Use {shelf}" button picks that one again in one click. Switching shelves updates which editions are checked, with owned editions listed first.
 6. Typing in the filter narrows the list by ISBN, publisher or title. Typing a full ISBN that isn't listed shows "Add this edition". It joins as unreviewed and lands on the shelf.
 7. The scan button opens the camera in the dialog. A scan fills in the filter.
 8. A brand new account with no shelves can name a first shelf right in the dialog.
@@ -174,7 +174,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 13. The shelf scan page still scans like before.
 14. Add to shelf explains what to do: pick a shelf, check your editions, or search, type or scan one that's missing.
 15. A shelf's series page says "Back to" and the shelf's name when you came from that shelf.
-16. On the shared series page, each volume has the Log button under its cover. It sets or changes the status and opens Add to shelf, without leaving the page. The label cuts off cleanly in narrow cards, and a rated volume shows its stars above the button.
+16. On the shared series page, each volume has the Log button under its cover, and all the buttons line up whether or not a volume has stars. It sets or changes the status and opens Add to shelf, without leaving the page. The label cuts off cleanly in narrow cards.
 
 ### Step 3
 

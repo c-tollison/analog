@@ -116,12 +116,16 @@ const hasDetails = computed(
                             >
                                 {{ item.title }}
                             </p>
-                            <StarRating
-                                v-if="item.rating !== null"
-                                readonly
-                                small
-                                :model-value="item.rating"
-                            />
+                            <!-- Keeps its height when empty, so every
+                                 Log button lines up. -->
+                            <div class="flex h-5 items-center">
+                                <StarRating
+                                    v-if="item.rating !== null"
+                                    readonly
+                                    small
+                                    :model-value="item.rating"
+                                />
+                            </div>
                         </RouterLink>
                         <LogButton
                             v-if="labels"
