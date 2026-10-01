@@ -1,25 +1,21 @@
 <script setup lang="ts">
 import BackButton from '@/components/BackButton.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
-import AddFromCatalogDialog from '@/components/collections/AddFromCatalogDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
+import CoverRating from '@/components/progress/CoverRating.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
 import { Badge } from '@/components/shadcn-components/badge';
-import { Button } from '@/components/shadcn-components/button';
 import { Progress } from '@/components/shadcn-components/progress';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import {
     useCollection,
     useCollectionSeries,
     useCollectionSeriesItems,
-    useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
 import {
-    addMoreLabel,
     completedWord,
     kindStatusLabels,
     SERIES_KIND_LABELS,
@@ -27,12 +23,10 @@ import {
 import { staggerIn } from '@/lib/motion';
 import { missingVolumes } from '@/lib/volumes';
 
-import { PlusIcon, XIcon } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 const props = defineProps<{ id: string; seriesId: string }>();
-
-const isAddOpen = ref(false);
 
 const { data: detail, error: detailError } = useCollectionSeries(
     () => props.id,
@@ -43,9 +37,23 @@ usePageTitle(() => detail.value?.series.title);
 const { data: collection, error: collectionError } = useCollection(
     () => props.id
 );
-const collectionName = computed(() => collection.value?.name ?? null);
-// Visitors get a read-only page. Edit controls wait for the role to load.
-const isMember = computed(() => !!collection.value?.role);
+// This page is a read-only look at someone else's shelf. Members manage the
+// series on its own page instead.
+const router = useRouter();
+watch(
+    () => collection.value?.role,
+    (role) => {
+        if (role) {
+            void router.replace({
+                name: 'series',
+                params: { id: props.seriesId },
+                query: { shelf: props.id },
+            });
+        }
+    },
+    { immediate: true }
+);
+
 // A visitor sees the owner's progress, so say whose it is.
 const progressOwner = computed(() =>
     collection.value?.role === null ? collection.value.ownerName : null
@@ -55,28 +63,6 @@ const volumes = useCollectionSeriesItems(
     () => props.id,
     () => props.seriesId
 );
-
-const {
-    mutate: removeItem,
-    isPending: isRemoving,
-    error: removeError,
-} = useRemoveCollectionItem();
-
-const removing = ref<{ id: string; title: string } | null>(null);
-const confirmingRemove = computed({
-    get: () => removing.value !== null,
-    set: (open) => {
-        if (!open) removing.value = null;
-    },
-});
-
-function onRemove() {
-    if (!removing.value) return;
-    removeItem(
-        { collectionId: props.id, itemId: removing.value.id },
-        { onSettled: () => (removing.value = null) }
-    );
-}
 
 const labels = computed(() =>
     detail.value ? kindStatusLabels(detail.value.series.kind) : null
@@ -106,38 +92,20 @@ const missing = computed(() => {
 });
 
 const headerError = computed(
-    () =>
-        (detailError.value ?? collectionError.value ?? removeError.value)
-            ?.message ?? null
+    () => (detailError.value ?? collectionError.value)?.message ?? null
 );
 </script>
 
 <template>
     <div class="flex flex-col gap-4">
-        <div class="flex items-center justify-between">
+        <div>
             <BackButton
                 :to="{ name: 'collection', params: { id } }"
-                text="Back to collection"
+                :text="
+                    collection ? `Back to ${collection.name}` : 'Back to shelf'
+                "
             />
-            <Button
-                v-if="isMember"
-                variant="outline"
-                size="sm"
-                :disabled="!detail || !collectionName"
-                @click="isAddOpen = true"
-            >
-                <PlusIcon />
-                {{ detail ? addMoreLabel(detail.series.kind) : 'Add more' }}
-            </Button>
         </div>
-
-        <AddFromCatalogDialog
-            v-if="detail && collectionName"
-            v-model:open="isAddOpen"
-            :collection-id="id"
-            :collection-name="collectionName"
-            :series="detail.series"
-        />
 
         <div
             v-if="detail && labels"
@@ -206,15 +174,6 @@ const headerError = computed(
         </div>
         <FormError :message="headerError" />
 
-        <ConfirmDialog
-            v-model:open="confirmingRemove"
-            :title="`Remove ${removing?.title ?? 'item'}?`"
-            description="It'll be taken out of this collection."
-            confirm-text="Remove"
-            :pending="isRemoving"
-            @confirm="onRemove"
-        />
-
         <PagedList :list="volumes" empty-text="Nothing from this series here.">
             <template #default="{ items }">
                 <ul class="grid grid-cols-3 gap-3 sm:grid-cols-5">
@@ -222,12 +181,12 @@ const headerError = computed(
                         v-for="(item, index) in items"
                         v-bind="staggerIn(index)"
                         :key="item.id"
-                        class="group relative"
+                        class="group"
                     >
                         <RouterLink
                             :to="{
-                                name: 'collection-item',
-                                params: { id, itemId: item.id },
+                                name: 'item',
+                                params: { id: item.catalogItemId },
                             }"
                             class="grid gap-1"
                         >
@@ -236,7 +195,12 @@ const headerError = computed(
                                 :src="item.coverUrl"
                                 :alt="item.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
-                            />
+                            >
+                                <CoverRating
+                                    v-if="item.rating !== null"
+                                    :rating="item.rating"
+                                />
+                            </CoverImage>
                             <p class="text-xs font-medium">
                                 Vol. {{ item.position ?? '?' }}
                             </p>
@@ -252,16 +216,6 @@ const headerError = computed(
                                 :labels="labels"
                             />
                         </RouterLink>
-                        <Button
-                            v-if="isMember"
-                            variant="secondary"
-                            size="icon"
-                            class="absolute top-1 right-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                            :aria-label="`Remove ${item.title}`"
-                            @click="removing = { id: item.id, title: item.title }"
-                        >
-                            <XIcon />
-                        </Button>
                     </li>
                 </ul>
             </template>

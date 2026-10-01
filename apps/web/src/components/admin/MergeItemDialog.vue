@@ -86,9 +86,9 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Merge {{ itemTitle }}</DialogTitle>
                 <DialogDescription>
-                    Its ISBNs, collection entries and reviews move to the item
-                    you pick, and this item is deleted. The item you pick keeps
-                    its own title, cover, series and volume.
+                    Its ISBNs, shelf entries and reviews move to the item you
+                    pick, and this item is deleted. The item you pick keeps its
+                    own title, cover, series and volume.
                 </DialogDescription>
             </DialogHeader>
             <FormError :message="merge.error.value?.message ?? null" />

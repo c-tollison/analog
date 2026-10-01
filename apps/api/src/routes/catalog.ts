@@ -1,7 +1,7 @@
 import { and, eq, schema, sql } from '@analog/db';
 import {
+    AddBookSchema,
     CheckTrigger,
-    GoogleSearchQuerySchema,
     IsbnSchema,
     ProgressStatus,
     ReviewSchema,
@@ -18,10 +18,10 @@ import {
     toBookLookup,
 } from '../lib/books.js';
 import { checkInBackground } from '../lib/check-runs.js';
-import { searchGoogleBooks } from '../lib/google-books.js';
+import { upsertBook } from '../lib/editions.js';
 import { db } from '../lib/init.js';
 import { IdParamSchema } from '../lib/params.js';
-import { isCompleted } from '../lib/progress.js';
+import { isCompleted, refreshItemStats } from '../lib/progress.js';
 import { schemaValidator } from '../lib/validator.js';
 import { requireRole } from '../middleware/require-role.js';
 import { Hono } from 'hono';
@@ -105,7 +105,14 @@ const catalog = new Hono<AppEnv>()
                         updatedAt: new Date(),
                     },
                 })
-                .returning({ status: progress.status });
+                // The stored rating and review, so the app can ask for one
+                // when there's none yet.
+                .returning({
+                    status: progress.status,
+                    rating: progress.rating,
+                    review: progress.review,
+                });
+            await refreshItemStats(id);
             return c.json(saved);
         }
     )
@@ -137,6 +144,7 @@ const catalog = new Hono<AppEnv>()
                     message: 'Mark it finished before reviewing it',
                 });
             }
+            await refreshItemStats(id);
             return c.json(saved);
         }
     )
@@ -171,6 +179,10 @@ const catalog = new Hono<AppEnv>()
                 : await findSimilarSeries(book.title, user.id);
             return c.json({
                 book,
+                itemId: item.id,
+                // A checked book, or one already in a series, has nothing
+                // left to pick.
+                isPlaced: !!item.verifiedAt || !!item.seriesId,
                 suggestedSeries: suggested
                     ? { id: suggested.id, title: suggested.title }
                     : null,
@@ -182,15 +194,16 @@ const catalog = new Hono<AppEnv>()
             });
         }
     )
-    .get(
-        '/search/google',
-        schemaValidator('query', GoogleSearchQuerySchema),
-        async (c) => {
-            const { q } = c.req.valid('query');
-            const { items } = await searchGoogleBooks(q, {});
-            return c.json(items);
-        }
-    )
+    // Saves a looked-up book with the series and volume picked, without
+    // putting it on a shelf.
+    .post('/books', schemaValidator('json', AddBookSchema), async (c) => {
+        const { isbn, series, volume } = c.req.valid('json');
+        const item = await upsertBook(isbn, series, volume, {
+            userId: c.get('user').id,
+            admin: false,
+        });
+        return c.json({ id: item.id, seriesId: item.seriesId }, 201);
+    })
     // A cover an admin uploaded. Its URL changes with each upload.
     .get(
         '/covers/:isbn',

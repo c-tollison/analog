@@ -66,8 +66,8 @@ defineProps<{ collection: CollectionSummary; showProgress: boolean }>();
                 </AvatarGroup>
             </div>
             <ItemDescription>
-                {{ collection.itemCount }}
-                {{ collection.itemCount === 1 ? 'item' : 'items' }}
+                {{ collection.editionCount }}
+                {{ collection.editionCount === 1 ? 'item' : 'items' }}
                 <template v-if="collection.itemCount && !showProgress">
                     · {{ collection.completedCount }}
                     {{ formatsCompletedWord(collection.formats) }}

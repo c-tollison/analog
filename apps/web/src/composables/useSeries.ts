@@ -2,6 +2,7 @@ import type { InferResponseType } from '@analog/api/client';
 import type {
     DetailsSource,
     LinkDetailsSourceSchema,
+    SeriesVolumeFilter,
     SetVolumeCountSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
@@ -74,6 +75,37 @@ export function useDetailsSearch(
             ),
         enabled: () => toValue(q) !== '',
     });
+}
+
+/** A series' page, with your own counts. */
+export function useSeriesPage(id: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: () => [...SERIES_KEY, 'page', toValue(id)],
+        queryFn: async () =>
+            unwrap(
+                await api.series[':id'].$get({ param: { id: toValue(id) } })
+            ),
+    });
+}
+
+/**
+ * A series' volumes you can see, with your status and ownership: the ones
+ * you own, the ones you don't, or all of them.
+ */
+export function useSeriesVolumes(
+    id: MaybeRefOrGetter<string>,
+    show: MaybeRefOrGetter<SeriesVolumeFilter>
+) {
+    return usePaginatedList(
+        () => [...SERIES_KEY, 'page', toValue(id), 'items', toValue(show)],
+        async (offset) =>
+            unwrap(
+                await api.series[':id'].items.$get({
+                    param: { id: toValue(id) },
+                    query: { offset, show: toValue(show) },
+                })
+            )
+    );
 }
 
 // Series pages live under collection and admin keys, so all refresh.

@@ -32,7 +32,7 @@ export const AddBookSchema = z.object({
     volume: z.number().nonnegative().nullable(),
 });
 
-export const OwnedIsbnSchema = z.object({ isbn: IsbnSchema });
+export const OwnEditionSchema = z.object({ catalogItemId: z.uuid() });
 
 export const CollectionNameSchema = z
     .string()
@@ -47,15 +47,6 @@ export const CreateCollectionSchema = z.object({ name: CollectionNameSchema });
 
 export const UpdateCollectionSchema = z.object({ isPublic: z.boolean() });
 
-export const MAX_BULK_ADD = 100;
-
-export const AddCatalogItemsSchema = z.object({
-    catalogItemIds: z
-        .array(z.uuid())
-        .min(1, 'Pick at least one item')
-        .max(MAX_BULK_ADD, `Add at most ${MAX_BULK_ADD} items at a time`),
-});
-
 export const MAX_VOLUME_COUNT = 1000;
 
 const VolumeCountSchema = z
@@ -68,6 +59,29 @@ const VolumeCountSchema = z
 export const SetVolumeCountSchema = z.object({
     volumeCount: VolumeCountSchema,
 });
+
+/** Which of a series' volumes to list: ones you own, ones you don't, or all. */
+export const SERIES_VOLUME_FILTERS = ['owned', 'missing', 'all'] as const;
+
+export type SeriesVolumeFilter = (typeof SERIES_VOLUME_FILTERS)[number];
+
+export const SeriesVolumesQuerySchema = PageQuerySchema.extend({
+    show: z.enum(SERIES_VOLUME_FILTERS).default('all'),
+});
+
+export const MAX_READING_GOAL = 10_000;
+
+/** A yearly goal: how many items to finish. */
+export const ReadingGoalSchema = z.object({
+    target: z
+        .number()
+        .int('Enter a whole number')
+        .positive('Enter a number above 0')
+        .max(MAX_READING_GOAL),
+});
+
+/** A year for goals and stats, as a route param or query. */
+export const GoalYearSchema = z.coerce.number().int().min(2000).max(2100);
 
 /** Sources a series can pull its synopsis, genres and run from. */
 export const DETAILS_SOURCES = [ExternalSource.AniList] as const;

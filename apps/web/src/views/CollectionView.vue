@@ -5,8 +5,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
+import CoverRating from '@/components/progress/CoverRating.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
-import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
@@ -23,7 +23,6 @@ import {
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
-import { useSearchTerm } from '@/composables/useSearchTerm';
 import {
     completedWord,
     FORMAT_LABELS,
@@ -39,9 +38,6 @@ import { computed, ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
-
-const query = ref('');
-const { term, isTyping } = useSearchTerm(query);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 usePageTitle(() => collection.value?.name);
@@ -59,8 +55,20 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
               },
               text: `Back to ${collection.value.ownerName}`,
           }
-        : { to: { name: 'collections' }, text: 'Collections' }
+        : { to: { name: 'collections' }, text: 'Shelves' }
 );
+
+// Members manage a series on its own page; visitors see what this shelf
+// holds.
+function seriesLink(seriesId: string): RouteLocationRaw {
+    return isMember.value
+        ? {
+              name: 'series',
+              params: { id: seriesId },
+              query: { shelf: props.id },
+          }
+        : { name: 'collection-series', params: { id: props.id, seriesId } };
+}
 
 const SORT_LABELS: Record<CollectionSort, string> = {
     [CollectionSort.Name]: 'Name',
@@ -68,9 +76,7 @@ const SORT_LABELS: Record<CollectionSort, string> = {
 };
 const sort = ref(CollectionSort.Name);
 
-const entries = useCollectionEntries(() => props.id, term, sort, {
-    pending: isTyping,
-});
+const entries = useCollectionEntries(() => props.id, sort);
 
 const {
     mutate: removeItem,
@@ -112,7 +118,7 @@ const headerError = computed(
         <div class="flex items-center justify-between">
             <BackButton :to="back.to" :text="back.text" />
             <Button v-if="isMember" size="sm" as-child>
-                <RouterLink :to="{ name: 'lookup', query: { collection: id } }">
+                <RouterLink :to="{ name: 'collection-scan', params: { id } }">
                     <PlusIcon />
                     {{ collection ? `Add to ${collection.name}` : 'Add' }}
                 </RouterLink>
@@ -144,15 +150,14 @@ const headerError = computed(
         <ConfirmDialog
             v-model:open="confirmingRemove"
             :title="`Remove ${removing?.title ?? 'item'}?`"
-            description="It'll be taken out of this collection."
+            description="It'll be taken off this shelf."
             confirm-text="Remove"
             :pending="isRemoving"
             @confirm="onRemove"
         />
 
-        <div class="flex gap-2">
-            <SearchInput v-model="query" placeholder="Search" />
-            <Select v-model="sort" :disabled="!!query">
+        <div class="flex justify-end">
+            <Select v-model="sort">
                 <SelectTrigger class="w-auto shrink-0" aria-label="Sort by">
                     <SelectValue />
                 </SelectTrigger>
@@ -171,11 +176,7 @@ const headerError = computed(
         <PagedList
             :list="entries"
             :empty-text="
-                query
-                    ? 'No matches.'
-                    : isMember
-                      ? 'Nothing here yet. Scan something in.'
-                      : 'Nothing here yet.'
+                isMember ? 'Nothing here yet. Scan something in.' : 'Nothing here yet.'
             "
         >
             <template #default="{ items }">
@@ -188,15 +189,12 @@ const headerError = computed(
                     >
                         <RouterLink
                             v-if="entry.series"
-                            :to="{
-                                name: 'collection-series',
-                                params: { id, seriesId: entry.series.id },
-                            }"
+                            :to="seriesLink(entry.series.id)"
                             class="grid gap-1"
                         >
                             <CoverImage
                                 size="md"
-                                :src="entry.series.coverUrl"
+                                :src="entry.coverUrl ?? entry.series.coverUrl"
                                 :alt="entry.series.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
                             />
@@ -222,8 +220,8 @@ const headerError = computed(
                         <RouterLink
                             v-else
                             :to="{
-                                name: 'collection-item',
-                                params: { id, itemId: entry.id },
+                                name: 'item',
+                                params: { id: entry.catalogItemId },
                             }"
                             class="grid gap-1"
                         >
@@ -232,7 +230,12 @@ const headerError = computed(
                                 :src="entry.coverUrl"
                                 :alt="entry.title"
                                 class="aspect-2/3 w-full transition duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
-                            />
+                            >
+                                <CoverRating
+                                    v-if="entry.rating !== null"
+                                    :rating="entry.rating"
+                                />
+                            </CoverImage>
                             <p class="line-clamp-2 min-h-8 text-xs font-medium">
                                 {{ entry.title }}
                             </p>

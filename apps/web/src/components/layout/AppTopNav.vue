@@ -1,19 +1,23 @@
 <script setup lang="ts">
+import { Button } from '@/components/shadcn-components/button';
+import { Kbd } from '@/components/shadcn-components/kbd';
 import {
     NavigationMenu,
     NavigationMenuItem,
     NavigationMenuLink,
     NavigationMenuList,
 } from '@/components/shadcn-components/navigation-menu';
+import { useSearchStore } from '@/stores/search';
 
 import NotificationSummaryTooltip from './NotificationSummaryTooltip.vue';
 import NotificationsBell from './NotificationsBell.vue';
 import { isNavActive, navLinks } from './nav-links';
 import UserMenu from './UserMenu.vue';
-import { DiscAlbumIcon } from '@lucide/vue';
+import { SearchIcon } from '@lucide/vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
+const search = useSearchStore();
 </script>
 
 <template>
@@ -23,11 +27,9 @@ const route = useRoute();
         <div class="mx-auto flex h-full max-w-5xl items-center gap-2 px-4">
             <RouterLink
                 :to="{ name: 'home' }"
-                class="mr-2 flex items-center"
-                aria-label="Analog home"
+                class="mr-2 text-lg font-semibold"
             >
-                <!-- TODO: swap for the Analog logo. -->
-                <DiscAlbumIcon class="size-6" />
+                Analog
             </RouterLink>
             <NavigationMenu :viewport="false" class="hidden md:flex">
                 <NavigationMenuList class="gap-1">
@@ -48,9 +50,19 @@ const route = useRoute();
                     </NavigationMenuItem>
                 </NavigationMenuList>
             </NavigationMenu>
-            <div class="flex-1" />
+            <div class="flex flex-1 justify-center">
+                <Button
+                    variant="outline"
+                    class="hidden w-full max-w-xs justify-start md:flex"
+                    @click="search.isOpen = true"
+                >
+                    <SearchIcon />
+                    Search
+                    <Kbd class="ml-auto">⌘K</Kbd>
+                </Button>
+            </div>
             <NotificationSummaryTooltip side="bottom" desktop>
-                <NotificationsBell class="hidden md:inline-flex" />
+                <NotificationsBell />
             </NotificationSummaryTooltip>
             <UserMenu />
         </div>

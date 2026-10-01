@@ -1,36 +1,41 @@
 import { and, asc, eq, ilike, inArray, ne, or, schema, sql } from '@analog/db';
 import {
+    GoalYearSchema,
     PageQuerySchema,
+    ReadingGoalSchema,
     UpdatePreferencesSchema,
     USER_SEARCH_MIN_LENGTH,
-    USERNAME_MAX_LENGTH,
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { toAvatar } from '../lib/avatar.js';
 import { canSeeCollection, collectionSummaries } from '../lib/collections.js';
-import { areFriends, relationshipTo, userColumns } from '../lib/friends.js';
+import {
+    relationshipTo,
+    requireVisibleProfile,
+    userColumns,
+} from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
-import { IdParamSchema } from '../lib/params.js';
+import { IdParamSchema, UsernameParamSchema } from '../lib/params.js';
 import { schemaValidator } from '../lib/validator.js';
+import userLog from './user-log.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
-const { collection, collectionMember, user, userAvatar } = schema;
+const { collection, collectionMember, readingGoal, user, userAvatar } = schema;
 
+const YearParamSchema = z.object({ year: GoalYearSchema });
 const SearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().min(USER_SEARCH_MIN_LENGTH).max(100),
-});
-const UsernameParamSchema = z.object({
-    username: z.string().trim().toLowerCase().min(1).max(USERNAME_MAX_LENGTH),
 });
 const AvatarFormSchema = z.object({
     file: z.instanceof(File, { message: 'Choose a photo' }),
 });
 
 const users = new Hono<AppEnv>()
+    .route('/:username', userLog)
     .get('/', schemaValidator('query', SearchQuerySchema), async (c) => {
         const { q, ...pageQuery } = c.req.valid('query');
         const me = c.get('user').id;
@@ -87,23 +92,7 @@ const users = new Hono<AppEnv>()
         async (c) => {
             const { username } = c.req.valid('param');
             const me = c.get('user').id;
-            const [found] = await db()
-                .select({ id: user.id, isPublic: user.isPublic })
-                .from(user)
-                .where(eq(user.username, username));
-            if (!found) {
-                throw new HTTPException(404, { message: 'User not found' });
-            }
-            // A private profile shows its collections to friends only.
-            if (
-                found.id !== me &&
-                !found.isPublic &&
-                !(await areFriends(me, found.id))
-            ) {
-                throw new HTTPException(403, {
-                    message: 'This profile is private',
-                });
-            }
+            const found = await requireVisibleProfile(username, me);
 
             // Everything they're a member of that I'm allowed to see.
             const theirs = db()
@@ -156,6 +145,40 @@ const users = new Hono<AppEnv>()
             const me = c.get('user').id;
             await db().update(user).set(values).where(eq(user.id, me));
             return c.json(values);
+        }
+    )
+    .put(
+        '/me/goals/:year',
+        schemaValidator('param', YearParamSchema),
+        schemaValidator('json', ReadingGoalSchema),
+        async (c) => {
+            const { year } = c.req.valid('param');
+            const { target } = c.req.valid('json');
+            const me = c.get('user').id;
+            await db()
+                .insert(readingGoal)
+                .values({ userId: me, year, target })
+                .onConflictDoUpdate({
+                    target: [readingGoal.userId, readingGoal.year],
+                    set: { target, updatedAt: new Date() },
+                });
+            return c.json({ year, target });
+        }
+    )
+    .delete(
+        '/me/goals/:year',
+        schemaValidator('param', YearParamSchema),
+        async (c) => {
+            const { year } = c.req.valid('param');
+            await db()
+                .delete(readingGoal)
+                .where(
+                    and(
+                        eq(readingGoal.userId, c.get('user').id),
+                        eq(readingGoal.year, year)
+                    )
+                );
+            return c.body(null, 204);
         }
     )
     .get('/:id/avatar', schemaValidator('param', IdParamSchema), async (c) => {

@@ -8,8 +8,10 @@ import { relations } from 'drizzle-orm';
 import {
     date,
     index,
+    integer,
     jsonb,
     numeric,
+    real,
     text,
     timestamp,
     uuid,
@@ -55,6 +57,11 @@ export const catalogItem = appSchema.table(
             () => user.id,
             { onDelete: 'set null' }
         ),
+        // Counted from progress by refreshItemStats. Saves are people with
+        // any status. Ratings only count once finished, out of 10.
+        saveCount: integer('save_count').default(0).notNull(),
+        ratingCount: integer('rating_count').default(0).notNull(),
+        ratingAverage: real('rating_average'),
         ...timestamps(),
     },
     (table) => [

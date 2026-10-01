@@ -53,7 +53,7 @@ watch(open, (isOpen) => {
     <Dialog v-model:open="open">
         <DialogContent class="sm:max-w-sm">
             <DialogHeader>
-                <DialogTitle>New collection</DialogTitle>
+                <DialogTitle>New shelf</DialogTitle>
                 <DialogDescription>
                     Group things however you like, e.g. Manga or Our DVDs.
                 </DialogDescription>

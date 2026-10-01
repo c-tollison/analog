@@ -11,3 +11,29 @@ export function goBackOr(router: Router, to: RouteLocationRaw) {
         router.replace(to);
     }
 }
+
+// The path at each history position up to the current page, so a link can
+// jump back to a page that's already behind the person instead of piling up
+// history.
+const visited: string[] = [];
+
+export function trackVisits(router: Router) {
+    router.afterEach((to, _from, failure) => {
+        const position = window.history.state?.position;
+        if (failure || typeof position !== 'number') return;
+        visited.length = position + 1;
+        visited[position] = to.path;
+    });
+}
+
+/**
+ * Goes back to `to` if it's already in history. Returns false when it isn't.
+ */
+export function goBackTo(router: Router, to: RouteLocationRaw): boolean {
+    const position = window.history.state?.position;
+    if (typeof position !== 'number' || position < 1) return false;
+    const index = visited.lastIndexOf(router.resolve(to).path, position - 1);
+    if (index === -1) return false;
+    router.go(index - position);
+    return true;
+}

@@ -1,11 +1,17 @@
-import { LibraryBigIcon, UsersIcon } from '@lucide/vue';
+import { LibraryBigIcon, NotebookPenIcon, UsersIcon } from '@lucide/vue';
 
 export const navLinks = [
     {
+        name: 'log',
+        label: 'Log',
+        icon: NotebookPenIcon,
+        paths: ['/log'],
+    },
+    {
         name: 'collections',
-        label: 'Collections',
+        label: 'Shelves',
         icon: LibraryBigIcon,
-        paths: ['/collections'],
+        paths: ['/shelves'],
     },
     {
         name: 'friends',

@@ -4,9 +4,7 @@ import {
     desc,
     eq,
     ilike,
-    inArray,
     isNotNull,
-    isNull,
     notExists,
     or,
     schema,
@@ -14,7 +12,6 @@ import {
 } from '@analog/db';
 import {
     AddBookSchema,
-    AddCatalogItemsSchema,
     CollectionRole,
     CollectionSort,
     CreateCollectionSchema,
@@ -27,31 +24,27 @@ import {
 } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { seriesColumns } from '../lib/books.js';
+import { lowestVolumeCover, seriesColumns } from '../lib/books.js';
 import {
     canSeeCollection,
     collectionSummaries,
     completedCount,
     myMember,
+    ownEdition,
     requireMember,
     requireViewer,
 } from '../lib/collections.js';
-import { discoverableItem, visibleToVisitors } from '../lib/discovery.js';
+import { visibleToVisitors } from '../lib/discovery.js';
 import { upsertBook } from '../lib/editions.js';
 import { areFriends, friendshipWith, userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { likePattern, paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { whenCompleted } from '../lib/progress.js';
-import {
-    catalogItemsMatching,
-    matchesAllTerms,
-    relevance,
-    searchTerms,
-} from '../lib/search.js';
+import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
 import { seriesDetails } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
-import collectionItems from './collection-items.js';
+import collectionItems, { collectionEditions } from './collection-items.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -62,7 +55,6 @@ const {
     collectionItem,
     collectionInvite,
     catalogItem,
-    collectionItemIsbn,
     friendship,
     progress,
     series,
@@ -87,7 +79,6 @@ const SeriesParamSchema = CollectionParamSchema.extend({
     seriesId: z.uuid('Invalid id'),
 });
 const EntriesQuerySchema = PageQuerySchema.extend({
-    q: z.string().trim().max(200).optional(),
     sort: z.enum(CollectionSort).default(CollectionSort.Name),
 });
 const SearchQuerySchema = PageQuerySchema.extend({
@@ -96,13 +87,10 @@ const SearchQuerySchema = PageQuerySchema.extend({
 const FriendsQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().max(100).optional(),
 });
-const CatalogQuerySchema = PageQuerySchema.extend({
-    q: z.string().trim().max(200).optional(),
-    seriesId: z.uuid('Invalid id').optional(),
-});
 
 const itemColumns = {
     id: collectionItem.id,
+    catalogItemId: catalogItem.id,
     format: catalogItem.format,
     kind: catalogItem.kind,
     title: catalogItem.title,
@@ -186,7 +174,7 @@ const collections = new Hono<AppEnv>()
                 .values({ name })
                 .returning({ id: collection.id });
             if (!row) {
-                throw new Error('Failed to create collection');
+                throw new Error('Failed to create shelf');
             }
             await tx.insert(collectionMember).values({
                 collectionId: row.id,
@@ -206,7 +194,7 @@ const collections = new Hono<AppEnv>()
             and(eq(collection.id, id), canSeeCollection(me))
         );
         if (!found) {
-            throw new HTTPException(404, { message: 'Collection not found' });
+            throw new HTTPException(404, { message: 'Shelf not found' });
         }
         return c.json(found);
     })
@@ -241,53 +229,12 @@ const collections = new Hono<AppEnv>()
         schemaValidator('query', EntriesQuerySchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { q, sort, ...pageQuery } = c.req.valid('query');
+            const { sort, ...pageQuery } = c.req.valid('query');
             const { role, progressUserId } = await requireViewer(
                 id,
                 c.get('user').id
             );
             const visible = role ? undefined : visibleToVisitors();
-
-            const terms = searchTerms(q ?? '');
-            if (terms.length) {
-                const titles = [catalogItem.title, series.title];
-                const page = await paginate(pageQuery, (limit, offset) =>
-                    db()
-                        .select({
-                            ...itemColumns,
-                            series: sql<null>`null`,
-                            completedCount: sql<number>`0`,
-                            status: progress.status,
-                            rating: myRating,
-                        })
-                        .from(collectionItem)
-                        .innerJoin(
-                            catalogItem,
-                            eq(collectionItem.catalogItemId, catalogItem.id)
-                        )
-                        .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                        .leftJoin(progress, progressOf(progressUserId))
-                        .where(
-                            and(
-                                eq(collectionItem.collectionId, id),
-                                visible,
-                                matchesAllTerms(terms, {
-                                    columns: titles,
-                                    position: catalogItem.position,
-                                })
-                            )
-                        )
-                        .orderBy(
-                            desc(relevance(terms.join(' '), titles)),
-                            sql`${catalogItem.position} asc nulls last`,
-                            asc(catalogItem.title),
-                            asc(collectionItem.id)
-                        )
-                        .limit(limit)
-                        .offset(offset)
-                );
-                return c.json(page);
-            }
 
             const groupKey = sql<string>`coalesce(${catalogItem.seriesId}, ${catalogItem.id})`;
             const itemTitle = sql<string>`min(${catalogItem.title})`;
@@ -302,12 +249,12 @@ const collections = new Hono<AppEnv>()
                         status: sql<ProgressStatus | null>`min(${progress.status}::text)`,
                         rating: sql<number | null>`min(${myRating})`,
                         id: sql<string>`min(${collectionItem.id}::text)`,
+                        // Only meaningful for items not in a series.
+                        catalogItemId: sql<string>`min(${catalogItem.id}::text)`,
                         format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         kind: sql<SeriesKind | null>`min(${catalogItem.kind}::text)`,
                         title: itemTitle,
-                        coverUrl: sql<
-                            string | null
-                        >`min(${catalogItem.coverUrl})`,
+                        coverUrl: lowestVolumeCover,
                         position: sql<
                             number | null
                         >`min(${catalogItem.position})::float`,
@@ -353,6 +300,7 @@ const collections = new Hono<AppEnv>()
                     .select({
                         ownedCount: sql<number>`count(*)::int`,
                         completedCount,
+                        coverUrl: lowestVolumeCover,
                         ownedPositions: sql<number[]>`coalesce(
                             array_agg(distinct ${catalogItem.position}::float)
                                 filter (where ${catalogItem.position} is not null),
@@ -383,7 +331,7 @@ const collections = new Hono<AppEnv>()
                     id: found.id,
                     title: found.title,
                     kind: found.kind,
-                    coverUrl: found.coverUrl,
+                    coverUrl: counted?.coverUrl ?? found.coverUrl,
                 },
                 ownedCount: counted?.ownedCount ?? 0,
                 completedCount: counted?.completedCount ?? 0,
@@ -436,101 +384,6 @@ const collections = new Hono<AppEnv>()
             return c.json(page);
         }
     )
-    .get(
-        '/:id/catalog',
-        schemaValidator('param', CollectionParamSchema),
-        schemaValidator('query', CatalogQuerySchema),
-        async (c) => {
-            const { id } = c.req.valid('param');
-            const { q, seriesId, ...pageQuery } = c.req.valid('query');
-            const me = c.get('user').id;
-            await requireMember(id, me);
-
-            const terms = searchTerms(q ?? '');
-            const titles = [catalogItem.title, series.title];
-            const page = await paginate(pageQuery, (limit, offset) =>
-                db()
-                    .select({
-                        id: catalogItem.id,
-                        format: catalogItem.format,
-                        title: catalogItem.title,
-                        coverUrl: catalogItem.coverUrl,
-                        position: catalogItem.position,
-                        inCollection: sql<boolean>`${collectionItem.id} is not null`,
-                    })
-                    .from(catalogItem)
-                    .leftJoin(
-                        collectionItem,
-                        and(
-                            eq(collectionItem.catalogItemId, catalogItem.id),
-                            eq(collectionItem.collectionId, id)
-                        )
-                    )
-                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                    .where(
-                        and(
-                            // Listing a series is for adding the rest of it,
-                            // so what the collection has is left out.
-                            seriesId
-                                ? and(
-                                      eq(catalogItem.seriesId, seriesId),
-                                      isNull(collectionItem.id)
-                                  )
-                                : undefined,
-                            catalogItemsMatching(terms),
-                            discoverableItem(me)
-                        )
-                    )
-                    .orderBy(
-                        ...(terms.length
-                            ? [desc(relevance(terms.join(' '), titles))]
-                            : []),
-                        sql`${catalogItem.position} asc nulls last`,
-                        asc(catalogItem.title),
-                        asc(catalogItem.id)
-                    )
-                    .limit(limit)
-                    .offset(offset)
-            );
-            return c.json(page);
-        }
-    )
-    .post(
-        '/:id/items',
-        schemaValidator('param', CollectionParamSchema),
-        schemaValidator('json', AddCatalogItemsSchema),
-        async (c) => {
-            const { id } = c.req.valid('param');
-            const { catalogItemIds } = c.req.valid('json');
-            const user = c.get('user');
-            await requireMember(id, user.id);
-
-            const uniqueIds = [...new Set(catalogItemIds)];
-            const found = await db()
-                .select({ id: catalogItem.id })
-                .from(catalogItem)
-                .where(inArray(catalogItem.id, uniqueIds));
-            if (found.length !== uniqueIds.length) {
-                throw new HTTPException(404, {
-                    message: 'Some items no longer exist in the catalog',
-                });
-            }
-
-            const added = await db()
-                .insert(collectionItem)
-                .values(
-                    uniqueIds.map((catalogItemId) => ({
-                        collectionId: id,
-                        catalogItemId,
-                        addedByUserId: user.id,
-                    }))
-                )
-                .onConflictDoNothing()
-                .returning({ id: collectionItem.id });
-
-            return c.json({ added: added.length }, 201);
-        }
-    )
     .post(
         '/:id/books',
         schemaValidator('param', CollectionParamSchema),
@@ -548,39 +401,23 @@ const collections = new Hono<AppEnv>()
 
             // A collection holds each volume once. Another edition of one it
             // already has joins that entry.
-            await db()
-                .insert(collectionItem)
-                .values({
-                    collectionId: id,
-                    catalogItemId: item.id,
-                    addedByUserId: user.id,
-                })
-                .onConflictDoNothing();
-            const entry = await db().query.collectionItem.findFirst({
-                columns: { id: true },
-                where: and(
-                    eq(collectionItem.collectionId, id),
-                    eq(collectionItem.catalogItemId, item.id)
-                ),
-            });
-            if (!entry) {
-                throw new Error(`Collection entry for ${item.id} missing`);
-            }
-            const [owned] = await db()
-                .insert(collectionItemIsbn)
-                .values({ collectionItemId: entry.id, isbn })
-                .onConflictDoNothing()
-                .returning({ isbn: collectionItemIsbn.isbn });
-            if (!owned) {
+            const { entryId, isNew } = await ownEdition(
+                id,
+                item.id,
+                isbn,
+                user.id
+            );
+            if (!isNew) {
                 throw new HTTPException(409, {
-                    message: 'Already in this collection',
+                    message: 'Already on this shelf',
                 });
             }
 
-            return c.json({ id: entry.id, seriesId: item.seriesId }, 201);
+            return c.json({ id: entryId, seriesId: item.seriesId }, 201);
         }
     )
     .route('/:id/items', collectionItems)
+    .route('/:id/editions', collectionEditions)
     .get(
         '/:id/members',
         schemaValidator('param', CollectionParamSchema),
@@ -613,8 +450,7 @@ const collections = new Hono<AppEnv>()
             );
             if (leaving && role === CollectionRole.Owner) {
                 throw new HTTPException(400, {
-                    message:
-                        "Owners can't leave. Delete the collection instead.",
+                    message: "Owners can't leave. Delete the shelf instead.",
                 });
             }
 

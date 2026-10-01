@@ -1,4 +1,5 @@
 import { hasRole, UserRole } from '@analog/types';
+import { trackVisits } from '@/lib/navigation';
 import { useSessionStore } from '@/stores/session';
 
 import {
@@ -15,11 +16,6 @@ declare module 'vue-router' {
         title?: string;
     }
 }
-
-const requireCollectionQuery: NavigationGuard = (to) =>
-    typeof to.query.collection === 'string' && to.query.collection !== ''
-        ? true
-        : { name: 'collections' };
 
 const requireEmailQuery: NavigationGuard = (to) =>
     typeof to.query.email === 'string' && to.query.email !== ''
@@ -38,61 +34,68 @@ export const router = createRouter({
                 {
                     path: '',
                     name: 'home',
-                    redirect: { name: 'collections' },
+                    redirect: { name: 'log' },
                 },
                 {
-                    path: 'lookup',
-                    name: 'lookup',
-                    meta: { title: 'Add media' },
-                    component: () => import('@/views/LookupView.vue'),
-                    beforeEnter: requireCollectionQuery,
-                    props: (route) => ({
-                        collectionId:
-                            typeof route.query.collection === 'string'
-                                ? route.query.collection
-                                : '',
-                    }),
-                },
-                {
-                    path: 'collections',
+                    path: 'shelves',
                     name: 'collections',
-                    meta: { title: 'Collections' },
+                    meta: { title: 'Shelves' },
                     component: () => import('@/views/CollectionsView.vue'),
                 },
                 {
-                    path: 'collections/:id',
+                    path: 'shelves/:id',
                     name: 'collection',
-                    meta: { title: 'Collection' },
+                    meta: { title: 'Shelf' },
                     component: () => import('@/views/CollectionView.vue'),
                     props: true,
                 },
                 {
-                    path: 'collections/:id/settings',
+                    path: 'shelves/:id/settings',
                     name: 'collection-settings',
-                    meta: { title: 'Collection settings' },
+                    meta: { title: 'Shelf settings' },
                     component: () =>
                         import('@/views/CollectionSettingsView.vue'),
                     props: true,
                 },
                 {
-                    path: 'collections/:id/settings/invite',
+                    path: 'shelves/:id/settings/invite',
                     name: 'collection-invite',
                     meta: { title: 'Invite friends' },
                     component: () => import('@/views/CollectionInviteView.vue'),
                     props: true,
                 },
                 {
-                    path: 'collections/:id/series/:seriesId',
+                    path: 'shelves/:id/series/:seriesId',
                     name: 'collection-series',
                     meta: { title: 'Series' },
                     component: () => import('@/views/CollectionSeriesView.vue'),
                     props: true,
                 },
                 {
-                    path: 'collections/:id/items/:itemId',
-                    name: 'collection-item',
+                    path: 'shelves/:id/scan',
+                    name: 'collection-scan',
+                    meta: { title: 'Scan' },
+                    component: () => import('@/views/CollectionScanView.vue'),
+                    props: true,
+                },
+                {
+                    path: 'log',
+                    name: 'log',
+                    meta: { title: 'Log' },
+                    component: () => import('@/views/LogView.vue'),
+                },
+                {
+                    path: 'items/:id',
+                    name: 'item',
                     meta: { title: 'Media' },
-                    component: () => import('@/views/CollectionItemView.vue'),
+                    component: () => import('@/views/ItemView.vue'),
+                    props: true,
+                },
+                {
+                    path: 'series/:id',
+                    name: 'series',
+                    meta: { title: 'Series' },
+                    component: () => import('@/views/SeriesView.vue'),
                     props: true,
                 },
                 {
@@ -201,6 +204,8 @@ export const router = createRouter({
         },
     ],
 });
+
+trackVisits(router);
 
 router.beforeEach(async (to) => {
     if (!to.meta.requiresAuth && !to.meta.guestOnly) {

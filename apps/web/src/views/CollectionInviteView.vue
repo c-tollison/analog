@@ -52,7 +52,7 @@ const error = computed(
             <h1 class="text-lg font-semibold">Invite friends</h1>
             <p class="text-muted-foreground text-sm">
                 Once they accept, they can add and edit media in
-                {{ collection?.name ?? 'this collection' }}.
+                {{ collection?.name ?? 'this shelf' }}.
             </p>
         </div>
 

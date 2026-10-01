@@ -9,7 +9,7 @@ import { useRoute } from 'vue-router';
 export function usePageTitle(title?: MaybeRefOrGetter<string | undefined>) {
     const route = useRoute();
     useTitle(() => toValue(title) ?? route.meta.title, {
-        titleTemplate: (page) => (page ? `${page} · Analog` : 'Analog'),
+        titleTemplate: (page) => (page ? `${page} - Analog` : 'Analog'),
         // The next page has already set its title by the time this unmounts.
         restoreOnUnmount: false,
     });
