@@ -11,6 +11,7 @@ import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
 import {
     type PaginatedListOptions,
+    pageLimit,
     usePaginatedList,
 } from './usePaginatedList';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
@@ -35,15 +36,18 @@ export function useSeriesSearch(
         limit,
         admin = false,
         ...options
-    }: PaginatedListOptions & { limit?: number; admin?: boolean } = {}
+    }: PaginatedListOptions & {
+        limit?: MaybeRefOrGetter<number | undefined>;
+        admin?: boolean;
+    } = {}
 ) {
     return usePaginatedList(
-        () => [...SERIES_KEY, 'search', toValue(q), limit, admin],
+        () => [...SERIES_KEY, 'search', toValue(q), toValue(limit), admin],
         async (offset) => {
             const query = {
                 q: toValue(q),
                 offset,
-                ...(limit ? { limit: String(limit) } : {}),
+                ...pageLimit(limit),
             };
             return unwrap(
                 admin

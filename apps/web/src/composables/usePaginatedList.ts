@@ -7,6 +7,12 @@ interface Page {
     nextOffset: number | null;
 }
 
+/** The `limit` query param, or nothing for the API's default page size. */
+export function pageLimit(limit: MaybeRefOrGetter<number | undefined>) {
+    const value = toValue(limit);
+    return value ? { limit: String(value) } : {};
+}
+
 /** How often live lists and counts check for changes. */
 export const POLL_MS = 30_000;
 

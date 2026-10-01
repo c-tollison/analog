@@ -12,6 +12,7 @@ import { CATALOG_KEY } from './useCatalog';
 import { ITEMS_KEY } from './useItems';
 import {
     type PaginatedListOptions,
+    pageLimit,
     usePaginatedList,
 } from './usePaginatedList';
 import { SERIES_KEY } from './useSeries';
@@ -34,7 +35,7 @@ export function useCollections(limit?: number) {
                 await api.collections.$get({
                     query: {
                         offset,
-                        ...(limit ? { limit: String(limit) } : {}),
+                        ...pageLimit(limit),
                     },
                 })
             )
@@ -62,14 +63,23 @@ export function useUserCollections(
 /** Items across every collection matching `q`; nothing loads while it's empty. */
 export function useCollectionSearch(
     q: MaybeRefOrGetter<string>,
-    options: PaginatedListOptions = {}
+    {
+        limit,
+        ...options
+    }: PaginatedListOptions & {
+        limit?: MaybeRefOrGetter<number | undefined>;
+    } = {}
 ) {
     return usePaginatedList(
-        () => [...COLLECTIONS_KEY, 'search', toValue(q)],
+        () => [...COLLECTIONS_KEY, 'search', toValue(q), toValue(limit)],
         async (offset) =>
             unwrap(
                 await api.collections.search.$get({
-                    query: { q: toValue(q), offset },
+                    query: {
+                        q: toValue(q),
+                        offset,
+                        ...pageLimit(limit),
+                    },
                 })
             ),
         { enabled: () => toValue(q) !== '', ...options }
