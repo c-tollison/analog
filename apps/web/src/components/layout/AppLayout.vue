@@ -1,6 +1,22 @@
 <script setup lang="ts">
+import AddByIsbnDialog from '@/components/search/AddByIsbnDialog.vue';
+import SearchDialog from '@/components/search/SearchDialog.vue';
+import { useSearchStore } from '@/stores/search';
+
 import AppBottomNav from './AppBottomNav.vue';
 import AppTopNav from './AppTopNav.vue';
+import { onKeyStroke } from '@vueuse/core';
+import { storeToRefs } from 'pinia';
+
+const { isOpen: isSearchOpen, isAddOpen } = storeToRefs(useSearchStore());
+
+// Cmd+K or Ctrl+K opens search from anywhere.
+onKeyStroke('k', (event) => {
+    if (event.metaKey || event.ctrlKey) {
+        event.preventDefault();
+        isSearchOpen.value = true;
+    }
+});
 </script>
 
 <template>
@@ -17,5 +33,7 @@ import AppTopNav from './AppTopNav.vue';
             </RouterView>
         </main>
         <AppBottomNav />
+        <SearchDialog />
+        <AddByIsbnDialog v-model:open="isAddOpen" />
     </div>
 </template>

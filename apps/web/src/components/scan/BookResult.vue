@@ -19,7 +19,7 @@ import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useSaveAdminBook } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
-import type { IsbnLookup } from '@/composables/useCatalog';
+import { type IsbnLookup, useSaveBook } from '@/composables/useCatalog';
 import type { CollectionSummary } from '@/composables/useCollections';
 import { useAddBook } from '@/composables/useCollections';
 import { AddBookFormSchema, SeriesPickSchema } from '@/lib/catalog-schemas';
@@ -31,16 +31,18 @@ import { HistoryIcon } from '@lucide/vue';
 import { StorageSerializers, useLocalStorage } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
-// Without a collection, only the book shows until one is picked. `admin`
-// saves the book with no collection, and any series can be picked.
+// Without a collection, only the book shows until one is picked. `saveOnly`
+// saves the book with no collection. `admin` does too, and any series can be
+// picked.
 const props = withDefaults(
     defineProps<{
         lookup: IsbnLookup;
         collection: Pick<CollectionSummary, 'id' | 'name'> | null;
         doneText?: string;
         admin?: boolean;
+        saveOnly?: boolean;
     }>(),
-    { doneText: 'Scan another', admin: false }
+    { doneText: 'Scan another', admin: false, saveOnly: false }
 );
 
 const emit = defineEmits<{
@@ -89,9 +91,12 @@ const lastSeries = computed(() => {
 
 const addBook = useAddBook();
 const saveAdminBook = useSaveAdminBook();
+const saveBook = useSaveBook();
+
+const savesOnly = computed(() => props.admin || props.saveOnly);
 
 const canSubmit = computed(
-    () => props.admin || (!!props.collection && !alreadyInCollection.value)
+    () => savesOnly.value || (!!props.collection && !alreadyInCollection.value)
 );
 
 const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
@@ -119,12 +124,14 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
             };
             const saved = props.admin
                 ? await saveAdminBook.mutateAsync(choice)
-                : collection
-                  ? await addBook.mutateAsync({
-                        ...choice,
-                        collectionId: collection.id,
-                    })
-                  : null;
+                : props.saveOnly
+                  ? await saveBook.mutateAsync(choice)
+                  : collection
+                    ? await addBook.mutateAsync({
+                          ...choice,
+                          collectionId: collection.id,
+                      })
+                    : null;
             if (!saved) {
                 return undefined;
             }
@@ -135,7 +142,7 @@ const { submit, formError, isSubmitting, fieldProps, values, setFieldValue } =
                     title: series.title,
                 };
             }
-            if (props.admin) {
+            if (savesOnly.value) {
                 emit('saved', { itemId: saved.id, seriesId: saved.seriesId });
             } else {
                 added.value = true;
@@ -370,7 +377,7 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
             </template>
             <Button type="submit" :disabled="isSubmitting">
                 <Spinner v-if="isSubmitting" />
-                {{ admin ? 'Save' : `Add to ${collection?.name}` }}
+                {{ savesOnly ? 'Save' : `Add to ${collection?.name}` }}
             </Button>
         </form>
 

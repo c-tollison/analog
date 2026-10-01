@@ -1,12 +1,15 @@
 import type { InferResponseType } from '@analog/api/client';
+import type { AddBookSchema } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { ADMIN_KEY } from './useAdmin';
 import { COLLECTIONS_KEY } from './useCollections';
+import { ITEMS_KEY } from './useItems';
 import { usePaginatedList } from './usePaginatedList';
 import { SERIES_KEY } from './useSeries';
 import { useMutation, useQueryClient } from '@tanstack/vue-query';
 import { type MaybeRefOrGetter, toValue } from 'vue';
+import type { z } from 'zod';
 
 export type IsbnLookup = InferResponseType<
     ApiClient['catalog']['isbn'][':isbn']['$get'],
@@ -74,6 +77,25 @@ export function useIsbnLookup() {
                     await api.catalog.isbn[':isbn'].$get({ param: { isbn } })
                 ),
         });
+}
+
+/**
+ * Saves a looked-up book with its series and volume, without putting it on a
+ * shelf. Returns its id, for opening its page.
+ */
+export function useSaveBook() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (json: z.output<typeof AddBookSchema>) =>
+            unwrap(await api.catalog.books.$post({ json })),
+        onSuccess: () =>
+            Promise.all(
+                [CATALOG_KEY, ITEMS_KEY, SERIES_KEY].map((queryKey) =>
+                    queryClient.invalidateQueries({ queryKey })
+                )
+            ),
+    });
 }
 
 /**

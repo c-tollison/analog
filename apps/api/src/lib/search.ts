@@ -129,7 +129,10 @@ export function searchSeries(
     const terms = withoutNumbers(searchTerms(q ?? ''));
     return paginate(page, (limit, offset) =>
         db()
-            .select(seriesColumns)
+            .select({
+                ...seriesColumns,
+                volumeCount: schema.series.volumeCount,
+            })
             .from(schema.series)
             .where(and(matchesAllTerms(terms, { columns: [title] }), where))
             .orderBy(

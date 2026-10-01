@@ -6,7 +6,6 @@ import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import ProgressMark from '@/components/progress/ProgressMark.vue';
-import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
 import {
@@ -23,7 +22,6 @@ import {
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
-import { useSearchTerm } from '@/composables/useSearchTerm';
 import {
     completedWord,
     FORMAT_LABELS,
@@ -39,9 +37,6 @@ import { computed, ref } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 
 const props = defineProps<{ id: string }>();
-
-const query = ref('');
-const { term, isTyping } = useSearchTerm(query);
 
 const { data: collection, error: loadError } = useCollection(() => props.id);
 usePageTitle(() => collection.value?.name);
@@ -68,9 +63,7 @@ const SORT_LABELS: Record<CollectionSort, string> = {
 };
 const sort = ref(CollectionSort.Name);
 
-const entries = useCollectionEntries(() => props.id, term, sort, {
-    pending: isTyping,
-});
+const entries = useCollectionEntries(() => props.id, sort);
 
 const {
     mutate: removeItem,
@@ -150,9 +143,8 @@ const headerError = computed(
             @confirm="onRemove"
         />
 
-        <div class="flex gap-2">
-            <SearchInput v-model="query" placeholder="Search" />
-            <Select v-model="sort" :disabled="!!query">
+        <div class="flex justify-end">
+            <Select v-model="sort">
                 <SelectTrigger class="w-auto shrink-0" aria-label="Sort by">
                     <SelectValue />
                 </SelectTrigger>
@@ -171,11 +163,7 @@ const headerError = computed(
         <PagedList
             :list="entries"
             :empty-text="
-                query
-                    ? 'No matches.'
-                    : isMember
-                      ? 'Nothing here yet. Scan something in.'
-                      : 'Nothing here yet.'
+                isMember ? 'Nothing here yet. Scan something in.' : 'Nothing here yet.'
             "
         >
             <template #default="{ items }">

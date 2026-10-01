@@ -14,6 +14,7 @@ import { PageQuerySchema } from '@analog/types';
 import type { AppEnv } from '../lib/app-env.js';
 import { itemDetails } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
+import { visibleToVisitors } from '../lib/discovery.js';
 import { userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import {
@@ -23,6 +24,7 @@ import {
 } from '../lib/items.js';
 import { paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
+import { catalogItemsMatching, relevance, searchTerms } from '../lib/search.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -30,7 +32,7 @@ import { z } from 'zod';
 // One catalog item's page, the same for everyone: its details, the person's
 // own status and shelves, its editions and everyone's reviews.
 
-const { catalogItemIsbn, progress, user } = schema;
+const { catalogItem, catalogItemIsbn, progress, series, user } = schema;
 
 const EditionsQuerySchema = PageQuerySchema.extend({
     // Marks the editions this shelf owns and lists them first.
@@ -52,7 +54,70 @@ function editionsMatching(q: string) {
     );
 }
 
+const SearchQuerySchema = PageQuerySchema.extend({
+    q: z.string().trim().min(1).max(200),
+});
+
 const items = new Hono<AppEnv>()
+    // Books anyone can find, plus the person's own unchecked ones. Closest
+    // matches first, then the most saved.
+    .get('/search', schemaValidator('query', SearchQuerySchema), async (c) => {
+        const { q, ...pageQuery } = c.req.valid('query');
+        const me = c.get('user').id;
+        const terms = searchTerms(q);
+        const titles = [catalogItem.title, series.title];
+
+        const page = await paginate(pageQuery, (limit, offset) =>
+            db()
+                .select({
+                    id: catalogItem.id,
+                    format: catalogItem.format,
+                    title: catalogItem.title,
+                    coverUrl: catalogItem.coverUrl,
+                    position: catalogItem.position,
+                    releaseDate: catalogItem.releaseDate,
+                    seriesId: series.id,
+                    seriesTitle: series.title,
+                    volumeCount: series.volumeCount,
+                    author: sql<
+                        string | null
+                    >`${catalogItem.metadata}->'authors'->>0`,
+                    saveCount: catalogItem.saveCount,
+                    ratingAverage: catalogItem.ratingAverage,
+                    ratingCount: catalogItem.ratingCount,
+                    isUnreviewed: sql<boolean>`not coalesce(${visibleToVisitors()}, false)`,
+                    status: progress.status,
+                })
+                .from(catalogItem)
+                .leftJoin(series, eq(series.id, catalogItem.seriesId))
+                .leftJoin(
+                    progress,
+                    and(
+                        eq(progress.catalogItemId, catalogItem.id),
+                        eq(progress.userId, me)
+                    )
+                )
+                .where(
+                    and(
+                        catalogItemsMatching(terms),
+                        or(
+                            visibleToVisitors(),
+                            eq(catalogItem.createdByUserId, me)
+                        )
+                    )
+                )
+                .orderBy(
+                    desc(relevance(terms.join(' '), titles)),
+                    desc(catalogItem.saveCount),
+                    sql`${catalogItem.position} asc nulls last`,
+                    asc(catalogItem.title),
+                    asc(catalogItem.id)
+                )
+                .limit(limit)
+                .offset(offset)
+        );
+        return c.json(page);
+    })
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');
         const me = c.get('user').id;

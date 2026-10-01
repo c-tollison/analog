@@ -125,10 +125,11 @@ Each step is its own branch from `main` and its own PR. Each one passes `pnpm ch
 
 ### 3. Search
 
-- [ ] Search dialog with the Books, Series, People and Shelves tabs.
-- [ ] Book rows with stats and the split button.
-- [ ] "Not here? Add by ISBN" dialog.
-- [ ] Remove the search bars on the shelf list, shelf page and Friends.
+- [x] Search dialog with the Books, Series, People and Shelves tabs.
+- [x] Book rows with stats and the split button.
+- [x] "Not here? Add by ISBN" dialog.
+- [x] Remove the search bars on the shelf list, shelf page and Friends.
+- [x] For now, a search button in the top nav and ⌘K or Ctrl+K open search. Step 4 moves it into the new nav.
 
 ### 4. Nav and Log
 
@@ -171,6 +172,20 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 13. The shelf scan page still scans like before.
 14. Add to shelf explains what to do: pick a shelf, check your editions, or search, type or scan one that's missing.
 15. A shelf's series page says "Back to" and the shelf's name when you came from that shelf.
+
+### Step 3
+
+1. The search button in the top nav, or ⌘K / Ctrl+K anywhere, opens search. On a phone, the magnifying glass in the top bar opens it.
+2. Books finds books by title or series name and a volume number, like "jujutsu 24". Each row shows the "#24 of N in …" badge, author, year, saves and average rating.
+3. The Log button on a row sets a status without leaving search. Its menu opens Add to shelf.
+4. Your own unreviewed books show with an "Unreviewed" badge. Other people's don't show at all.
+5. Clicking a row opens the book page and closes search.
+6. Series shows covers, kinds and volume counts, and opens the shared series page.
+7. People needs 2 letters, shows Friend or Requested badges, and opens the profile.
+8. Shelves finds books on your shelves and shared ones, shows the shelf name, and opens the shelf's series page or the book page.
+9. Each tab scrolls endlessly.
+10. "Not here? Add by ISBN" closes search and opens the scan or type dialog. A book already in the app opens its page straight away. A new one asks for series and volume, then saves and opens its page as unreviewed.
+11. The shelf list, the shelf page and Friends have no search bar. The shelf page still sorts.
 
 ## Not now
 

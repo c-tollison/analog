@@ -90,17 +90,11 @@ export function useCollection(id: MaybeRefOrGetter<string>) {
 /** A collection's series and one-shots, optionally filtered by `q`. */
 export function useCollectionEntries(
     id: MaybeRefOrGetter<string>,
-    q: MaybeRefOrGetter<string>,
     sort: MaybeRefOrGetter<CollectionSort>,
     options: PaginatedListOptions = {}
 ) {
     return usePaginatedList(
-        () => [
-            ...collectionKey(toValue(id)),
-            'entries',
-            toValue(q),
-            toValue(sort),
-        ],
+        () => [...collectionKey(toValue(id)), 'entries', toValue(sort)],
         async (offset) =>
             unwrap(
                 await api.collections[':id'].entries.$get({
@@ -108,7 +102,6 @@ export function useCollectionEntries(
                     query: {
                         offset,
                         sort: toValue(sort),
-                        ...(toValue(q) ? { q: toValue(q) } : {}),
                     },
                 })
             ),

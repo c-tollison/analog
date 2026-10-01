@@ -1,5 +1,6 @@
 import { and, eq, schema, sql } from '@analog/db';
 import {
+    AddBookSchema,
     CheckTrigger,
     IsbnSchema,
     ProgressStatus,
@@ -17,6 +18,7 @@ import {
     toBookLookup,
 } from '../lib/books.js';
 import { checkInBackground } from '../lib/check-runs.js';
+import { upsertBook } from '../lib/editions.js';
 import { db } from '../lib/init.js';
 import { IdParamSchema } from '../lib/params.js';
 import { isCompleted, refreshItemStats } from '../lib/progress.js';
@@ -171,6 +173,10 @@ const catalog = new Hono<AppEnv>()
                 : await findSimilarSeries(book.title, user.id);
             return c.json({
                 book,
+                itemId: item.id,
+                // A checked book, or one already in a series, has nothing
+                // left to pick.
+                isPlaced: !!item.verifiedAt || !!item.seriesId,
                 suggestedSeries: suggested
                     ? { id: suggested.id, title: suggested.title }
                     : null,
@@ -182,6 +188,16 @@ const catalog = new Hono<AppEnv>()
             });
         }
     )
+    // Saves a looked-up book with the series and volume picked, without
+    // putting it on a shelf.
+    .post('/books', schemaValidator('json', AddBookSchema), async (c) => {
+        const { isbn, series, volume } = c.req.valid('json');
+        const item = await upsertBook(isbn, series, volume, {
+            userId: c.get('user').id,
+            admin: false,
+        });
+        return c.json({ id: item.id, seriesId: item.seriesId }, 201);
+    })
     // A cover an admin uploaded. Its URL changes with each upload.
     .get(
         '/covers/:isbn',

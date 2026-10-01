@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Relationship, USER_SEARCH_MIN_LENGTH } from '@analog/types';
 import AcceptDeclineButtons from '@/components/AcceptDeclineButtons.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
-import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { ItemGroup } from '@/components/shadcn-components/item';
 import {
@@ -20,8 +18,6 @@ import {
     useFriends,
 } from '@/composables/useFriends';
 import { useNotificationCount } from '@/composables/useNotifications';
-import { useSearchTerm } from '@/composables/useSearchTerm';
-import { useUserSearch } from '@/composables/useUsers';
 import { staggerIn } from '@/lib/motion';
 
 import { computed, ref } from 'vue';
@@ -34,12 +30,6 @@ function isTab(value: unknown): value is Tab {
     return TABS.some((tab) => tab === value);
 }
 
-const RELATIONSHIP_LABELS: Partial<Record<Relationship, string>> = {
-    [Relationship.Friends]: 'Friend',
-    [Relationship.RequestSent]: 'Requested',
-    [Relationship.RequestReceived]: 'Wants to be friends',
-};
-
 const route = useRoute();
 const router = useRouter();
 
@@ -49,17 +39,6 @@ const tab = computed({
         router.replace({ query: { ...route.query, tab: value } });
     },
 });
-
-const query = ref('');
-const { trimmed, term, isTyping } = useSearchTerm(query);
-
-// Short queries keep showing friends; longer ones search everyone.
-const isSearching = computed(
-    () => trimmed.value.length >= USER_SEARCH_MIN_LENGTH
-);
-const searchTerm = computed(() =>
-    term.value.length >= USER_SEARCH_MIN_LENGTH ? term.value : ''
-);
 
 const friends = useFriends('');
 const requests = useFriendRequests();
@@ -90,49 +69,13 @@ function pendingFor(userId: string) {
         ? answering.value.action
         : undefined;
 }
-
-const results = useUserSearch(searchTerm, {
-    enabled: () => searchTerm.value !== '',
-    pending: isTyping,
-});
 </script>
 
 <template>
     <div class="flex flex-col gap-4">
         <h1 class="text-lg font-semibold">Friends</h1>
 
-        <SearchInput
-            v-model="query"
-            placeholder="Find people by name or username"
-        />
-
-        <PagedList
-            v-if="isSearching"
-            :list="results"
-            empty-text="No one matches."
-        >
-            <template #default="{ items }">
-                <ItemGroup class="gap-2">
-                    <UserItem
-                        v-for="(person, index) in items"
-                        v-bind="staggerIn(index)"
-                        :key="person.id"
-                        :user="person"
-                    >
-                        <template
-                            v-if="RELATIONSHIP_LABELS[person.relationship]"
-                            #actions
-                        >
-                            <Badge variant="secondary">
-                                {{ RELATIONSHIP_LABELS[person.relationship] }}
-                            </Badge>
-                        </template>
-                    </UserItem>
-                </ItemGroup>
-            </template>
-        </PagedList>
-
-        <Tabs v-else v-model="tab">
+        <Tabs v-model="tab">
             <TabsList>
                 <TabsTrigger value="friends">Friends</TabsTrigger>
                 <TabsTrigger value="requests">

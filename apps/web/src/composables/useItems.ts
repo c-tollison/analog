@@ -31,6 +31,28 @@ export type ItemEdition = InferResponseType<
     200
 >['items'][number];
 
+export type BookSearchResult = InferResponseType<
+    ApiClient['items']['search']['$get'],
+    200
+>['items'][number];
+
+/** Books matching `q`, closest first; nothing loads while it's empty. */
+export function useBookSearch(
+    q: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [...ITEMS_KEY, 'search', toValue(q)],
+        async (offset) =>
+            unwrap(
+                await api.items.search.$get({
+                    query: { q: toValue(q), offset },
+                })
+            ),
+        { enabled: () => toValue(q) !== '', ...options }
+    );
+}
+
 /** An item's page: its details, your status and the shelves that hold it. */
 export function useItem(id: MaybeRefOrGetter<string>) {
     return useQuery({

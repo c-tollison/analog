@@ -79,7 +79,6 @@ const SeriesParamSchema = CollectionParamSchema.extend({
     seriesId: z.uuid('Invalid id'),
 });
 const EntriesQuerySchema = PageQuerySchema.extend({
-    q: z.string().trim().max(200).optional(),
     sort: z.enum(CollectionSort).default(CollectionSort.Name),
 });
 const SearchQuerySchema = PageQuerySchema.extend({
@@ -237,53 +236,12 @@ const collections = new Hono<AppEnv>()
         schemaValidator('query', EntriesQuerySchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { q, sort, ...pageQuery } = c.req.valid('query');
+            const { sort, ...pageQuery } = c.req.valid('query');
             const { role, progressUserId } = await requireViewer(
                 id,
                 c.get('user').id
             );
             const visible = role ? undefined : visibleToVisitors();
-
-            const terms = searchTerms(q ?? '');
-            if (terms.length) {
-                const titles = [catalogItem.title, series.title];
-                const page = await paginate(pageQuery, (limit, offset) =>
-                    db()
-                        .select({
-                            ...itemColumns,
-                            series: sql<null>`null`,
-                            completedCount: sql<number>`0`,
-                            status: progress.status,
-                            rating: myRating,
-                        })
-                        .from(collectionItem)
-                        .innerJoin(
-                            catalogItem,
-                            eq(collectionItem.catalogItemId, catalogItem.id)
-                        )
-                        .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                        .leftJoin(progress, progressOf(progressUserId))
-                        .where(
-                            and(
-                                eq(collectionItem.collectionId, id),
-                                visible,
-                                matchesAllTerms(terms, {
-                                    columns: titles,
-                                    position: catalogItem.position,
-                                })
-                            )
-                        )
-                        .orderBy(
-                            desc(relevance(terms.join(' '), titles)),
-                            sql`${catalogItem.position} asc nulls last`,
-                            asc(catalogItem.title),
-                            asc(collectionItem.id)
-                        )
-                        .limit(limit)
-                        .offset(offset)
-                );
-                return c.json(page);
-            }
 
             const groupKey = sql<string>`coalesce(${catalogItem.seriesId}, ${catalogItem.id})`;
             const itemTitle = sql<string>`min(${catalogItem.title})`;
