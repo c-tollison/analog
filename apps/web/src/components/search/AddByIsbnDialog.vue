@@ -87,7 +87,7 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Add by ISBN</DialogTitle>
                 <DialogDescription>
-                    Scan the barcode or type the ISBN. New books wait for an
+                    Scan the barcode or type the ISBN. New items wait for an
                     admin to check them.
                 </DialogDescription>
             </DialogHeader>

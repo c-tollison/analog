@@ -14,11 +14,14 @@ import { db } from './init.js';
 import { isCompleted } from './progress.js';
 import { HTTPException } from 'hono/http-exception';
 
-/** A person's shelves that hold an item, with the editions each one owns. */
-export async function shelvesHolding(catalogItemId: string, userId: string) {
+/**
+ * A person's shelves that hold an item: one row per shelf and edition it
+ * owns, by shelf name.
+ */
+export function shelvesHolding(catalogItemId: string, userId: string) {
     const { collection, collectionItem, collectionItemIsbn, collectionMember } =
         schema;
-    const rows = await db()
+    return db()
         .select({
             id: collection.id,
             name: collection.name,
@@ -43,25 +46,14 @@ export async function shelvesHolding(catalogItemId: string, userId: string) {
             asc(collection.id),
             asc(collectionItemIsbn.createdAt)
         );
-
-    const shelves: { id: string; name: string; isbns: string[] }[] = [];
-    for (const row of rows) {
-        const shelf = shelves.find((found) => found.id === row.id);
-        if (shelf) {
-            shelf.isbns.push(row.isbn);
-        } else {
-            shelves.push({ id: row.id, name: row.name, isbns: [row.isbn] });
-        }
-    }
-    return shelves;
 }
 
 /**
- * An item and the person's shelves that hold it, or a 404. People see
- * verified items in verified series, items they added, and items on their
- * shelves.
+ * An item and the person's shelves that hold it, or a 404. Anyone with the
+ * link can open an item's page, like after scanning its ISBN. Search and
+ * other people's shelves are where unchecked items stay hidden.
  */
-export async function requireVisibleItem(id: string, userId: string) {
+export async function requireItem(id: string, userId: string) {
     const { catalogItem } = schema;
     const [item, shelves] = await Promise.all([
         db().query.catalogItem.findFirst({
@@ -70,12 +62,7 @@ export async function requireVisibleItem(id: string, userId: string) {
         }),
         shelvesHolding(id, userId),
     ]);
-    const isVerified =
-        !!item?.verifiedAt && (!item.series || !!item.series.verifiedAt);
-    if (
-        !item ||
-        !(isVerified || item.createdByUserId === userId || shelves.length)
-    ) {
+    if (!item) {
         throw new HTTPException(404, { message: 'Item not found' });
     }
     return { item, shelves };

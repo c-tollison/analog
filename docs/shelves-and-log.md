@@ -39,7 +39,7 @@ Only the UI and web URLs say "shelf". The database, API and composables keep "co
 ### Search
 
 - Clicking the bar opens a `Dialog` near the top. It's full screen on mobile, and Esc closes it.
-- Tabs: **Books**, **Series**, **People** and **Shelves**. Each tab scrolls endlessly.
+- Tabs: **Media**, **Series**, **People** and **Shelves**. Each tab scrolls endlessly.
 - **Book rows:** cover, a "#1 of 30 in Jujutsu Kaisen" badge, title, first author, release year, saves, average rating and the split button. The badge drops "of 30" when the series has no volume count.
 - **The Shelves tab** searches books on every shelf you're a member of and shows which shelf each one is on. A series opens that shelf's series page. A book opens the shared book page.
 - Your own unreviewed books show up with an "Unreviewed" badge. Other people's don't.
@@ -138,7 +138,7 @@ Each step is its own branch from `main` and its own PR. Each one passes `pnpm ch
 
 ### 3. Search
 
-- [x] Search dialog with the Books, Series, People and Shelves tabs.
+- [x] Search dialog with the Media, Series, People and Shelves tabs.
 - [x] Book rows with stats and the split button.
 - [x] "Not here? Add by ISBN" dialog.
 - [x] Remove the search bars on the shelf list, shelf page and Friends.
@@ -192,7 +192,7 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 ### Step 3
 
 1. The search button in the top nav, or ⌘K / Ctrl+K anywhere, opens search. On a phone, the magnifying glass in the top bar opens it.
-2. Books finds books by title or series name and a volume number, like "jujutsu 24". Each row shows the "#24 of N in …" badge, author, year, saves and average rating.
+2. The Media tab finds items by title or series name and a volume number, like "jujutsu 24". Each row shows the "#24 of N in …" badge, author, year, saves and average rating.
 3. The Log button on a row sets a status without leaving search. Its menu opens Add to shelf.
 4. Your own unreviewed books show with an "Unreviewed" badge. Other people's don't show at all.
 5. Clicking a row opens the book page and closes search.
@@ -247,6 +247,17 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
 1. Signing in, opening `/`, or clicking "Analog" lands on the Log.
 2. Rows in search, the book page's shelves, editions and reviews, and the Add to shelf editions list fade in one after another, like other lists.
 3. On the series page, the toggle row fades in with the header after loading.
+
+### Review fixes
+
+1. **Add by ISBN for an unreviewed book:** someone else added it and placed it in a series, and an admin hasn't reviewed it. Looking it up opens its page instead of "Item not found". Its series page opens too.
+2. **Removing from a shelf:** take a book off a shelf from the shelf grid, then open its book page and series page. Neither still shows it as on that shelf or Owned.
+3. **Scanning onto a shelf:** scan a book onto a shelf. Add to shelf shows that edition checked right away.
+4. **Scanning the same edition twice:** it still says "Already on this shelf".
+5. **Big pages stay fast:** a series page with many volumes, or a long search list, loads without delay. Add to shelf and the review sheet still open from every Log button.
+6. **Time zone:** finishing something late at night lands in your local month and year in the Log stats.
+7. **Visitor counts:** a visitor's count on a public shelf leaves out editions an admin hasn't reviewed.
+8. **Search wording:** the first tab says Media, with "Nothing matches." when empty. The Add by ISBN text says "New items wait for an admin to check them."
 
 ## Not now
 

@@ -28,9 +28,25 @@ const { catalogItem, progress, readingGoal, series } = schema;
 const LogQuerySchema = PageQuerySchema.extend({
     status: z.enum([ProgressStatus.Planned, ProgressStatus.InProgress]),
 });
-// The viewer's own year, since a new year starts at a different moment
-// for each of them.
-const StatsQuerySchema = z.object({ year: GoalYearSchema });
+function isTimeZone(zone: string) {
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: zone });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// The viewer's own year and time zone, since a year and its months start at
+// a different moment for each of them.
+const StatsQuerySchema = z.object({
+    year: GoalYearSchema,
+    tz: z
+        .string()
+        .max(64)
+        .refine(isTimeZone, 'Unknown time zone')
+        .default('UTC'),
+});
 
 function statusCount(status: ProgressStatus) {
     return sql<number>`(count(*) filter (where ${progress.status} = ${status}))::int`;
@@ -136,7 +152,7 @@ const userLog = new Hono<AppEnv>()
         schemaValidator('query', StatsQuerySchema),
         async (c) => {
             const { username } = c.req.valid('param');
-            const { year } = c.req.valid('query');
+            const { year, tz } = c.req.valid('query');
             const { id, isMe } = await requireVisibleProfile(
                 username,
                 c.get('user').id
@@ -145,8 +161,9 @@ const userLog = new Hono<AppEnv>()
                 eq(progress.userId, id),
                 isMe ? undefined : visibleToVisitors()
             );
-            const finishedThisYear = sql`${isCompleted} and extract(year from ${progress.completedAt}) = ${year}`;
-            const month = sql<number>`extract(month from ${progress.completedAt})::int`;
+            const finishedAt = sql`(${progress.completedAt} at time zone ${tz})`;
+            const finishedThisYear = sql`${isCompleted} and extract(year from ${finishedAt}) = ${year}`;
+            const month = sql<number>`extract(month from ${finishedAt})::int`;
 
             const [[counts], months, [goal]] = await Promise.all([
                 db()
@@ -175,7 +192,9 @@ const userLog = new Hono<AppEnv>()
                     )
                     .leftJoin(series, eq(series.id, catalogItem.seriesId))
                     .where(and(theirs, finishedThisYear))
-                    .groupBy(month),
+                    // By position: the time zone is sent once per use, so
+                    // Postgres can't match the two month expressions.
+                    .groupBy(sql`1`),
                 db()
                     .select({ target: readingGoal.target })
                     .from(readingGoal)

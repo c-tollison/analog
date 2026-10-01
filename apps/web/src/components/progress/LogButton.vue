@@ -26,7 +26,7 @@ import {
     LibraryBigIcon,
     XIcon,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { z } from 'zod';
 
 const props = defineProps<{
@@ -40,6 +40,10 @@ const props = defineProps<{
 
 const isMenuOpen = ref(false);
 const isAddOpen = ref(false);
+const hasOpenedAdd = ref(false);
+watch(isAddOpen, (isOpen) => {
+    if (isOpen) hasOpenedAdd.value = true;
+});
 
 const { mutate, isPending, variables, error } = useSetProgressStatus();
 
@@ -49,6 +53,10 @@ const shown = computed(() =>
 );
 
 const isReviewOpen = ref(false);
+const hasOpenedReview = ref(false);
+watch(isReviewOpen, (isOpen) => {
+    if (isOpen) hasOpenedReview.value = true;
+});
 const saved = ref<{ rating: number | null; review: string | null }>({
     rating: null,
     review: null,
@@ -144,7 +152,10 @@ function onMain() {
         </DropdownMenuContent>
     </DropdownMenu>
 
+    <!-- Each dialog is built the first time it opens, since a page can have
+         many Log buttons and most are never used. -->
     <ReviewSheet
+        v-if="hasOpenedReview"
         v-model:open="isReviewOpen"
         :catalog-item-id="catalogItemId"
         :title="title"
@@ -153,6 +164,7 @@ function onMain() {
     />
 
     <AddToShelfDialog
+        v-if="hasOpenedAdd"
         v-model:open="isAddOpen"
         :catalog-item-id="catalogItemId"
         :title="title"

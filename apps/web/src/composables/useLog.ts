@@ -67,7 +67,11 @@ export function useLogStats(
             unwrap(
                 await api.users[':username'].log.stats.$get({
                     param: { username: toValue(username) },
-                    query: { year: String(toValue(year)) },
+                    // Months and years follow the viewer's clock.
+                    query: {
+                        year: String(toValue(year)),
+                        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    },
                 })
             ),
     });

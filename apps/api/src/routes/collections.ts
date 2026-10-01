@@ -30,6 +30,7 @@ import {
     collectionSummaries,
     completedCount,
     myMember,
+    ownEdition,
     requireMember,
     requireViewer,
 } from '../lib/collections.js';
@@ -54,7 +55,6 @@ const {
     collectionItem,
     collectionInvite,
     catalogItem,
-    collectionItemIsbn,
     friendship,
     progress,
     series,
@@ -401,36 +401,19 @@ const collections = new Hono<AppEnv>()
 
             // A collection holds each volume once. Another edition of one it
             // already has joins that entry.
-            await db()
-                .insert(collectionItem)
-                .values({
-                    collectionId: id,
-                    catalogItemId: item.id,
-                    addedByUserId: user.id,
-                })
-                .onConflictDoNothing();
-            const entry = await db().query.collectionItem.findFirst({
-                columns: { id: true },
-                where: and(
-                    eq(collectionItem.collectionId, id),
-                    eq(collectionItem.catalogItemId, item.id)
-                ),
-            });
-            if (!entry) {
-                throw new Error(`Collection entry for ${item.id} missing`);
-            }
-            const [owned] = await db()
-                .insert(collectionItemIsbn)
-                .values({ collectionItemId: entry.id, isbn })
-                .onConflictDoNothing()
-                .returning({ isbn: collectionItemIsbn.isbn });
-            if (!owned) {
+            const { entryId, isNew } = await ownEdition(
+                id,
+                item.id,
+                isbn,
+                user.id
+            );
+            if (!isNew) {
                 throw new HTTPException(409, {
                     message: 'Already on this shelf',
                 });
             }
 
-            return c.json({ id: entry.id, seriesId: item.seriesId }, 201);
+            return c.json({ id: entryId, seriesId: item.seriesId }, 201);
         }
     )
     .route('/:id/items', collectionItems)

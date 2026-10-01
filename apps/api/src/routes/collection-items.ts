@@ -2,10 +2,10 @@ import { and, eq, notExists, schema } from '@analog/db';
 import { IsbnSchema, OwnEditionSchema } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { requireMember } from '../lib/collections.js';
+import { ownEdition, requireMember } from '../lib/collections.js';
 import { addEdition } from '../lib/editions.js';
 import { db } from '../lib/init.js';
-import { requireVisibleItem } from '../lib/items.js';
+import { requireItem } from '../lib/items.js';
 import { IdParamSchema } from '../lib/params.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
@@ -59,41 +59,14 @@ export const collectionEditions = new Hono<AppEnv>()
             const { catalogItemId } = c.req.valid('json');
             const me = c.get('user').id;
             await requireMember(id, me);
-            await requireVisibleItem(catalogItemId, me);
+            await requireItem(catalogItemId, me);
 
             if (!(await addEdition(catalogItemId, isbn, me))) {
                 throw new HTTPException(409, {
                     message: 'That ISBN is already on another book',
                 });
             }
-            await db().transaction(async (tx) => {
-                await tx
-                    .insert(collectionItem)
-                    .values({
-                        collectionId: id,
-                        catalogItemId,
-                        addedByUserId: me,
-                    })
-                    .onConflictDoNothing();
-                const [entry] = await tx
-                    .select({ id: collectionItem.id })
-                    .from(collectionItem)
-                    .where(
-                        and(
-                            eq(collectionItem.collectionId, id),
-                            eq(collectionItem.catalogItemId, catalogItemId)
-                        )
-                    );
-                if (!entry) {
-                    throw new Error(
-                        `Collection entry for ${catalogItemId} missing`
-                    );
-                }
-                await tx
-                    .insert(collectionItemIsbn)
-                    .values({ collectionItemId: entry.id, isbn })
-                    .onConflictDoNothing();
-            });
+            await ownEdition(id, catalogItemId, isbn, me);
             return c.body(null, 204);
         }
     )

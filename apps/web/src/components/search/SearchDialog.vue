@@ -123,7 +123,7 @@ watch(
             <DialogHeader class="sr-only">
                 <DialogTitle>Search</DialogTitle>
                 <DialogDescription>
-                    Search books, series, people and your shelves.
+                    Search media, series, people and your shelves.
                 </DialogDescription>
             </DialogHeader>
 
@@ -145,7 +145,7 @@ watch(
                 @update:model-value="(value) => isTab(value) && (tab = value)"
             >
                 <TabsList>
-                    <TabsTrigger value="books">Books</TabsTrigger>
+                    <TabsTrigger value="books">Media</TabsTrigger>
                     <TabsTrigger value="series">Series</TabsTrigger>
                     <TabsTrigger value="people">People</TabsTrigger>
                     <TabsTrigger value="shelves">Shelves</TabsTrigger>
@@ -153,7 +153,7 @@ watch(
 
                 <div v-if="term" class="min-h-0 flex-1 overflow-y-auto">
                     <TabsContent value="books">
-                        <PagedList :list="books" empty-text="No books match.">
+                        <PagedList :list="books" empty-text="Nothing matches.">
                             <template #default="{ items }">
                                 <ItemGroup class="grid gap-2">
                                     <BookSearchItem

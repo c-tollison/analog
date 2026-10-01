@@ -137,12 +137,9 @@ const series = new Hono<AppEnv>()
                 .leftJoin(progress, myProgress(me))
                 .where(visibleVolumes(id, me)),
         ]);
-        const canSee =
-            !!found &&
-            (!!found.verifiedAt ||
-                found.createdByUserId === me ||
-                !!counted?.ownedCount);
-        if (!found || !canSee) {
+        // Anyone with the link can open it. Search is where unchecked series
+        // stay hidden.
+        if (!found) {
             throw new HTTPException(404, { message: 'Series not found' });
         }
 

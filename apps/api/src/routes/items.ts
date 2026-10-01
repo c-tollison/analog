@@ -17,11 +17,7 @@ import { requireMember } from '../lib/collections.js';
 import { visibleToVisitors } from '../lib/discovery.js';
 import { userColumns } from '../lib/friends.js';
 import { db } from '../lib/init.js';
-import {
-    othersReviewed,
-    requireVisibleItem,
-    visibleEditions,
-} from '../lib/items.js';
+import { othersReviewed, requireItem, visibleEditions } from '../lib/items.js';
 import { paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { catalogItemsMatching, relevance, searchTerms } from '../lib/search.js';
@@ -121,8 +117,8 @@ const items = new Hono<AppEnv>()
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');
         const me = c.get('user').id;
-        const { item, shelves } = await requireVisibleItem(id, me);
-        const owned = shelves.flatMap((shelf) => shelf.isbns);
+        const { item, shelves } = await requireItem(id, me);
+        const owned = shelves.map((shelf) => shelf.isbn);
 
         const [main, [mine], [reviews], [editions]] = await Promise.all([
             db().query.catalogItemIsbn.findFirst({
@@ -186,12 +182,13 @@ const items = new Hono<AppEnv>()
             const { id } = c.req.valid('param');
             const { collectionId, q, ...pageQuery } = c.req.valid('query');
             const me = c.get('user').id;
-            const { shelves } = await requireVisibleItem(id, me);
+            const { shelves } = await requireItem(id, me);
             if (collectionId) {
                 await requireMember(collectionId, me);
             }
-            const ownedHere =
-                shelves.find((shelf) => shelf.id === collectionId)?.isbns ?? [];
+            const ownedHere = shelves
+                .filter((shelf) => shelf.id === collectionId)
+                .map((shelf) => shelf.isbn);
             const owned = sql<boolean>`${
                 ownedHere.length
                     ? inArray(catalogItemIsbn.isbn, ownedHere)
@@ -215,9 +212,7 @@ const items = new Hono<AppEnv>()
                     .where(
                         and(
                             eq(catalogItemIsbn.catalogItemId, id),
-                            visibleEditions(
-                                shelves.flatMap((shelf) => shelf.isbns)
-                            ),
+                            visibleEditions(shelves.map((shelf) => shelf.isbn)),
                             q ? editionsMatching(q) : undefined
                         )
                     )
@@ -240,7 +235,7 @@ const items = new Hono<AppEnv>()
         async (c) => {
             const { id } = c.req.valid('param');
             const me = c.get('user').id;
-            await requireVisibleItem(id, me);
+            await requireItem(id, me);
 
             const page = await paginate(c.req.valid('query'), (limit, offset) =>
                 db()

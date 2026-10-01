@@ -2,8 +2,8 @@ import { and, eq, isNotNull, isNull, or, schema } from '@analog/db';
 
 // What people can find in search and pick from lists. Until an admin
 // verifies an item or series, only the person who added it can find it.
-// Anyone can still reach an item by scanning its ISBN, and collections that
-// have it show it as usual.
+// Anyone can still open its page by link or by scanning its ISBN, and
+// collections that have it show it as usual.
 
 export function discoverableItem(userId: string) {
     const { catalogItem } = schema;

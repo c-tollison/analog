@@ -9,6 +9,7 @@ import type {
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { CATALOG_KEY } from './useCatalog';
+import { ITEMS_KEY } from './useItems';
 import {
     type PaginatedListOptions,
     usePaginatedList,
@@ -339,14 +340,20 @@ export function useRemoveCollectionItem() {
                     param: { id: input.collectionId, itemId: input.itemId },
                 })
             ),
+        // Book and series pages show what your shelves own, so they change
+        // too.
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: COLLECTIONS_KEY }),
+            Promise.all(
+                [COLLECTIONS_KEY, ITEMS_KEY, SERIES_KEY].map((queryKey) =>
+                    queryClient.invalidateQueries({ queryKey })
+                )
+            ),
     });
 }
 
 /**
  * Add a scanned book. A new series or catalog item shows up in lookups,
- * series searches and collection lists, so all three refresh.
+ * series searches, collection lists and book pages, so they all refresh.
  */
 export function useAddBook() {
     const queryClient = useQueryClient();
@@ -364,8 +371,8 @@ export function useAddBook() {
             ),
         onSuccess: () =>
             Promise.all(
-                [COLLECTIONS_KEY, CATALOG_KEY, SERIES_KEY].map((queryKey) =>
-                    queryClient.invalidateQueries({ queryKey })
+                [COLLECTIONS_KEY, CATALOG_KEY, ITEMS_KEY, SERIES_KEY].map(
+                    (queryKey) => queryClient.invalidateQueries({ queryKey })
                 )
             ),
     });

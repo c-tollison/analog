@@ -14,14 +14,28 @@ export function whenCompleted<T>(column: Column) {
 
 /**
  * Recounts an item's saves and ratings from everyone's progress. Run it after
- * anything changes an item's progress, so the counts can't drift.
+ * anything changes an item's progress. It locks the item's row first, so two
+ * recounts at once run one after the other, and the last one sees every
+ * change.
  */
 export async function refreshItemStats(
     catalogItemId: string,
-    executor: Pick<Transaction, 'select' | 'update'> = db()
+    tx?: Transaction
 ): Promise<void> {
+    if (!tx) {
+        await db().transaction((own) => refreshItemStats(catalogItemId, own));
+        return;
+    }
     const { catalogItem, progress } = schema;
-    const [stats] = await executor
+    const [locked] = await tx
+        .select({ id: catalogItem.id })
+        .from(catalogItem)
+        .where(eq(catalogItem.id, catalogItemId))
+        .for('update');
+    if (!locked) {
+        return;
+    }
+    const [stats] = await tx
         .select({
             saveCount: sql<number>`count(${progress.status})::int`,
             ratingCount: sql<number>`count(${whenCompleted(progress.rating)})::int`,
@@ -34,7 +48,7 @@ export async function refreshItemStats(
     if (!stats) {
         return;
     }
-    await executor
+    await tx
         .update(catalogItem)
         .set(stats)
         .where(eq(catalogItem.id, catalogItemId));

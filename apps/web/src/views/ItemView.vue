@@ -100,9 +100,24 @@ const averageStars = computed(() =>
 
 function shelvesOwning(isbn: string): string[] {
     return (item.value?.shelves ?? [])
-        .filter((shelf) => shelf.isbns.includes(isbn))
-        .map((shelf) => shelf.name);
+        .filter((row) => row.isbn === isbn)
+        .map((row) => row.name);
 }
+
+// The API sends one row per shelf and edition; the page lists each shelf
+// once with how many editions it owns.
+const shelves = computed(() => {
+    const grouped = new Map<
+        string,
+        { id: string; name: string; count: number }
+    >();
+    for (const row of item.value?.shelves ?? []) {
+        const shelf = grouped.get(row.id);
+        if (shelf) shelf.count++;
+        else grouped.set(row.id, { id: row.id, name: row.name, count: 1 });
+    }
+    return [...grouped.values()];
+});
 
 const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
     item.value?.seriesId
@@ -244,12 +259,9 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                     Add to shelf
                                 </Button>
                             </div>
-                            <ItemGroup
-                                v-if="item.shelves.length"
-                                class="grid gap-2"
-                            >
+                            <ItemGroup v-if="shelves.length" class="grid gap-2">
                                 <Item
-                                    v-for="(shelf, index) in item.shelves"
+                                    v-for="(shelf, index) in shelves"
                                     v-bind="staggerIn(index)"
                                     :key="shelf.id"
                                     variant="outline"
@@ -270,9 +282,9 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                                 >{{ shelf.name }}</ItemTitle
                                             >
                                             <ItemDescription>
-                                                {{ shelf.isbns.length }}
+                                                {{ shelf.count }}
                                                 {{
-                                                    shelf.isbns.length === 1
+                                                    shelf.count === 1
                                                         ? 'edition'
                                                         : 'editions'
                                                 }}

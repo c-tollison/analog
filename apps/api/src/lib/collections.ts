@@ -24,6 +24,7 @@ type Role = (typeof schema.collectionMember.$inferSelect)['role'];
 
 const {
     catalogItem,
+    catalogItemIsbn,
     collection,
     collectionItem,
     collectionItemIsbn,
@@ -138,9 +139,15 @@ function itemStats() {
     return db()
         .select({
             itemCount: sql<number>`count(*)::int`.as('item_count'),
+            // Visitors don't count editions an admin hasn't checked, since
+            // they can't see them. Each lookup uses the owned editions'
+            // primary key.
             editionCount: sql<number>`coalesce(sum((
                 select count(*) from ${collectionItemIsbn}
+                join ${catalogItemIsbn}
+                    on ${catalogItemIsbn.isbn} = ${collectionItemIsbn.isbn}
                 where ${collectionItemIsbn.collectionItemId} = ${collectionItem.id}
+                    and (${myMember.userId} is not null or not ${catalogItemIsbn.pending})
             )), 0)::int`.as('edition_count'),
             completedCount: completedCount.as('completed_count'),
             inProgressCount: statusCount(ProgressStatus.InProgress).as(
@@ -220,4 +227,41 @@ export function collectionSummaries(userId: string, where: SQL | undefined) {
         .where(where)
         .orderBy(sql`lower(${collection.name})`, asc(collection.id))
         .$dynamic();
+}
+
+/**
+ * Puts an edition of an item on a collection as one change: the item's
+ * entry, made if the collection doesn't have it yet, and the edition on that
+ * entry. `isNew` is false when the entry already owned the edition.
+ */
+export function ownEdition(
+    collectionId: string,
+    catalogItemId: string,
+    isbn: string,
+    userId: string
+) {
+    return db().transaction(async (tx) => {
+        // The upsert locks the entry, so removing its last edition at the
+        // same time waits instead of leaving it empty.
+        const [entry] = await tx
+            .insert(collectionItem)
+            .values({ collectionId, catalogItemId, addedByUserId: userId })
+            .onConflictDoUpdate({
+                target: [
+                    collectionItem.collectionId,
+                    collectionItem.catalogItemId,
+                ],
+                set: { updatedAt: new Date() },
+            })
+            .returning({ id: collectionItem.id });
+        if (!entry) {
+            throw new Error(`Collection entry for ${catalogItemId} missing`);
+        }
+        const [added] = await tx
+            .insert(collectionItemIsbn)
+            .values({ collectionItemId: entry.id, isbn })
+            .onConflictDoNothing()
+            .returning({ isbn: collectionItemIsbn.isbn });
+        return { entryId: entry.id, isNew: !!added };
+    });
 }
