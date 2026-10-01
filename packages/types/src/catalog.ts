@@ -60,6 +60,20 @@ export const SetVolumeCountSchema = z.object({
     volumeCount: VolumeCountSchema,
 });
 
+export const MAX_READING_GOAL = 10_000;
+
+/** A yearly goal: how many items to finish. */
+export const ReadingGoalSchema = z.object({
+    target: z
+        .number()
+        .int('Enter a whole number')
+        .positive('Enter a number above 0')
+        .max(MAX_READING_GOAL),
+});
+
+/** A year for goals and stats, as a route param or query. */
+export const GoalYearSchema = z.coerce.number().int().min(2000).max(2100);
+
 /** Sources a series can pull its synopsis, genres and run from. */
 export const DETAILS_SOURCES = [ExternalSource.AniList] as const;
 

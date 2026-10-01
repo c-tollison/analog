@@ -14,5 +14,6 @@ export * from './friend-request.js';
 export * from './friendship.js';
 export * from './primitives.js';
 export * from './progress.js';
+export * from './reading-goal.js';
 export * from './series.js';
 export * from './user-avatar.js';

@@ -140,6 +140,7 @@ Each step is its own branch from `main` and its own PR. Each one passes `pnpm ch
 - [x] `/shelves/:id/scan` route, and delete `/lookup`.
 - [x] `/` goes to Shelves.
 - [x] Search is full screen on phones.
+- [x] Stats and a yearly goal at the top of the Log.
 
 ## Testing
 
@@ -204,6 +205,16 @@ Carson tests everything in the UI once all four steps land. Each step adds its c
     - On a friend's or a public profile, the Log shows only reviewed books.
     - A private profile you're not friends with says only friends can see its shelves and Log.
 10. **Empty Log tabs:** they say "Nothing here yet." on yours and "Nothing here." on someone else's.
+
+### Log stats and goal
+
+1. The top of the Log has a stats card for this year:
+    - read this year, read all time, reading, want to read, and average rating
+    - a bar for each month, with a tooltip showing that month's count
+2. With no goal, your Log shows "Set a goal for 2026". Setting one shows "N of goal", a progress bar, the percent, and how far ahead or behind an even pace you are. Once you hit it, it says "Goal reached".
+3. The pencil on the goal card lets you change the goal or remove it. Typing 0 or nothing shows "Enter a number above 0".
+4. Changing a status updates the stats and the goal right away.
+5. On someone else's Log, both cards are read-only, and their goal shows if they set one. A visitor's counts leave out books that haven't been reviewed, like the rest of the Log.
 
 ## Not now
 

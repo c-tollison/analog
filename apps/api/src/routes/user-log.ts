@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, schema, sql } from '@analog/db';
 import {
+    GoalYearSchema,
     type MediaFormat,
     PageQuerySchema,
     ProgressStatus,
@@ -12,6 +13,7 @@ import { requireVisibleProfile } from '../lib/friends.js';
 import { db } from '../lib/init.js';
 import { paginate } from '../lib/pagination.js';
 import { UsernameParamSchema } from '../lib/params.js';
+import { isCompleted, whenCompleted } from '../lib/progress.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -21,11 +23,18 @@ import { z } from 'zod';
 // get too deep for TypeScript. It follows the profile's visibility, and
 // visitors only see checked items.
 
-const { catalogItem, progress, series } = schema;
+const { catalogItem, progress, readingGoal, series } = schema;
 
 const LogQuerySchema = PageQuerySchema.extend({
     status: z.enum([ProgressStatus.Planned, ProgressStatus.InProgress]),
 });
+// The viewer's own year, since a new year starts at a different moment
+// for each of them.
+const StatsQuerySchema = z.object({ year: GoalYearSchema });
+
+function statusCount(status: ProgressStatus) {
+    return sql<number>`(count(*) filter (where ${progress.status} = ${status}))::int`;
+}
 
 function inLog(userId: string, isMe: boolean, status: ProgressStatus) {
     return and(
@@ -117,6 +126,83 @@ const userLog = new Hono<AppEnv>()
                     .offset(offset)
             );
             return c.json(page);
+        }
+    )
+    // Totals for the top of the Log, the year's finishes by month, and the
+    // year's goal.
+    .get(
+        '/log/stats',
+        schemaValidator('param', UsernameParamSchema),
+        schemaValidator('query', StatsQuerySchema),
+        async (c) => {
+            const { username } = c.req.valid('param');
+            const { year } = c.req.valid('query');
+            const { id, isMe } = await requireVisibleProfile(
+                username,
+                c.get('user').id
+            );
+            const theirs = and(
+                eq(progress.userId, id),
+                isMe ? undefined : visibleToVisitors()
+            );
+            const finishedThisYear = sql`${isCompleted} and extract(year from ${progress.completedAt}) = ${year}`;
+            const month = sql<number>`extract(month from ${progress.completedAt})::int`;
+
+            const [[counts], months, [goal]] = await Promise.all([
+                db()
+                    .select({
+                        readThisYear: sql<number>`(count(*) filter (where ${finishedThisYear}))::int`,
+                        readAllTime: statusCount(ProgressStatus.Completed),
+                        reading: statusCount(ProgressStatus.InProgress),
+                        wantToRead: statusCount(ProgressStatus.Planned),
+                        ratingAverage: sql<
+                            number | null
+                        >`avg(${whenCompleted(progress.rating)})::real`,
+                    })
+                    .from(progress)
+                    .innerJoin(
+                        catalogItem,
+                        eq(catalogItem.id, progress.catalogItemId)
+                    )
+                    .leftJoin(series, eq(series.id, catalogItem.seriesId))
+                    .where(theirs),
+                db()
+                    .select({ month, count: sql<number>`count(*)::int` })
+                    .from(progress)
+                    .innerJoin(
+                        catalogItem,
+                        eq(catalogItem.id, progress.catalogItemId)
+                    )
+                    .leftJoin(series, eq(series.id, catalogItem.seriesId))
+                    .where(and(theirs, finishedThisYear))
+                    .groupBy(month),
+                db()
+                    .select({ target: readingGoal.target })
+                    .from(readingGoal)
+                    .where(
+                        and(
+                            eq(readingGoal.userId, id),
+                            eq(readingGoal.year, year)
+                        )
+                    ),
+            ]);
+
+            // Finishes in January through December, zero when none.
+            const perMonth = Array.from(
+                { length: 12 },
+                (_, index) =>
+                    months.find((row) => row.month === index + 1)?.count ?? 0
+            );
+            return c.json({
+                year,
+                readThisYear: counts?.readThisYear ?? 0,
+                readAllTime: counts?.readAllTime ?? 0,
+                reading: counts?.reading ?? 0,
+                wantToRead: counts?.wantToRead ?? 0,
+                ratingAverage: counts?.ratingAverage ?? null,
+                perMonth,
+                goal: goal?.target ?? null,
+            });
         }
     );
 

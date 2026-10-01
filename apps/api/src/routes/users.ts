@@ -1,6 +1,8 @@
 import { and, asc, eq, ilike, inArray, ne, or, schema, sql } from '@analog/db';
 import {
+    GoalYearSchema,
     PageQuerySchema,
+    ReadingGoalSchema,
     UpdatePreferencesSchema,
     USER_SEARCH_MIN_LENGTH,
 } from '@analog/types';
@@ -22,8 +24,9 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 
-const { collection, collectionMember, user, userAvatar } = schema;
+const { collection, collectionMember, readingGoal, user, userAvatar } = schema;
 
+const YearParamSchema = z.object({ year: GoalYearSchema });
 const SearchQuerySchema = PageQuerySchema.extend({
     q: z.string().trim().min(USER_SEARCH_MIN_LENGTH).max(100),
 });
@@ -142,6 +145,40 @@ const users = new Hono<AppEnv>()
             const me = c.get('user').id;
             await db().update(user).set(values).where(eq(user.id, me));
             return c.json(values);
+        }
+    )
+    .put(
+        '/me/goals/:year',
+        schemaValidator('param', YearParamSchema),
+        schemaValidator('json', ReadingGoalSchema),
+        async (c) => {
+            const { year } = c.req.valid('param');
+            const { target } = c.req.valid('json');
+            const me = c.get('user').id;
+            await db()
+                .insert(readingGoal)
+                .values({ userId: me, year, target })
+                .onConflictDoUpdate({
+                    target: [readingGoal.userId, readingGoal.year],
+                    set: { target, updatedAt: new Date() },
+                });
+            return c.json({ year, target });
+        }
+    )
+    .delete(
+        '/me/goals/:year',
+        schemaValidator('param', YearParamSchema),
+        async (c) => {
+            const { year } = c.req.valid('param');
+            await db()
+                .delete(readingGoal)
+                .where(
+                    and(
+                        eq(readingGoal.userId, c.get('user').id),
+                        eq(readingGoal.year, year)
+                    )
+                );
+            return c.body(null, 204);
         }
     )
     .get('/:id/avatar', schemaValidator('param', IdParamSchema), async (c) => {
