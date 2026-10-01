@@ -27,10 +27,11 @@ import {
     useReading,
     useWantToRead,
 } from '@/composables/useLog';
+import { useQueryParam } from '@/composables/useQueryParam';
 import { formatStatusLabels } from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
 
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { z } from 'zod';
 
 const props = defineProps<{ username: string; isMe: boolean }>();
@@ -39,14 +40,24 @@ const props = defineProps<{ username: string; isMe: boolean }>();
 const labels = formatStatusLabels(MediaFormat.Book);
 
 const StatusSchema = z.enum(ProgressStatus);
-const tab = ref<ProgressStatus>(ProgressStatus.InProgress);
+// "status" and not "tab", since the profile page uses "tab" for Log and
+// Shelves.
+const tab = useQueryParam(
+    'status',
+    Object.values(ProgressStatus),
+    ProgressStatus.InProgress
+);
 
 function onTab(value: unknown) {
     const parsed = StatusSchema.safeParse(value);
     if (parsed.success) tab.value = parsed.data;
 }
 
-const range = ref<LogRange>(LogRange.ThirtyDays);
+const range = useQueryParam(
+    'range',
+    Object.values(LogRange),
+    LogRange.ThirtyDays
+);
 const { data: stats, error: statsError } = useLogStats(
     () => props.username,
     range

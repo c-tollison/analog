@@ -18,27 +18,12 @@ import {
     useFriends,
 } from '@/composables/useFriends';
 import { useNotificationCount } from '@/composables/useNotifications';
+import { useQueryParam } from '@/composables/useQueryParam';
 import { staggerIn } from '@/lib/motion';
 
 import { computed, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
 
-const TABS = ['friends', 'requests'] as const;
-type Tab = (typeof TABS)[number];
-
-function isTab(value: unknown): value is Tab {
-    return TABS.some((tab) => tab === value);
-}
-
-const route = useRoute();
-const router = useRouter();
-
-const tab = computed({
-    get: (): Tab => (isTab(route.query.tab) ? route.query.tab : 'friends'),
-    set: (value) => {
-        router.replace({ query: { ...route.query, tab: value } });
-    },
-});
+const tab = useQueryParam('tab', ['friends', 'requests'], 'friends');
 
 const friends = useFriends('');
 const requests = useFriendRequests();

@@ -33,6 +33,7 @@ import {
     useSendFriendRequest,
 } from '@/composables/useFriends';
 import { usePageTitle } from '@/composables/usePageTitle';
+import { useQueryParam } from '@/composables/useQueryParam';
 import { useUser } from '@/composables/useUsers';
 import { staggerIn } from '@/lib/motion';
 import { useSessionStore } from '@/stores/session';
@@ -93,7 +94,7 @@ function onRemove() {
 }
 
 const inviting = ref(false);
-const tab = ref('log');
+const tab = useQueryParam('tab', ['log', 'shelves'], 'log');
 
 const error = computed(
     () =>

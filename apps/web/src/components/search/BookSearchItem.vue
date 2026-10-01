@@ -26,14 +26,14 @@ const placement = computed(() => {
     return `#${position}${total} in ${seriesTitle}`;
 });
 
-const facts = computed(() => {
-    const { author, releaseDate, saveCount } = props.book;
-    return [
-        author,
-        releaseDate?.slice(0, 4),
-        `${saveCount} ${saveCount === 1 ? 'save' : 'saves'}`,
-    ].filter(Boolean);
-});
+const facts = computed(() =>
+    [props.book.author, props.book.releaseDate?.slice(0, 4)].filter(Boolean)
+);
+
+const saves = computed(
+    () =>
+        `${props.book.saveCount} ${props.book.saveCount === 1 ? 'save' : 'saves'}`
+);
 
 // Out of 5 stars, like the rating picker.
 const averageStars = computed(() =>
@@ -52,7 +52,7 @@ stays clickable. -->
                 size="sm"
                 :src="book.coverUrl"
                 :alt="book.title"
-                class="aspect-2/3 w-12"
+                class="aspect-2/3 w-14 sm:w-12"
             />
         </ItemMedia>
         <ItemContent class="min-w-0 gap-1">
@@ -67,17 +67,28 @@ stays clickable. -->
             <ItemTitle class="w-full">
                 <RouterLink
                     :to="{ name: 'item', params: { id: book.id } }"
-                    class="line-clamp-2 after:absolute after:inset-0"
+                    class="line-clamp-3 after:absolute after:inset-0 sm:line-clamp-2"
                 >
                     {{ book.title }}
                 </RouterLink>
             </ItemTitle>
-            <ItemDescription class="flex items-center gap-1">
-                {{ facts.join(' · ') }}
-                <template v-if="averageStars">
-                    · {{ averageStars }}
-                    <StarIcon class="size-3" />
+            <!-- One fact per line on phones, one line with dots on wider
+                 screens. -->
+            <ItemDescription
+                class="line-clamp-none flex flex-col sm:flex-row sm:gap-1"
+            >
+                <template v-for="(fact, index) in facts" :key="index">
+                    <span v-if="index > 0" class="hidden sm:inline">·</span>
+                    <span class="truncate">{{ fact }}</span>
                 </template>
+                <span v-if="facts.length" class="hidden sm:inline">·</span>
+                <span class="flex shrink-0 items-center gap-1">
+                    {{ saves }}
+                    <template v-if="averageStars">
+                        · {{ averageStars }}
+                        <StarIcon class="size-3" />
+                    </template>
+                </span>
             </ItemDescription>
         </ItemContent>
         <ItemActions class="relative">

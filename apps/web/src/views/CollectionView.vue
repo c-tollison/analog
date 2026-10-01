@@ -23,6 +23,7 @@ import {
     useRemoveCollectionItem,
 } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
+import { useQueryParam } from '@/composables/useQueryParam';
 import {
     completedWord,
     FORMAT_LABELS,
@@ -74,7 +75,11 @@ const SORT_LABELS: Record<CollectionSort, string> = {
     [CollectionSort.Name]: 'Name',
     [CollectionSort.Newest]: 'Recently added',
 };
-const sort = ref(CollectionSort.Name);
+const sort = useQueryParam(
+    'sort',
+    Object.values(CollectionSort),
+    CollectionSort.Name
+);
 
 const entries = useCollectionEntries(() => props.id, sort);
 

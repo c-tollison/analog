@@ -24,7 +24,15 @@ const requireEmailQuery: NavigationGuard = (to) =>
 
 export const router = createRouter({
     history: createWebHistory(),
-    scrollBehavior: (_to, _from, savedPosition) => savedPosition ?? { top: 0 },
+    scrollBehavior: (to, from, savedPosition) => {
+        if (savedPosition) return savedPosition;
+        // Switching a tab or sort on the same page stays put. A new page
+        // number still goes to the top.
+        if (to.path === from.path && to.query.page === from.query.page) {
+            return false;
+        }
+        return { top: 0 };
+    },
     routes: [
         {
             path: '/',

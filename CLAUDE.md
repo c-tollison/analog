@@ -73,6 +73,7 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 - **API calls.** Each domain gets one composable file in `src/composables/`, such as `useCollections.ts`, `useSeries.ts` and `useCatalog.ts`. The file owns the domain's root query key and exports hooks like `useCollection(id)` and `useCreateCollection()`. Queries call `unwrap(await api.x.$get(...))`. Mutations take ids in their variables and invalidate queries in their own `onSuccess`. Views and components only call these hooks. They never use `useQuery`, `useMutation` or `api` directly.
 - **Paginated lists.** Use `usePaginatedList` inside the domain composable and render the list with `PagedList` or `LoadMore`. Search uses `useSearchTerm`. Admin tables are the exception: they page by number with `adminListQuery()`, `AdminTable` and `AdminPagination`, and keep their state in the URL.
 - **Client state.** Pinia stores live in `src/stores/`. `useSessionStore` holds the session.
+- **Page choices live in the URL.** Tabs, sorts, filters and ranges on a page use `useQueryParam(key, values, fallback)` from `composables/useQueryParam.ts`, never a plain `ref`, so going back lands on the same choice. When a component inside a page has its own tabs, give it a different key, like `status` on the Log inside a profile's `tab`. The router keeps the scroll position when only the query changes, unless `page` changes.
 - Show errors as `error?.message ?? null`. Every async load shows a spinner.
 
 ### Forms
