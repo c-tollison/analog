@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AddByIsbnDialog from '@/components/search/AddByIsbnDialog.vue';
 import SearchDialog from '@/components/search/SearchDialog.vue';
+import { pageEntered } from '@/lib/scroll';
 import { useSearchStore } from '@/stores/search';
 
 import AppBottomNav from './AppBottomNav.vue';
@@ -26,6 +27,7 @@ onKeyStroke('k', (event) => {
             <RouterView v-slot="{ Component }">
                 <Transition
                     mode="out-in"
+                    @enter="pageEntered"
                     enter-active-class="motion-safe:animate-in fade-in slide-in-from-bottom-2 animation-duration-300 ease-out"
                 >
                     <component :is="Component" />
