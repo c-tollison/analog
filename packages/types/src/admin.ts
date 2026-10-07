@@ -5,7 +5,13 @@ import {
     SeriesChoiceSchema,
     SeriesTitleSchema,
 } from './catalog.js';
-import { CheckRule, SeriesKind } from './catalog-enums.js';
+import {
+    Audience,
+    CheckRule,
+    EDITION_ROLES,
+    EditionFormat,
+    SeriesKind,
+} from './catalog-enums.js';
 import { PageQuerySchema } from './pagination.js';
 import { z } from 'zod';
 
@@ -61,35 +67,56 @@ const DetailListSchema = z
     .array(z.string().trim().min(1).max(CATALOG_TITLE_MAX_LENGTH))
     .max(100);
 
+// Genres by slug, like "cozy-mystery".
+export const GenresSchema = z
+    .array(z.string().regex(/^[a-z0-9-]{1,60}$/))
+    .max(50);
+
+export const SetGenresSchema = z.object({ genres: GenresSchema });
+
 /** An ISBN's own facts, edited on the admin item page. */
 export const UpdateIsbnSchema = z.object({
     title: ItemTitleSchema,
+    editionName: DetailTextSchema,
+    format: z.enum(EditionFormat).nullable(),
+    // Found by name or alias, or made new.
     publisher: DetailTextSchema,
-    format: DetailTextSchema,
+    // A full date when it's known. The year is kept either way.
+    releaseYear: z.number().int().min(0).max(9999).nullable(),
+    releaseDate: z.iso.date().nullable(),
+    pageCount: z.number().int().positive().max(100_000).nullable(),
     // A language code, like "en" or "zh-TW".
     language: z
         .string()
         .regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/)
         .nullable(),
+    goodreadsId: z.string().regex(/^\d+$/).nullable(),
+    // In credit order. Each name finds its person by name or alias.
+    credits: z
+        .array(
+            z.object({
+                name: z.string().trim().min(1).max(CATALOG_TITLE_MAX_LENGTH),
+                role: z.enum(EDITION_ROLES),
+            })
+        )
+        .max(100),
 });
 
 /** A book's details that don't belong to one ISBN. */
 export const UpdateItemDetailsSchema = z.object({
     // Only saved when the item isn't in a series, which sets it instead.
     kind: z.enum(SeriesKind).optional(),
-    authors: DetailListSchema,
-    genres: DetailListSchema,
-    characters: DetailListSchema,
     description: z
         .string()
         .trim()
         .max(20_000)
         .transform((value) => value || null),
-    publishDate: DetailTextSchema,
-    firstPublishYear: z.number().int().min(0).max(9999).nullable(),
-    pageCount: z.number().int().positive().max(100_000).nullable(),
-    editionName: DetailTextSchema,
-    goodreadsId: z.string().regex(/^\d+$/).nullable(),
+    firstPublishedYear: z.number().int().min(0).max(9999).nullable(),
+    genres: GenresSchema,
+    audience: z.enum(Audience).nullable(),
+    // Names in credit order. Each finds its person by name or alias.
+    authors: DetailListSchema,
+    illustrators: DetailListSchema,
 });
 
 export const UpdateCatalogItemSchema = z.object({
@@ -105,6 +132,14 @@ export const MergeItemSchema = z.object({ intoItemId: z.uuid() });
 export const UpdateSeriesSchema = z.object({
     title: SeriesTitleSchema,
     kind: z.enum(SeriesKind),
+    // Left out, these stay as they are.
+    audience: z.enum(Audience).nullable().optional(),
+    description: z
+        .string()
+        .trim()
+        .max(20_000)
+        .transform((value) => value || null)
+        .optional(),
 });
 
 export const MAX_SERIES_VOLUMES = 1000;
@@ -127,6 +162,33 @@ export const MergeSeriesSchema = z.object({ intoSeriesId: z.uuid() });
 
 export const AdminAddBookSchema = AddBookSchema.extend({
     googleId: GoogleIdSchema.optional(),
+});
+
+export const NameSearchQuerySchema = PageQuerySchema.extend({
+    q: z.string().trim().min(1).max(200),
+});
+
+export const NameListQuerySchema = PageQuerySchema.extend({
+    q: z.string().trim().max(200).optional(),
+});
+
+const NameSchema = z
+    .string()
+    .trim()
+    .min(1, 'Name is required')
+    .max(CATALOG_TITLE_MAX_LENGTH);
+
+/** A person's or publisher's name and the other spellings lookups match. */
+export const UpdateNameSchema = z.object({
+    name: NameSchema,
+    aliases: z.array(NameSchema).max(100),
+});
+
+export const MergeNameSchema = z.object({ intoId: z.uuid() });
+
+/** The publisher an imprint belongs to, or null for none. */
+export const SetParentPublisherSchema = z.object({
+    parentId: z.uuid().nullable(),
 });
 
 export const AdminGoogleSearchQuerySchema = GoogleSearchQuerySchema.extend({

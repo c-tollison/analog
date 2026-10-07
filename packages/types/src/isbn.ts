@@ -17,6 +17,15 @@ function isbn13CheckDigit(first12: string): string {
     return String((10 - (sum % 10)) % 10);
 }
 
+/** The ISBN-10 of an ISBN-13, which only 978 ISBNs have. Null for others. */
+export function isbn10From13(isbn13: string): string | null {
+    if (!/^978\d{10}$/.test(isbn13)) {
+        return null;
+    }
+    const first9 = isbn13.slice(3, 12);
+    return first9 + isbn10CheckDigit(first9);
+}
+
 /**
  * Normalizes an ISBN-10 or ISBN-13 (hyphens/spaces allowed) to ISBN-13.
  * Returns null if the input isn't a valid ISBN.

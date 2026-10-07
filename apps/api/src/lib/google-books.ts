@@ -10,7 +10,7 @@ import { config } from './init.js';
 import {
     type BookLookup,
     bookKind,
-    parseReleaseDate,
+    parseRelease,
     parseVolume,
     seriesFromTitle,
 } from './open-library.js';
@@ -103,15 +103,6 @@ function coverUrl(imageLinks: Record<string, string> | undefined) {
     return url?.replace(/^http:/, 'https:').replace('&edge=curl', '') ?? null;
 }
 
-// Categories are paths like "Comics & Graphic Novels / Manga / Fantasy". The
-// last part is the genre.
-function genres(categories: string[] | undefined): string[] {
-    const names = (categories ?? [])
-        .map((category) => category.split('/').at(-1)?.trim() ?? '')
-        .filter((name) => name && name !== 'General');
-    return [...new Set(names)];
-}
-
 function displayNumber(volume: Volume): number | null {
     const number = Number(volume.volumeInfo.seriesInfo?.bookDisplayNumber);
     return Number.isFinite(number) && number > 0 ? number : null;
@@ -150,7 +141,6 @@ export async function lookupGoogleBooksIsbn(
     }
     const info = volume.volumeInfo;
     const publishers = info.publisher ? [info.publisher] : [];
-    const language = languageName(info.language);
     const number = displayNumber(volume);
 
     return {
@@ -163,13 +153,14 @@ export async function lookupGoogleBooksIsbn(
         firstPublishYear: null,
         pageCount: info.pageCount || null,
         description: plainText(info.description),
-        characters: [],
+        illustrators: [],
+        translators: [],
         editionName: null,
         physicalFormat: null,
-        languages: language ? [language] : [],
         goodreadsId: null,
-        genres: genres(info.categories),
-        releaseDate: parseReleaseDate(info.publishedDate),
+        // Paths like "Comics & Graphic Novels / Manga / Fantasy".
+        genres: info.categories ?? [],
+        ...parseRelease(info.publishedDate),
         kind: bookKind({ subjects: info.categories, publishers }),
         // Google only knows a series by id, so name it from the title.
         // A numbered volume's title is often just the series name.

@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull, schema } from '@analog/db';
 import { CheckRule, type CheckTrigger } from '@analog/types';
 
+import { withPeople } from './book-values.js';
 import {
     type Checked,
     checkDuplicateVolumes,
@@ -132,7 +133,11 @@ export async function recheckItem(
 ): Promise<Problem[]> {
     const item = await db().query.catalogItem.findFirst({
         where: eq(catalogItem.id, itemId),
-        with: { isbns: true, series: true },
+        with: {
+            isbns: { with: { publisher: { columns: { name: true } } } },
+            series: true,
+            ...withPeople,
+        },
     });
     if (!item || item.verifiedAt) {
         return [];

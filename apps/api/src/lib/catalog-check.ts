@@ -9,9 +9,10 @@ import {
     schema,
     sql,
 } from '@analog/db';
-import { CheckRule, SeriesKind } from '@analog/types';
+import { CheckRule, PersonRole, SeriesKind } from '@analog/types';
 
-import { readMetadata, VOLUME_TEXT } from './books.js';
+import { creditNames, type PersonLink } from './book-values.js';
+import { VOLUME_TEXT } from './books.js';
 import { db } from './init.js';
 import { isLatin } from './open-library.js';
 import {
@@ -45,10 +46,13 @@ import {
 const { catalogItem, series } = schema;
 
 type Series = typeof series.$inferSelect;
-type Isbn = typeof schema.catalogItemIsbn.$inferSelect;
+type Isbn = typeof schema.catalogItemIsbn.$inferSelect & {
+    publisher: { name: string } | null;
+};
 export type Item = typeof catalogItem.$inferSelect & {
     isbns: Isbn[];
     series: Series | null;
+    people: PersonLink[];
 };
 export type Problem = Omit<
     typeof schema.catalogCheck.$inferInsert,
@@ -213,15 +217,18 @@ export async function checkItem(
     item: Item,
     seriesNames: Map<string, string>
 ): Promise<Checked> {
-    const meta = readMetadata(item);
     const otherTitles = item.isbns.flatMap((isbn) =>
         isbn.title && isbn.title !== item.title ? [isbn.title] : []
     );
     const book = {
         title: item.title,
-        subtitle: meta.subtitle,
-        authors: meta.authors,
-        publishers: meta.publishers,
+        subtitle: item.subtitle,
+        authors: creditNames(item.people, PersonRole.Author),
+        publishers: [
+            ...new Set(
+                item.isbns.flatMap((isbn) => isbn.publisher?.name ?? [])
+            ),
+        ],
         other_edition_titles: otherTitles,
     };
     const problems: Problem[] = [];

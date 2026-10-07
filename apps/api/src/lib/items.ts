@@ -10,6 +10,7 @@ import {
     schema,
 } from '@analog/db';
 
+import { withGenres, withPeople } from './book-values.js';
 import { db } from './init.js';
 import { isCompleted } from './progress.js';
 import { HTTPException } from 'hono/http-exception';
@@ -58,12 +59,12 @@ export async function requireItem(id: string, userId: string) {
     const [item, shelves] = await Promise.all([
         db().query.catalogItem.findFirst({
             where: eq(catalogItem.id, id),
-            with: { series: true },
+            with: { series: true, ...withPeople, ...withGenres },
         }),
         shelvesHolding(id, userId),
     ]);
     if (!item) {
-        throw new HTTPException(404, { message: 'Item not found' });
+        throw new HTTPException(404, { message: 'Book not found' });
     }
     return { item, shelves };
 }
