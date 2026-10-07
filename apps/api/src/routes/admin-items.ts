@@ -14,8 +14,8 @@ import {
     AdminAddBookSchema,
     AdminItemListQuerySchema,
     IsbnSchema,
-    languageName,
     MergeItemSchema,
+    PersonRole,
     SetVerifiedSchema,
     UpdateCatalogItemSchema,
     UpdateIsbnSchema,
@@ -33,9 +33,19 @@ import {
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
 import {
-    itemLinks,
+    creditList,
+    creditNames,
+    findOrCreatePublisher,
+    inheritSeriesGenres,
+    itemCredits,
+    setEditionPeople,
+    setItemGenres,
+    setItemPeople,
+    withPeople,
+} from '../lib/book-values.js';
+import {
+    bookLinks,
     kindInSeries,
-    readMetadata,
     refreshSeriesCover,
     seriesForItem,
 } from '../lib/books.js';
@@ -45,7 +55,12 @@ import {
     clearItemChecks,
 } from '../lib/checks.js';
 import { toCover, uploadedCoverUrl } from '../lib/covers.js';
-import { mergeItem, splitOffIsbn, upsertBook } from '../lib/editions.js';
+import {
+    mergeItem,
+    removeIsbn,
+    splitOffIsbn,
+    upsertBook,
+} from '../lib/editions.js';
 import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
@@ -59,7 +74,12 @@ const {
     catalogItem,
     catalogItemIsbn,
     catalogItemIsbnCover,
+    catalogItemGenre,
+    catalogItemIsbnPerson,
+    catalogItemPerson,
     collectionItem,
+    person,
+    publisher,
     series,
 } = schema;
 
@@ -95,7 +115,7 @@ async function requireItem(id: string) {
         where: eq(catalogItem.id, id),
     });
     if (!item) {
-        throw new HTTPException(404, { message: 'Item not found' });
+        throw new HTTPException(404, { message: 'Book not found' });
     }
     return item;
 }
@@ -183,69 +203,123 @@ const adminItems = new Hono<AppEnv>()
     })
     .get('/:id', schemaValidator('param', IdParamSchema), async (c) => {
         const { id } = c.req.valid('param');
-        const [[row], collectionCount, isbns] = await Promise.all([
-            db()
-                .select({
-                    id: catalogItem.id,
-                    title: catalogItem.title,
-                    format: catalogItem.format,
-                    kind: catalogItem.kind,
-                    coverUrl: catalogItem.coverUrl,
-                    position: catalogItem.position,
-                    saveCount: catalogItem.saveCount,
-                    seriesId: catalogItem.seriesId,
-                    seriesTitle: series.title,
-                    addedBy: addedByUser.username,
-                    createdAt: catalogItem.createdAt,
-                    verifiedBy: verifiedByUser.username,
-                    verifiedAt: catalogItem.verifiedAt,
-                    googleBooksFetchedAt: catalogItem.googleBooksFetchedAt,
-                    openLibraryFetchedAt: catalogItem.openLibraryFetchedAt,
-                    // Only read to build the links.
-                    metadata: catalogItem.metadata,
-                    externalSource: catalogItem.externalSource,
-                    externalId: catalogItem.externalId,
-                })
-                .from(catalogItem)
-                .leftJoin(series, eq(catalogItem.seriesId, series.id))
-                .leftJoin(
-                    addedByUser,
-                    eq(catalogItem.createdByUserId, addedByUser.id)
-                )
-                .leftJoin(
-                    verifiedByUser,
-                    eq(catalogItem.verifiedByUserId, verifiedByUser.id)
-                )
-                .where(eq(catalogItem.id, id)),
-            db().$count(collectionItem, eq(collectionItem.catalogItemId, id)),
-            db()
-                .select({
-                    isbn: catalogItemIsbn.isbn,
-                    title: catalogItemIsbn.title,
-                    coverUrl: catalogItemIsbn.coverUrl,
-                    publisher: catalogItemIsbn.publisher,
-                    language: catalogItemIsbn.language,
-                    format: catalogItemIsbn.format,
-                    main: catalogItemIsbn.main,
-                    pending: catalogItemIsbn.pending,
-                })
-                .from(catalogItemIsbn)
-                .where(eq(catalogItemIsbn.catalogItemId, id))
-                .orderBy(
-                    asc(catalogItemIsbn.createdAt),
-                    asc(catalogItemIsbn.isbn)
+        const [[row], collectionCount, isbns, people, itemPeople, genres] =
+            await Promise.all([
+                db()
+                    .select({
+                        id: catalogItem.id,
+                        title: catalogItem.title,
+                        kind: catalogItem.kind,
+                        coverUrl: catalogItem.coverUrl,
+                        position: catalogItem.position,
+                        subtitle: catalogItem.subtitle,
+                        description: catalogItem.description,
+                        firstPublishedYear: catalogItem.firstPublishedYear,
+                        audience: catalogItem.audience,
+                        saveCount: catalogItem.saveCount,
+                        seriesId: catalogItem.seriesId,
+                        seriesTitle: series.title,
+                        addedBy: addedByUser.username,
+                        createdAt: catalogItem.createdAt,
+                        verifiedBy: verifiedByUser.username,
+                        verifiedAt: catalogItem.verifiedAt,
+                        googleBooksFetchedAt: catalogItem.googleBooksFetchedAt,
+                        openLibraryFetchedAt: catalogItem.openLibraryFetchedAt,
+                        // Only read to build the links.
+                        externalSource: catalogItem.externalSource,
+                        externalId: catalogItem.externalId,
+                    })
+                    .from(catalogItem)
+                    .leftJoin(series, eq(catalogItem.seriesId, series.id))
+                    .leftJoin(
+                        addedByUser,
+                        eq(catalogItem.createdByUserId, addedByUser.id)
+                    )
+                    .leftJoin(
+                        verifiedByUser,
+                        eq(catalogItem.verifiedByUserId, verifiedByUser.id)
+                    )
+                    .where(eq(catalogItem.id, id)),
+                db().$count(
+                    collectionItem,
+                    eq(collectionItem.catalogItemId, id)
                 ),
-        ]);
+                db()
+                    .select({
+                        isbn: catalogItemIsbn.isbn,
+                        title: catalogItemIsbn.title,
+                        editionName: catalogItemIsbn.editionName,
+                        coverUrl: catalogItemIsbn.coverUrl,
+                        publisher: publisher.name,
+                        language: catalogItemIsbn.language,
+                        format: catalogItemIsbn.format,
+                        releaseYear: catalogItemIsbn.releaseYear,
+                        releaseDate: catalogItemIsbn.releaseDate,
+                        pageCount: catalogItemIsbn.pageCount,
+                        goodreadsId: catalogItemIsbn.goodreadsId,
+                        main: catalogItemIsbn.main,
+                        pending: catalogItemIsbn.pending,
+                    })
+                    .from(catalogItemIsbn)
+                    .leftJoin(
+                        publisher,
+                        eq(publisher.id, catalogItemIsbn.publisherId)
+                    )
+                    .where(eq(catalogItemIsbn.catalogItemId, id))
+                    .orderBy(
+                        asc(catalogItemIsbn.createdAt),
+                        asc(catalogItemIsbn.isbn)
+                    ),
+                db()
+                    .select({
+                        isbn: catalogItemIsbnPerson.isbn,
+                        role: catalogItemIsbnPerson.role,
+                        position: catalogItemIsbnPerson.position,
+                        name: person.name,
+                    })
+                    .from(catalogItemIsbnPerson)
+                    .innerJoin(
+                        catalogItemIsbn,
+                        eq(catalogItemIsbn.isbn, catalogItemIsbnPerson.isbn)
+                    )
+                    .innerJoin(
+                        person,
+                        eq(person.id, catalogItemIsbnPerson.personId)
+                    )
+                    .where(eq(catalogItemIsbn.catalogItemId, id)),
+                db().query.catalogItemPerson.findMany({
+                    where: eq(catalogItemPerson.catalogItemId, id),
+                    ...withPeople.people,
+                }),
+                db().query.catalogItemGenre.findMany({
+                    columns: { genreSlug: true },
+                    where: eq(catalogItemGenre.catalogItemId, id),
+                }),
+            ]);
         if (!row) {
-            throw new HTTPException(404, { message: 'Item not found' });
+            throw new HTTPException(404, { message: 'Book not found' });
         }
-        const { metadata, externalSource, externalId, ...item } = row;
+        const { externalSource, externalId, ...item } = row;
+        const main = isbns.find((edition) => edition.main);
         return c.json({
             ...item,
-            ...readMetadata(row),
+            genres: genres.map(({ genreSlug }) => genreSlug),
+            authors: creditNames(itemPeople, PersonRole.Author),
+            illustrators: creditNames(itemPeople, PersonRole.Illustrator),
             collectionCount,
-            isbns,
-            links: itemLinks(row),
+            isbns: isbns.map((edition) => ({
+                ...edition,
+                credits: creditList(
+                    people
+                        .filter((credit) => credit.isbn === edition.isbn)
+                        .map(({ role, position, name }) => ({
+                            role,
+                            position,
+                            person: { name },
+                        }))
+                ),
+            })),
+            links: bookLinks(row, main?.goodreadsId ?? null),
         });
     })
     .put(
@@ -271,11 +345,7 @@ const adminItems = new Hono<AppEnv>()
                 .update(catalogItem)
                 .set({
                     title,
-                    ...(subtitle === undefined
-                        ? {}
-                        : {
-                              metadata: sql`jsonb_set(${catalogItem.metadata}, '{subtitle}', ${JSON.stringify(subtitle)}::jsonb)`,
-                          }),
+                    subtitle,
                     seriesId: next?.id ?? null,
                     position: volume,
                     kind: kindInSeries(next, item.kind),
@@ -287,6 +357,9 @@ const adminItems = new Hono<AppEnv>()
                 volume,
                 seriesId: next?.id ?? null,
             });
+            if (next && next.id !== item.seriesId) {
+                await inheritSeriesGenres(item.id, next.id);
+            }
             await refreshCovers([item.seriesId, next?.id ?? null]);
             return c.body(null, 204);
         }
@@ -297,15 +370,24 @@ const adminItems = new Hono<AppEnv>()
         schemaValidator('json', UpdateItemDetailsSchema),
         async (c) => {
             const item = await requireItem(c.req.valid('param').id);
-            const { kind, ...details } = c.req.valid('json');
-            await db()
-                .update(catalogItem)
-                .set({
-                    metadata: { ...readMetadata(item), ...details },
-                    ...(kind && !item.seriesId ? { kind } : {}),
-                    updatedAt: new Date(),
-                })
-                .where(eq(catalogItem.id, item.id));
+            const { kind, authors, illustrators, genres, ...details } =
+                c.req.valid('json');
+            await db().transaction(async (tx) => {
+                await tx
+                    .update(catalogItem)
+                    .set({
+                        ...details,
+                        ...(kind && !item.seriesId ? { kind } : {}),
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(catalogItem.id, item.id));
+                await setItemPeople(
+                    item.id,
+                    itemCredits({ authors, illustrators }),
+                    tx
+                );
+                await setItemGenres(item.id, genres, tx);
+            });
             return c.body(null, 204);
         }
     )
@@ -318,7 +400,7 @@ const adminItems = new Hono<AppEnv>()
             const { verified } = c.req.valid('json');
             const by = verified ? c.get('user').id : null;
             if (!(await setVerified(catalogItem, id, by))) {
-                throw new HTTPException(404, { message: 'Item not found' });
+                throw new HTTPException(404, { message: 'Book not found' });
             }
             if (verified) {
                 await clearItemChecks([id]);
@@ -349,45 +431,47 @@ const adminItems = new Hono<AppEnv>()
             return c.json({ id: created }, 201);
         }
     )
+    .delete(
+        '/:id/isbns/:isbn',
+        schemaValidator('param', ItemIsbnParamSchema),
+        async (c) => {
+            const { id, isbn } = c.req.valid('param');
+            await removeIsbn(id, isbn);
+            return c.body(null, 204);
+        }
+    )
     .put(
         '/:id/isbns/:isbn',
         schemaValidator('param', ItemIsbnParamSchema),
         schemaValidator('json', UpdateIsbnSchema),
         async (c) => {
             const { id, isbn } = c.req.valid('param');
-            const edition = c.req.valid('json');
+            const {
+                publisher: publisherName,
+                credits,
+                ...edition
+            } = c.req.valid('json');
             const [updated] = await db()
                 .update(catalogItemIsbn)
-                .set(edition)
+                .set({
+                    ...edition,
+                    // A full date sets the year.
+                    releaseYear: edition.releaseDate
+                        ? Number(edition.releaseDate.slice(0, 4))
+                        : edition.releaseYear,
+                    publisherId: await findOrCreatePublisher(publisherName),
+                })
                 .where(
                     and(
                         eq(catalogItemIsbn.catalogItemId, id),
                         eq(catalogItemIsbn.isbn, isbn)
                     )
                 )
-                .returning({ main: catalogItemIsbn.main });
+                .returning({ isbn: catalogItemIsbn.isbn });
             if (!updated) {
                 throw new HTTPException(404, { message: 'ISBN not found' });
             }
-            // The item's own copy is shown when the main ISBN has none.
-            if (updated.main) {
-                const item = await requireItem(id);
-                const language = languageName(edition.language);
-                await db()
-                    .update(catalogItem)
-                    .set({
-                        metadata: {
-                            ...readMetadata(item),
-                            publishers: edition.publisher
-                                ? [edition.publisher]
-                                : [],
-                            physicalFormat: edition.format,
-                            languages: language ? [language] : [],
-                        },
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(catalogItem.id, id));
-            }
+            await setEditionPeople(isbn, credits);
             return c.body(null, 204);
         }
     )
@@ -469,7 +553,7 @@ const adminItems = new Hono<AppEnv>()
             .where(eq(catalogItem.id, c.req.valid('param').id))
             .returning({ seriesId: catalogItem.seriesId });
         if (!deleted) {
-            throw new HTTPException(404, { message: 'Item not found' });
+            throw new HTTPException(404, { message: 'Book not found' });
         }
         await refreshCovers([deleted.seriesId]);
         return c.body(null, 204);

@@ -15,7 +15,6 @@ import {
     CollectionRole,
     CollectionSort,
     CreateCollectionSchema,
-    type MediaFormat,
     PageQuerySchema,
     type ProgressStatus,
     type SeriesKind,
@@ -42,7 +41,7 @@ import { likePattern, paginate } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { whenCompleted } from '../lib/progress.js';
 import { matchesAllTerms, relevance, searchTerms } from '../lib/search.js';
-import { seriesDetails } from '../lib/series-details.js';
+import { seriesDetails, volumeGenres } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import collectionItems, { collectionEditions } from './collection-items.js';
 import { Hono } from 'hono';
@@ -91,7 +90,6 @@ const FriendsQuerySchema = PageQuerySchema.extend({
 const itemColumns = {
     id: collectionItem.id,
     catalogItemId: catalogItem.id,
-    format: catalogItem.format,
     kind: catalogItem.kind,
     title: catalogItem.title,
     coverUrl: catalogItem.coverUrl,
@@ -251,7 +249,6 @@ const collections = new Hono<AppEnv>()
                         id: sql<string>`min(${collectionItem.id}::text)`,
                         // Only meaningful for items not in a series.
                         catalogItemId: sql<string>`min(${catalogItem.id}::text)`,
-                        format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         kind: sql<SeriesKind | null>`min(${catalogItem.kind}::text)`,
                         title: itemTitle,
                         coverUrl: lowestVolumeCover,
@@ -292,10 +289,11 @@ const collections = new Hono<AppEnv>()
                 c.get('user').id
             );
 
-            const [found, [counted]] = await Promise.all([
+            const [found, genres, [counted]] = await Promise.all([
                 db().query.series.findFirst({
                     where: eq(series.id, seriesId),
                 }),
+                volumeGenres(seriesId),
                 db()
                     .select({
                         ownedCount: sql<number>`count(*)::int`,
@@ -337,6 +335,7 @@ const collections = new Hono<AppEnv>()
                 completedCount: counted?.completedCount ?? 0,
                 ownedPositions: counted?.ownedPositions ?? [],
                 ...seriesDetails(found),
+                genres: genres.map(({ name }) => name),
             });
         }
     )

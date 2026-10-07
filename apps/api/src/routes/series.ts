@@ -1,7 +1,5 @@
 import { and, asc, eq, not, or, schema, sql } from '@analog/db';
 import {
-    DetailsSourceSchema,
-    LinkDetailsSourceSchema,
     ProgressStatus,
     SeriesPageQuerySchema,
     SeriesSearchQuerySchema,
@@ -19,17 +17,14 @@ import { IdParamSchema } from '../lib/params.js';
 import { whenCompleted } from '../lib/progress.js';
 import { searchSeries } from '../lib/search.js';
 import {
-    linkDetailsSource,
-    searchDetailsSource,
     seriesDetails,
     setVolumeCount,
-    unlinkDetailsSource,
+    volumeGenres,
 } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { requireRole } from '../middleware/require-role.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { z } from 'zod';
 
 const { catalogItem, progress, series: seriesTable } = schema;
 
@@ -54,44 +49,8 @@ function myProgress(userId: string) {
     );
 }
 
-const DetailsSearchQuerySchema = z.object({
-    source: DetailsSourceSchema,
-    q: z.string().trim().min(1).max(200),
-});
-
 // Series are shared by everyone, so only admins can change them.
 const series = new Hono<AppEnv>()
-    .get(
-        '/details-source/search',
-        requireRole(UserRole.Admin),
-        schemaValidator('query', DetailsSearchQuerySchema),
-        async (c) => {
-            const { source, q } = c.req.valid('query');
-            return c.json(await searchDetailsSource(source, q));
-        }
-    )
-    .put(
-        '/:id/details-source',
-        requireRole(UserRole.Admin),
-        schemaValidator('param', IdParamSchema),
-        schemaValidator('json', LinkDetailsSourceSchema),
-        async (c) => {
-            await linkDetailsSource(
-                c.req.valid('param').id,
-                c.req.valid('json')
-            );
-            return c.body(null, 204);
-        }
-    )
-    .delete(
-        '/:id/details-source',
-        requireRole(UserRole.Admin),
-        schemaValidator('param', IdParamSchema),
-        async (c) => {
-            await unlinkDetailsSource(c.req.valid('param').id);
-            return c.body(null, 204);
-        }
-    )
     .put(
         '/:id/volume-count',
         requireRole(UserRole.Admin),
@@ -122,8 +81,11 @@ const series = new Hono<AppEnv>()
             const { shelf } = c.req.valid('query');
             const me = c.get('user').id;
 
-            const [found, [counted]] = await Promise.all([
-                db().query.series.findFirst({ where: eq(seriesTable.id, id) }),
+            const [found, genres, [counted]] = await Promise.all([
+                db().query.series.findFirst({
+                    where: eq(seriesTable.id, id),
+                }),
+                volumeGenres(id),
                 db()
                     .select({
                         itemCount: sql<number>`count(*)::int`,
@@ -155,6 +117,7 @@ const series = new Hono<AppEnv>()
                 kind: found.kind,
                 coverUrl: found.coverUrl,
                 ...seriesDetails(found),
+                genres: genres.map(({ name }) => name),
                 itemCount: counted?.itemCount ?? 0,
                 ownedCount: counted?.ownedCount ?? 0,
                 completedCount: counted?.completedCount ?? 0,
@@ -183,7 +146,6 @@ const series = new Hono<AppEnv>()
                 db()
                     .select({
                         id: catalogItem.id,
-                        format: catalogItem.format,
                         title: catalogItem.title,
                         coverUrl: catalogItem.coverUrl,
                         position: catalogItem.position,

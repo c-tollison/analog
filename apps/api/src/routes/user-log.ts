@@ -1,10 +1,5 @@
 import { and, asc, desc, eq, isNotNull, schema, sql } from '@analog/db';
-import {
-    LogRange,
-    type MediaFormat,
-    PageQuerySchema,
-    ProgressStatus,
-} from '@analog/types';
+import { LogRange, PageQuerySchema, ProgressStatus } from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
 import { lowestVolumeCover, seriesColumns } from '../lib/books.js';
@@ -126,7 +121,6 @@ const userLog = new Hono<AppEnv>()
                         // The rest are only meaningful for items not in a
                         // series.
                         id: sql<string>`min(${catalogItem.id}::text)`,
-                        format: sql<MediaFormat>`min(${catalogItem.format}::text)`,
                         title: sql<string>`min(${catalogItem.title})`,
                         coverUrl: lowestVolumeCover,
                     })
@@ -194,7 +188,6 @@ const userLog = new Hono<AppEnv>()
                 db()
                     .select({
                         id: catalogItem.id,
-                        format: catalogItem.format,
                         title: catalogItem.title,
                         coverUrl: catalogItem.coverUrl,
                         seriesTitle: series.title,
