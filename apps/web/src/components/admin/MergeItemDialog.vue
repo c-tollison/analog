@@ -86,13 +86,13 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Merge {{ itemTitle }}</DialogTitle>
                 <DialogDescription>
-                    Its ISBNs, shelf entries and reviews move to the item you
-                    pick, and this item is deleted. The item you pick keeps its
+                    Its ISBNs, shelf entries and reviews move to the book you
+                    pick, and this book is deleted. The book you pick keeps its
                     own title, cover, series and volume.
                 </DialogDescription>
             </DialogHeader>
             <FormError :message="merge.error.value?.message ?? null" />
-            <SearchInput v-model="search" placeholder="Search media" />
+            <SearchInput v-model="search" placeholder="Search books" />
             <div class="min-h-0 overflow-y-auto">
                 <div
                     v-if="results.isLoading.value"

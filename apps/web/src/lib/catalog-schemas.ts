@@ -61,13 +61,3 @@ const VolumeCountField = z
 export const VolumeCountFormSchema = z.object({
     volumeCount: VolumeCountField,
 });
-
-export const LinkDetailsSourceFormSchema = z
-    .object({
-        sourceId: z.string().nullable(),
-        volumeCount: VolumeCountField,
-    })
-    .refine((values) => values.sourceId !== null, {
-        message: 'Pick a match',
-        path: ['sourceId'],
-    });

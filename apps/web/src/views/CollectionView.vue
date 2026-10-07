@@ -24,14 +24,7 @@ import {
 } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
 import { useQueryParam } from '@/composables/useQueryParam';
-import {
-    completedWord,
-    FORMAT_LABELS,
-    formatStatusLabels,
-    formatsCompletedWord,
-    kindStatusLabels,
-    SERIES_KIND_LABELS,
-} from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { staggerIn } from '@/lib/motion';
 
 import { PlusIcon, SettingsIcon, XIcon } from '@lucide/vue';
@@ -108,7 +101,7 @@ function onRemove() {
 const progress = computed(() => {
     const summary = collection.value;
     if (!summary || summary.itemCount === 0) return null;
-    const counts = `${summary.completedCount} of ${summary.itemCount} ${formatsCompletedWord(summary.formats)}`;
+    const counts = `${summary.completedCount} of ${summary.itemCount} read`;
     // A visitor sees the owner's progress, so say whose it is.
     return isVisitor.value ? `${summary.ownerName} · ${counts}` : counts;
 });
@@ -213,11 +206,7 @@ const headerError = computed(
                                 <span class="text-muted-foreground text-xs">
                                     {{ entry.ownedCount }} owned ·
                                     {{ entry.completedCount }}
-                                    {{
-                                        completedWord(
-                                            kindStatusLabels(entry.series.kind)
-                                        )
-                                    }}
+                                    read
                                 </span>
                             </div>
                         </RouterLink>
@@ -249,7 +238,7 @@ const headerError = computed(
                                     {{
                                         entry.kind
                                             ? SERIES_KIND_LABELS[entry.kind]
-                                            : FORMAT_LABELS[entry.format]
+                                            : 'Book'
                                     }}
                                 </Badge>
                                 <span
@@ -262,7 +251,6 @@ const headerError = computed(
                             <ProgressMark
                                 :status="entry.status"
                                 :rating="entry.rating"
-                                :labels="formatStatusLabels(entry.format)"
                             />
                         </RouterLink>
                         <Button

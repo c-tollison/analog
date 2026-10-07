@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ProgressStatus } from '@analog/types';
-import type { StatusLabels } from '@/lib/media-types';
+import { STATUS_LABELS } from '@/lib/book-labels';
 
 import { computed } from 'vue';
 
@@ -9,7 +9,6 @@ const props = defineProps<{
     completed: number;
     inProgress: number;
     planned: number;
-    labels: StatusLabels;
 }>();
 
 const segments = computed(() =>
@@ -17,19 +16,19 @@ const segments = computed(() =>
         {
             key: 'completed',
             count: props.completed,
-            label: props.labels[ProgressStatus.Completed],
+            label: STATUS_LABELS[ProgressStatus.Completed],
             class: 'bg-status-completed',
         },
         {
             key: 'in-progress',
             count: props.inProgress,
-            label: props.labels[ProgressStatus.InProgress],
+            label: STATUS_LABELS[ProgressStatus.InProgress],
             class: 'bg-status-in-progress',
         },
         {
             key: 'planned',
             count: props.planned,
-            label: props.labels[ProgressStatus.Planned],
+            label: STATUS_LABELS[ProgressStatus.Planned],
             class: 'bg-status-planned',
         },
         {

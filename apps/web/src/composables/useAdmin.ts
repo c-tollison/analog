@@ -8,16 +8,22 @@ import {
     type IsbnSchema,
     type MergeItemSchema,
     type MergeSeriesSchema,
+    type SetGenresSchema,
     type SetSeriesItemsSchema,
     type SetVerifiedSchema,
     type UpdateCatalogItemSchema,
     type UpdateIsbnSchema,
     type UpdateItemDetailsSchema,
+    type UpdateNameSchema,
     type UpdateSeriesSchema,
 } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { GOOGLE_KEY } from './useCatalog';
+import {
+    type PaginatedListOptions,
+    usePaginatedList,
+} from './usePaginatedList';
 import {
     keepPreviousData,
     useMutation,
@@ -152,6 +158,134 @@ export function useUpdateAdminItem() {
     });
 }
 
+/** People and publishers: the two kinds of names admins fix. */
+export type NameKind = 'people' | 'publishers';
+
+function namesApi(kind: NameKind) {
+    return kind === 'people' ? api.admin.people : api.admin.publishers;
+}
+
+/** Names that match `q` or one of their other spellings, for pickers. */
+export function useAdminNameSearch(
+    kind: NameKind,
+    q: MaybeRefOrGetter<string>,
+    options: PaginatedListOptions = {}
+) {
+    return usePaginatedList(
+        () => [...ADMIN_KEY, kind, 'search', toValue(q)],
+        async (offset) =>
+            unwrap(
+                await namesApi(kind).search.$get({
+                    query: { q: toValue(q), offset },
+                })
+            ),
+        { enabled: () => toValue(q) !== '', ...options }
+    );
+}
+
+export type AdminNameRow = InferResponseType<
+    ApiClient['admin']['people']['$get'],
+    200
+>['items'][number];
+
+export function useAdminNames(
+    kind: MaybeRefOrGetter<NameKind>,
+    query: MaybeRefOrGetter<{ q: string; page: number }>
+) {
+    return useQuery({
+        queryKey: () => [...ADMIN_KEY, toValue(kind), 'list', toValue(query)],
+        queryFn: async () => {
+            const { q, page } = toValue(query);
+            return unwrap(
+                await namesApi(toValue(kind)).$get({
+                    query: {
+                        ...(q ? { q } : {}),
+                        limit: String(DEFAULT_PAGE_SIZE),
+                        offset: String((page - 1) * DEFAULT_PAGE_SIZE),
+                    },
+                })
+            );
+        },
+        placeholderData: keepPreviousData,
+    });
+}
+
+export function useAdminName(kind: NameKind, id: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: () => [...ADMIN_KEY, kind, 'detail', toValue(id)],
+        queryFn: async () =>
+            unwrap(
+                await namesApi(kind)[':id'].$get({
+                    param: { id: toValue(id) },
+                })
+            ),
+    });
+}
+
+export function useUpdateName(kind: NameKind) {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({
+            id,
+            ...json
+        }: z.input<typeof UpdateNameSchema> & { id: string }) =>
+            unwrap(await namesApi(kind)[':id'].$put({ param: { id }, json })),
+        onSuccess: afterEdit,
+    });
+}
+
+/** A publisher's page, with the publisher it's an imprint of. */
+export function useAdminPublisher(
+    id: MaybeRefOrGetter<string>,
+    enabled: MaybeRefOrGetter<boolean>
+) {
+    return useQuery({
+        enabled: () => toValue(enabled),
+        queryKey: () => [...ADMIN_KEY, 'publishers', 'detail', toValue(id)],
+        queryFn: async () =>
+            unwrap(
+                await api.admin.publishers[':id'].$get({
+                    param: { id: toValue(id) },
+                })
+            ),
+    });
+}
+
+/** Makes a publisher an imprint of another, or not one with null. */
+export function useSetParentPublisher() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({
+            id,
+            parentId,
+        }: {
+            id: string;
+            parentId: string | null;
+        }) =>
+            unwrap(
+                await api.admin.publishers[':id'].parent.$put({
+                    param: { id },
+                    json: { parentId },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
+export function useMergeName(kind: NameKind) {
+    const { afterDelete } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({ id, intoId }: { id: string; intoId: string }) =>
+            unwrap(
+                await namesApi(kind)[':id'].merge.$post({
+                    param: { id },
+                    json: { intoId },
+                })
+            ),
+        onSuccess: afterDelete,
+    });
+}
+
 export function useUpdateItemDetails() {
     const { afterEdit } = useInvalidateAll();
     return useMutation({
@@ -245,6 +379,20 @@ export function useSplitIsbn() {
     });
 }
 
+/** Takes a mistaken ISBN off an item. */
+export function useRemoveIsbn() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({ itemId, isbn }: ItemIsbn) =>
+            unwrap(
+                await api.admin.items[':id'].isbns[':isbn'].$delete({
+                    param: { id: itemId, isbn },
+                })
+            ),
+        onSuccess: afterEdit,
+    });
+}
+
 /**
  * Uploads a cover for one of an item's ISBNs. `choose` opens the file picker,
  * and the upload starts once an image is picked.
@@ -318,6 +466,23 @@ export function useAdminSeriesItems(id: MaybeRefOrGetter<string>) {
                     param: { id: toValue(id) },
                 })
             ),
+    });
+}
+
+export function useSetSeriesGenres() {
+    const { afterEdit } = useInvalidateAll();
+    return useMutation({
+        mutationFn: async ({
+            seriesId,
+            ...json
+        }: z.input<typeof SetGenresSchema> & { seriesId: string }) =>
+            unwrap(
+                await api.admin.series[':id'].genres.$put({
+                    param: { id: seriesId },
+                    json,
+                })
+            ),
+        onSuccess: afterEdit,
     });
 }
 
@@ -430,7 +595,7 @@ export function useAddSeriesVolumes() {
                         problems.push({
                             ...volume,
                             itemId: item.id,
-                            message: 'Already on another item',
+                            message: 'Already on another book',
                         });
                     }
                 } catch (err) {

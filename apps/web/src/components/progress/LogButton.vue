@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ProgressStatus } from '@analog/types';
-import AddToShelfDialog from '@/components/collections/AddToShelfDialog.vue';
 import FormError from '@/components/FormError.vue';
 import ReviewSheet from '@/components/progress/ReviewSheet.vue';
 import { Button } from '@/components/shadcn-components/button';
@@ -12,18 +11,16 @@ import {
     DropdownMenuLabel,
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/shadcn-components/dropdown-menu';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useSetProgressStatus } from '@/composables/useProgress';
-import { PROGRESS_STATUSES, type StatusLabels } from '@/lib/media-types';
+import { PROGRESS_STATUSES, STATUS_LABELS } from '@/lib/book-labels';
 
 import {
     BookmarkPlusIcon,
     CheckIcon,
     ChevronDownIcon,
-    LibraryBigIcon,
     XIcon,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
@@ -33,18 +30,12 @@ const props = defineProps<{
     catalogItemId: string;
     title: string;
     status: ProgressStatus | null;
-    labels: StatusLabels;
     // Fills its container, like a card in a grid. Drops the icon so the
     // label fits a narrow card.
     block?: boolean;
 }>();
 
 const isMenuOpen = ref(false);
-const isAddOpen = ref(false);
-const hasOpenedAdd = ref(false);
-watch(isAddOpen, (isOpen) => {
-    if (isOpen) hasOpenedAdd.value = true;
-});
 
 const { mutate, isPending, variables, error } = useSetProgressStatus();
 
@@ -117,7 +108,7 @@ function onMain() {
                     <BookmarkPlusIcon v-else />
                 </template>
                 <span class="truncate">
-                    {{ labels[shown ?? ProgressStatus.Planned] }}
+                    {{ STATUS_LABELS[shown ?? ProgressStatus.Planned] }}
                 </span>
             </Button>
             <DropdownMenuTrigger as-child>
@@ -142,17 +133,12 @@ function onMain() {
                     :key="value"
                     :value="value"
                 >
-                    {{ labels[value] }}
+                    {{ STATUS_LABELS[value] }}
                 </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
             <DropdownMenuItem v-if="shown" @select="setStatus(null)">
                 <XIcon />
                 Remove from Log
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem @select="isAddOpen = true">
-                <LibraryBigIcon />
-                Add to shelf…
             </DropdownMenuItem>
         </DropdownMenuContent>
     </DropdownMenu>
@@ -167,12 +153,5 @@ function onMain() {
         :rating="saved.rating"
         :review="saved.review"
         :completed-at="saved.completedAt"
-    />
-
-    <AddToShelfDialog
-        v-if="hasOpenedAdd"
-        v-model:open="isAddOpen"
-        :catalog-item-id="catalogItemId"
-        :title="title"
     />
 </template>

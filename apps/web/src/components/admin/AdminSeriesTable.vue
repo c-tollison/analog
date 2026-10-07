@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import {
-    type AddedSort,
-    DETAILS_SOURCE_INFO,
-    DetailsSourceSchema,
-    type VerifiedFilter,
-} from '@analog/types';
+import type { AddedSort, VerifiedFilter } from '@analog/types';
 import AdminTable from '@/components/admin/AdminTable.vue';
 import {
     addedColumn,
@@ -18,7 +13,7 @@ import {
     adminListQuery,
     useAdminSeriesList,
 } from '@/composables/useAdmin';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 
 import type { ColumnDef } from '@tanstack/vue-table';
 
@@ -43,7 +38,7 @@ const seriesTo = (row: AdminSeriesRow) => ({
 function details(row: AdminSeriesRow): string {
     const count = row.volumeCount
         ? `${row.itemCount} of ${row.volumeCount} volumes`
-        : `${row.itemCount} items`;
+        : `${row.itemCount} books`;
     return `${SERIES_KIND_LABELS[row.kind]} · ${count}`;
 }
 
@@ -59,7 +54,7 @@ const columns: ColumnDef<AdminSeriesRow>[] = [
     },
     {
         id: 'items',
-        header: 'Items',
+        header: 'Books',
         cell: ({ row }) => row.original.itemCount,
         meta: WIDE_ONLY,
     },
@@ -67,19 +62,6 @@ const columns: ColumnDef<AdminSeriesRow>[] = [
         id: 'volumeCount',
         header: 'Total volumes',
         cell: ({ row }) => row.original.volumeCount ?? '—',
-        meta: WIDE_ONLY,
-    },
-    {
-        id: 'detailsSource',
-        header: 'Data source',
-        cell: ({ row }) => {
-            const source = DetailsSourceSchema.safeParse(
-                row.original.detailsSource
-            );
-            return source.success
-                ? DETAILS_SOURCE_INFO[source.data].label
-                : '—';
-        },
         meta: WIDE_ONLY,
     },
     addedColumn(),

@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { DETAILS_SOURCE_INFO, detailsSourceFor } from '@analog/types';
 import AddVolumesDialog from '@/components/admin/AddVolumesDialog.vue';
 import AdminSeriesForm from '@/components/admin/AdminSeriesForm.vue';
 import CheckList from '@/components/admin/CheckList.vue';
 import MergeSeriesDialog from '@/components/admin/MergeSeriesDialog.vue';
+import SeriesDetailsForm from '@/components/admin/SeriesDetailsForm.vue';
 import SeriesItemsForm from '@/components/admin/SeriesItemsForm.vue';
 import VerifiedBy from '@/components/admin/VerifiedBy.vue';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
-import ExternalLinks from '@/components/media/ExternalLinks.vue';
-import LinkDetailsSourceDialog from '@/components/series/LinkDetailsSourceDialog.vue';
 import VolumeCountDialog from '@/components/series/VolumeCountDialog.vue';
 import {
     Alert,
@@ -40,7 +38,6 @@ import { goBackOr } from '@/lib/navigation';
 import {
     CopyIcon,
     InfoIcon,
-    LinkIcon,
     MergeIcon,
     PencilIcon,
     PlusIcon,
@@ -68,7 +65,6 @@ const itemChecks = computed(
 const setVerified = useSetSeriesVerified();
 const remove = useDeleteAdminSeries();
 
-const isLinkOpen = ref(false);
 const isVolumeCountOpen = ref(false);
 const isMergeOpen = ref(false);
 const isAddVolumesOpen = ref(false);
@@ -86,11 +82,6 @@ function openMerge(into: { id: string; title: string } | null) {
     isMergeOpen.value = true;
 }
 const confirmingDelete = ref(false);
-
-// Where this kind of series can get more details, e.g. AniList for manga.
-const linkSource = computed(() =>
-    series.value ? detailsSourceFor(series.value.kind) : null
-);
 
 // Rebuild the items form when items join or leave the series.
 const itemsKey = computed(
@@ -153,16 +144,6 @@ function onDelete() {
             <VolumeCountDialog
                 v-model:open="isVolumeCountOpen"
                 :series-id="series.id"
-                :volume-count="series.volumeCount"
-            />
-            <LinkDetailsSourceDialog
-                v-if="linkSource"
-                v-model:open="isLinkOpen"
-                :series-id="series.id"
-                :series-title="series.title"
-                :source="linkSource"
-                :linked-id="series.detailsId"
-                :linked-title="series.detailsTitle"
                 :volume-count="series.volumeCount"
             />
 
@@ -255,7 +236,7 @@ function onDelete() {
                                         </PopoverTrigger>
                                     </WithTooltip>
                                     <PopoverContent class="w-64 text-sm">
-                                        Move or merge its items before deleting
+                                        Move or merge its books before deleting
                                         it.
                                     </PopoverContent>
                                 </Popover>
@@ -293,33 +274,14 @@ function onDelete() {
                                 </Button>
                             </WithTooltip>
                         </dd>
-                        <template v-if="linkSource">
-                            <dt class="text-muted-foreground">Data source</dt>
-                            <dd class="flex flex-wrap items-center gap-2">
-                                <template v-if="series.detailsSource">
-                                    <ExternalLinks :links="series.links" />
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        @click="isLinkOpen = true"
-                                    >
-                                        <PencilIcon />
-                                        Edit link
-                                    </Button>
-                                </template>
-                                <Button
-                                    v-else
-                                    variant="outline"
-                                    size="sm"
-                                    @click="isLinkOpen = true"
-                                >
-                                    <LinkIcon />
-                                    Link
-                                    {{ DETAILS_SOURCE_INFO[linkSource].label }}
-                                </Button>
-                            </dd>
-                        </template>
                     </dl>
+
+                    <Separator />
+
+                    <SeriesDetailsForm
+                        :series="series"
+                        :volume-count="items?.length ?? 0"
+                    />
                 </div>
             </div>
 

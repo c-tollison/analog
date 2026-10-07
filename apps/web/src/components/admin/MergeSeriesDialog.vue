@@ -62,9 +62,9 @@ watch(open, (isOpen) => {
             <DialogHeader>
                 <DialogTitle>Merge {{ seriesTitle }}</DialogTitle>
                 <DialogDescription>
-                    Its items move to the series you pick, and this series is
+                    Its books move to the series you pick, and this series is
                     deleted. The series you pick keeps its own name, language
-                    and AniList link.
+                    and details.
                 </DialogDescription>
             </DialogHeader>
             <form class="grid gap-4" novalidate @submit="submit">

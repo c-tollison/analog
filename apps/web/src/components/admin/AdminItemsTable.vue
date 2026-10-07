@@ -17,8 +17,8 @@ import {
     useAdminItems,
     useUploadCover,
 } from '@/composables/useAdmin';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { isPendingFor } from '@/lib/editions';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
 
 import { UploadIcon } from '@lucide/vue';
 import type { ColumnDef } from '@tanstack/vue-table';

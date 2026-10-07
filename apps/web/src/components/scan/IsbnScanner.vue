@@ -81,9 +81,6 @@ function scanAnother() {
 </script>
 
 <template>
-    <!-- The pickers stay up until there's a collection to add to. -->
-    <slot v-if="!lookup || !collection" />
-
     <template v-if="lookup">
         <Alert v-if="!collection">
             <CircleAlertIcon />

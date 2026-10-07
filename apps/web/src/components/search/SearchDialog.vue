@@ -33,7 +33,7 @@ import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useSeriesSearch } from '@/composables/useSeries';
 import { useUserSearch } from '@/composables/useUsers';
 import type { ApiClient } from '@/lib/api';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { staggerIn } from '@/lib/motion';
 import { useSearchStore } from '@/stores/search';
 
@@ -49,7 +49,7 @@ import { computed, ref, watch } from 'vue';
 import { type RouteLocationRaw, useRouter } from 'vue-router';
 
 const KINDS = [
-    { value: 'books', label: 'Media', more: 'More media' },
+    { value: 'books', label: 'Books', more: 'More books' },
     { value: 'series', label: 'Series', more: 'More series' },
     { value: 'people', label: 'People', more: 'More people' },
     { value: 'shelves', label: 'Shelves', more: 'More from your shelves' },
@@ -148,7 +148,7 @@ const rows = computed<Record<Kind, Row[]>>(() => ({
                 book.position !== null &&
                 `#${book.position} in ${book.seriesTitle}`,
             book.author,
-            book.releaseDate?.slice(0, 4)
+            book.firstPublishedYear?.toString()
         ),
         to: { name: 'item', params: { id: book.id } },
         cover: book.coverUrl,
@@ -250,7 +250,7 @@ watch(
             <DialogHeader class="sr-only">
                 <DialogTitle>Search</DialogTitle>
                 <DialogDescription>
-                    Search media, series, people and your shelves.
+                    Search books, series, people and your shelves.
                 </DialogDescription>
             </DialogHeader>
 

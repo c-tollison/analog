@@ -91,13 +91,12 @@ Drizzle types the queries and zod validates requests. The web client in `@analog
 
 ## Product words
 
-`docs/shelves-and-log.md` has the full plan for shelves, the Log and search.
-
 - **Shelf** is the UI word for a collection. Web URLs say `/shelves`. The database, API and composables keep `collection`.
 - **Log** is the UI word for a person's statuses, ratings and reviews, stored in `progress`.
 - **Edition** is the UI word for one ISBN of a catalog item, stored in `catalog_item_isbn`. Only say "ISBN" where people type or scan one.
 - A shelf entry owns at least one edition. Shelves count editions, series progress counts volumes, and the Log counts catalog items.
-- UI text is media-neutral. Say "items" or "media", not "books". Never show "catalog" outside admin pages. Status labels may name the format, like "Want to read".
+- Analog tracks books only: manga, light novels, graphic novels and other books. There are no other media types.
+- **Book** is the UI word for a catalog item. UI text says "book", not "item" or "media". The database, API and code keep `catalog_item` and `/items`. Never show "catalog" outside admin pages.
 
 ## Writing
 

@@ -16,8 +16,8 @@ import { Spinner } from '@/components/shadcn-components/spinner';
 import WithTooltip from '@/components/WithTooltip.vue';
 import { useSearchTerm } from '@/composables/useSearchTerm';
 import { useSeriesSearch } from '@/composables/useSeries';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import type { AddBookFormSchema } from '@/lib/catalog-schemas';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
 
 import { PlusIcon, XIcon } from '@lucide/vue';
 import { computed, ref, useAttrs, watch } from 'vue';
