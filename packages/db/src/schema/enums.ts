@@ -1,9 +1,11 @@
 import {
+    Audience,
     CheckRule,
     CheckTrigger,
     CollectionRole,
+    EditionFormat,
     ExternalSource,
-    MediaFormat,
+    PersonRole,
     ProgressStatus,
     SeriesKind,
     UserRole,
@@ -23,7 +25,6 @@ function values<T extends string>(enumObject: Record<string, T>): [T, ...T[]] {
 }
 
 export const seriesKind = appSchema.enum('series_kind', values(SeriesKind));
-export const mediaFormat = appSchema.enum('media_format', values(MediaFormat));
 export const collectionRole = appSchema.enum(
     'collection_role',
     values(CollectionRole)
@@ -36,6 +37,12 @@ export const progressStatus = appSchema.enum(
     'progress_status',
     values(ProgressStatus)
 );
+export const audience = appSchema.enum('audience', values(Audience));
+export const editionFormat = appSchema.enum(
+    'edition_format',
+    values(EditionFormat)
+);
+export const personRole = appSchema.enum('person_role', values(PersonRole));
 export const userRole = appSchema.enum('user_role', values(UserRole));
 export const checkRule = appSchema.enum('check_rule', values(CheckRule));
 export const checkTrigger = appSchema.enum(
