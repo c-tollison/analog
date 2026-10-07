@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { AUDIENCE_GROUPS, AUDIENCE_LABELS, Audience } from '@analog/types';
+import GenrePicker from '@/components/admin/GenrePicker.vue';
+import PeoplePicker from '@/components/admin/PeoplePicker.vue';
 import FormError from '@/components/FormError.vue';
 import { Button } from '@/components/shadcn-components/button';
 import {
@@ -12,7 +15,9 @@ import { Input } from '@/components/shadcn-components/input';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from '@/components/shadcn-components/select';
@@ -21,49 +26,40 @@ import { Textarea } from '@/components/shadcn-components/textarea';
 import { type AdminItem, useUpdateItemDetails } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
 import { ItemDetailsFormSchema } from '@/lib/admin-schemas';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import { ref } from 'vue';
 
-// The book's details that aren't one ISBN's. Lists are typed with commas.
+// The book's details that aren't one ISBN's.
 const props = defineProps<{ item: AdminItem }>();
+
+const NOT_SET = 'none';
 
 const update = useUpdateItemDetails();
 const saved = ref(false);
-
-function splitList(text: string): string[] {
-    return text
-        .split(',')
-        .map((name) => name.trim())
-        .filter(Boolean);
-}
 
 const { submit, formError, isSubmitting, fieldProps } = useAppForm({
     schema: ItemDetailsFormSchema,
     initialValues: {
         kind: props.item.kind ?? undefined,
-        authors: props.item.authors.join(', '),
-        genres: props.item.genres.join(', '),
-        characters: props.item.characters.join(', '),
+        genres: props.item.genres,
+        audience: props.item.audience ?? NOT_SET,
+        authors: props.item.authors,
+        illustrators: props.item.illustrators,
         description: props.item.description ?? '',
-        publishDate: props.item.publishDate ?? '',
-        firstPublishYear: props.item.firstPublishYear ?? '',
-        pageCount: props.item.pageCount ?? '',
-        editionName: props.item.editionName ?? '',
-        goodreadsId: props.item.goodreadsId ?? '',
+        firstPublishedYear: props.item.firstPublishedYear ?? '',
     },
-    onSubmit: async ({ kind, authors, genres, characters, ...values }) => {
+    onSubmit: async ({ kind, audience, ...values }) => {
         saved.value = false;
         await update.mutateAsync({
             itemId: props.item.id,
             ...values,
             // A series sets the kind of its items.
             kind: props.item.seriesId ? undefined : kind,
-            authors: splitList(authors),
-            genres: splitList(genres),
-            characters: splitList(characters),
-            goodreadsId: values.goodreadsId || null,
+            audience:
+                Object.values(Audience).find((value) => value === audience) ??
+                (props.item.seriesId ? props.item.audience : null),
         });
         saved.value = true;
         return undefined;
@@ -83,7 +79,46 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                 <FormItem>
                     <FormLabel>Authors</FormLabel>
                     <FormControl>
-                        <Input v-no-autofill v-bind="componentField" />
+                        <PeoplePicker
+                            v-bind="componentField"
+                            placeholder="Add an author…"
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            </FormField>
+            <FormField
+                v-slot="{ componentField }"
+                v-bind="fieldProps"
+                name="illustrators"
+            >
+                <FormItem>
+                    <FormLabel>Illustrators</FormLabel>
+                    <FormControl>
+                        <PeoplePicker
+                            v-bind="componentField"
+                            placeholder="Add an illustrator…"
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            </FormField>
+            <FormField
+                v-slot="{ componentField }"
+                v-bind="fieldProps"
+                name="firstPublishedYear"
+            >
+                <FormItem>
+                    <FormLabel>First published</FormLabel>
+                    <FormControl>
+                        <Input
+                            type="number"
+                            inputmode="numeric"
+                            v-no-autofill
+                            min="0"
+                            placeholder="Year"
+                            v-bind="componentField"
+                        />
                     </FormControl>
                     <FormMessage />
                 </FormItem>
@@ -115,6 +150,9 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                     <FormMessage />
                 </FormItem>
             </FormField>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-[1fr_12rem]">
             <FormField
                 v-slot="{ componentField }"
                 v-bind="fieldProps"
@@ -123,21 +161,46 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                 <FormItem>
                     <FormLabel>Genres</FormLabel>
                     <FormControl>
-                        <Input v-no-autofill v-bind="componentField" />
+                        <GenrePicker
+                            v-bind="componentField"
+                            placeholder="Add a genre…"
+                        />
                     </FormControl>
                     <FormMessage />
                 </FormItem>
             </FormField>
+            <!-- A series sets the audience of its volumes. -->
             <FormField
+                v-if="!item.seriesId"
                 v-slot="{ componentField }"
                 v-bind="fieldProps"
-                name="characters"
+                name="audience"
             >
                 <FormItem>
-                    <FormLabel>Characters</FormLabel>
-                    <FormControl>
-                        <Input v-no-autofill v-bind="componentField" />
-                    </FormControl>
+                    <FormLabel>Audience</FormLabel>
+                    <Select v-bind="componentField">
+                        <FormControl>
+                            <SelectTrigger class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem :value="NOT_SET">Not set</SelectItem>
+                            <SelectGroup
+                                v-for="group in AUDIENCE_GROUPS"
+                                :key="group.label"
+                            >
+                                <SelectLabel>{{ group.label }}</SelectLabel>
+                                <SelectItem
+                                    v-for="value in group.audiences"
+                                    :key="value"
+                                    :value="value"
+                                >
+                                    {{ AUDIENCE_LABELS[value] }}
+                                </SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
                     <FormMessage />
                 </FormItem>
             </FormField>
@@ -156,91 +219,6 @@ const { submit, formError, isSubmitting, fieldProps } = useAppForm({
                 <FormMessage />
             </FormItem>
         </FormField>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-            <FormField
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="firstPublishYear"
-            >
-                <FormItem>
-                    <FormLabel>First published</FormLabel>
-                    <FormControl>
-                        <Input
-                            type="number"
-                            inputmode="numeric"
-                            v-no-autofill
-                            min="0"
-                            placeholder="Year"
-                            v-bind="componentField"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <FormField
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="publishDate"
-            >
-                <FormItem>
-                    <FormLabel>This edition</FormLabel>
-                    <FormControl>
-                        <Input v-no-autofill v-bind="componentField" />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <FormField
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="pageCount"
-            >
-                <FormItem>
-                    <FormLabel>Pages</FormLabel>
-                    <FormControl>
-                        <Input
-                            type="number"
-                            inputmode="numeric"
-                            v-no-autofill
-                            min="1"
-                            v-bind="componentField"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <FormField
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="editionName"
-            >
-                <FormItem>
-                    <FormLabel>Edition name</FormLabel>
-                    <FormControl>
-                        <Input v-no-autofill v-bind="componentField" />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-            <FormField
-                v-slot="{ componentField }"
-                v-bind="fieldProps"
-                name="goodreadsId"
-            >
-                <FormItem>
-                    <FormLabel>Goodreads id</FormLabel>
-                    <FormControl>
-                        <Input
-                            inputmode="numeric"
-                            v-no-autofill
-                            v-bind="componentField"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            </FormField>
-        </div>
 
         <div class="flex items-center gap-3">
             <Button type="submit" :disabled="isSubmitting">

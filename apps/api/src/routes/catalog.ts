@@ -46,7 +46,7 @@ async function requireCatalogItem(id: string): Promise<void> {
         where: eq(catalogItem.id, id),
     });
     if (!found) {
-        throw new HTTPException(404, { message: 'Item not found' });
+        throw new HTTPException(404, { message: 'Book not found' });
     }
 }
 

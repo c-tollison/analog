@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AddByIsbnDialog from '@/components/search/AddByIsbnDialog.vue';
 import SearchDialog from '@/components/search/SearchDialog.vue';
+import { isRestoredPage } from '@/lib/navigation';
 import { pageEntered } from '@/lib/scroll';
 import { useSearchStore } from '@/stores/search';
 
@@ -28,9 +29,19 @@ onKeyStroke('k', (event) => {
                 <Transition
                     mode="out-in"
                     @enter="pageEntered"
-                    enter-active-class="motion-safe:animate-in fade-in slide-in-from-bottom-2 animation-duration-300 ease-out"
+                    :enter-active-class="
+                        isRestoredPage
+                            ? ''
+                            : 'motion-safe:animate-in fade-in slide-in-from-bottom-2 animation-duration-300 ease-out'
+                    "
                 >
-                    <component :is="Component" />
+                    <component
+                        :is="Component"
+                        :class="{
+                            '[&_*]:animate-none! [&_img]:transition-none!':
+                                isRestoredPage,
+                        }"
+                    />
                 </Transition>
             </RouterView>
         </main>

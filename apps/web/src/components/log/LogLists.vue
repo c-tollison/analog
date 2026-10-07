@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogRange, MediaFormat, ProgressStatus } from '@analog/types';
+import { LogRange, ProgressStatus } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
@@ -28,16 +28,13 @@ import {
     useWantToRead,
 } from '@/composables/useLog';
 import { useQueryParam } from '@/composables/useQueryParam';
-import { formatStatusLabels } from '@/lib/media-types';
+import { STATUS_LABELS } from '@/lib/book-labels';
 import { staggerIn } from '@/lib/motion';
 
 import { computed } from 'vue';
 import { z } from 'zod';
 
 const props = defineProps<{ username: string; isMe: boolean }>();
-
-// Books are the only media so far, so the tabs use their words.
-const labels = formatStatusLabels(MediaFormat.Book);
 
 const StatusSchema = z.enum(ProgressStatus);
 // "status" and not "tab", since the profile page uses "tab" for Log and
@@ -102,13 +99,13 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
         <Tabs :model-value="tab" class="gap-4" @update:model-value="onTab">
             <TabsList>
                 <TabsTrigger :value="ProgressStatus.InProgress">
-                    {{ labels[ProgressStatus.InProgress] }}
+                    {{ STATUS_LABELS[ProgressStatus.InProgress] }}
                 </TabsTrigger>
                 <TabsTrigger :value="ProgressStatus.Planned">
-                    {{ labels[ProgressStatus.Planned] }}
+                    {{ STATUS_LABELS[ProgressStatus.Planned] }}
                 </TabsTrigger>
                 <TabsTrigger :value="ProgressStatus.Completed">
-                    {{ labels[ProgressStatus.Completed] }}
+                    {{ STATUS_LABELS[ProgressStatus.Completed] }}
                 </TabsTrigger>
             </TabsList>
 

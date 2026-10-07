@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNull, or, schema } from '@analog/db';
-import { CheckTrigger, MediaFormat } from '@analog/types';
+import { CheckTrigger } from '@analog/types';
 
 import { refreshBook } from '../lib/books.js';
 import { checkInBackground, settleChecks } from '../lib/check-runs.js';
@@ -31,7 +31,6 @@ async function main() {
         .from(catalogItem)
         .where(
             and(
-                eq(catalogItem.format, MediaFormat.Book),
                 // Only books with a main ISBN can be looked up again.
                 inArray(
                     catalogItem.id,

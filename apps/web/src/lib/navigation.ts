@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import type { RouteLocationRaw, Router } from 'vue-router';
 
 /**
@@ -36,4 +37,24 @@ export function goBackTo(router: Router, to: RouteLocationRaw): boolean {
     if (index === -1) return false;
     router.go(index - position);
     return true;
+}
+
+/**
+ * True when the page on screen was reached with the back or forward button.
+ * That page shows up as it was left, with no animations. It only changes when
+ * the page itself changes, so nothing on screen starts animating later.
+ */
+export const isRestoredPage = ref(false);
+
+export function trackRestores(router: Router) {
+    let popped = false;
+    router.options.history.listen(() => {
+        popped = true;
+    });
+    router.afterEach((to, from, failure) => {
+        if (!failure && to.matched.at(-1) !== from.matched.at(-1)) {
+            isRestoredPage.value = popped;
+        }
+        popped = false;
+    });
 }

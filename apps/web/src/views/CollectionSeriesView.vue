@@ -15,11 +15,7 @@ import {
     useCollectionSeriesItems,
 } from '@/composables/useCollections';
 import { usePageTitle } from '@/composables/usePageTitle';
-import {
-    completedWord,
-    kindStatusLabels,
-    SERIES_KIND_LABELS,
-} from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { staggerIn } from '@/lib/motion';
 import { missingVolumes } from '@/lib/volumes';
 
@@ -64,10 +60,6 @@ const volumes = useCollectionSeriesItems(
     () => props.seriesId
 );
 
-const labels = computed(() =>
-    detail.value ? kindStatusLabels(detail.value.series.kind) : null
-);
-
 const percent = computed(() =>
     detail.value?.ownedCount
         ? Math.round(
@@ -108,7 +100,7 @@ const headerError = computed(
         </div>
 
         <div
-            v-if="detail && labels"
+            v-if="detail"
             class="motion-safe:animate-in fade-in animation-duration-500 flex gap-4"
         >
             <CoverImage
@@ -149,7 +141,7 @@ const headerError = computed(
                             </template>
                             {{ detail.completedCount }} of
                             {{ detail.ownedCount }}
-                            {{ completedWord(labels) }}
+                            read
                         </span>
                         <span class="text-muted-foreground">
                             {{ percent }}%
@@ -210,10 +202,8 @@ const headerError = computed(
                                 {{ item.title }}
                             </p>
                             <ProgressMark
-                                v-if="labels"
                                 :status="item.status"
                                 :rating="item.rating"
-                                :labels="labels"
                             />
                         </RouterLink>
                     </li>

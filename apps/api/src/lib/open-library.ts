@@ -1,9 +1,4 @@
-import {
-    ExternalSource,
-    isoLanguage,
-    languageName,
-    SeriesKind,
-} from '@analog/types';
+import { ExternalSource, isoLanguage, SeriesKind } from '@analog/types';
 
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -43,7 +38,11 @@ const EditionSchema = z.object({
 
 type Edition = z.infer<typeof EditionSchema>;
 
-const WorkSchema = EditionSchema.pick({ subjects: true, description: true });
+const WorkSchema = EditionSchema.pick({ description: true }).extend({
+    authors: z
+        .array(z.object({ author: z.object({ key: z.string() }) }))
+        .optional(),
+});
 
 const AuthorSchema = z.object({
     name: z.string(),
@@ -55,14 +54,11 @@ const SearchSchema = z.object({
     docs: z.array(
         z.object({
             first_publish_year: z.number().optional(),
-            subject: z.array(z.string()).optional(),
         })
     ),
 });
 const AUTHOR_KEY = /^\/authors\/OL\d+A$/;
 const WORK_KEY = /^\/works\/OL\d+W$/;
-const MAX_CHARACTERS = 8;
-const FICTIONAL_CHARACTER = /\s*\(fictitious character\)\s*$/i;
 // Anything outside the Latin alphabet, ignoring spaces, punctuation and accents.
 const NON_LATIN = /[^\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
 
@@ -82,13 +78,22 @@ function matches(values: string[] | undefined, pattern: RegExp): boolean {
     return !!values?.some((value) => pattern.test(value));
 }
 
+// The kinds a book can be. Lookups only tell manga and light novels from
+// other books, and admins set the rest.
+export type BookKind =
+    | SeriesKind.Manga
+    | SeriesKind.LightNovel
+    | SeriesKind.Book
+    | SeriesKind.GraphicNovel
+    | SeriesKind.ShortStories;
+
 export function bookKind({
     subjects,
     publishers,
 }: {
     subjects?: string[];
     publishers?: string[];
-}): SeriesKind.Manga | SeriesKind.LightNovel | SeriesKind.Book {
+}): BookKind {
     // Checked first: light novel imprints share publishers with manga.
     if (
         matches(subjects, LIGHT_NOVEL_SUBJECTS) ||
@@ -157,19 +162,63 @@ async function getAuthorName(key: string): Promise<string | null> {
     );
 }
 
+const TRANSLATOR = /translat/i;
+const ILLUSTRATOR = /illustrat|artist/i;
+// Contributors who didn't write the book.
+const NOT_AUTHOR = /translat|illustrat|artist|editor|foreword|introduc/i;
+
+// Contributors listed with a role like "Translator".
+function contributorsAs(edition: Edition, role: RegExp): string[] {
+    const names = (edition.contributors ?? [])
+        .filter(
+            (contributor) => contributor.role && role.test(contributor.role)
+        )
+        .map((contributor) => contributor.name);
+    return [...new Set(names)];
+}
+
+// A name from a credit line like "translated from the Polish by Danuta
+// Borchardt ; foreword by Susan Sontag".
+function byStatementAs(edition: Edition, role: RegExp): string[] {
+    const part = edition.by_statement
+        ?.split(';')
+        .find((text) => role.test(text));
+    const name = part
+        ?.match(/\bby\s+(.+)$/i)?.[1]
+        ?.trim()
+        .replace(/\.$/, '');
+    return name ? [name] : [];
+}
+
+function creditsAs(edition: Edition, role: RegExp): string[] {
+    const listed = contributorsAs(edition, role);
+    return listed.length ? listed : byStatementAs(edition, role);
+}
+
 // Credits written on the edition itself, for when author records don't help.
 function editionCredits(edition: Edition): string[] {
-    if (edition.contributors?.length) {
-        return [...new Set(edition.contributors.map((c) => c.name))];
+    const writers = (edition.contributors ?? [])
+        .filter(
+            (contributor) =>
+                !contributor.role || !NOT_AUTHOR.test(contributor.role)
+        )
+        .map((contributor) => contributor.name);
+    if (writers.length) {
+        return [...new Set(writers)];
     }
-    return edition.by_statement ? [edition.by_statement] : [];
+    const line = edition.by_statement;
+    return line && !NOT_AUTHOR.test(line) ? [line.replace(/\.$/, '')] : [];
+}
+
+async function authorNames(keys: string[]): Promise<string[]> {
+    const names = await Promise.all(keys.map((key) => getAuthorName(key)));
+    return names.filter((name): name is string => !!name);
 }
 
 async function getAuthors(edition: Edition): Promise<string[]> {
-    const names = await Promise.all(
-        (edition.authors ?? []).map((author) => getAuthorName(author.key))
+    const authors = await authorNames(
+        (edition.authors ?? []).map((author) => author.key)
     );
-    const authors = names.filter((name): name is string => !!name);
     return authors.length ? authors : editionCredits(edition);
 }
 
@@ -193,12 +242,12 @@ function languageCode(languages: Edition['languages']): string | null {
     return code ? isoLanguage(code) : null;
 }
 
-// Search results carry what's pooled across every edition of the book: the
-// year it first came out, and fuller subjects that name its characters.
+// Search results carry the year the book first came out, pooled across
+// every edition.
 async function getSearchDoc(isbn: string) {
     const parsed = SearchSchema.safeParse(
         await getJson(
-            `/search.json?q=isbn:${isbn}&fields=first_publish_year,subject&limit=1`
+            `/search.json?q=isbn:${isbn}&fields=first_publish_year&limit=1`
         )
     );
     return parsed.success ? (parsed.data.docs[0] ?? {}) : {};
@@ -216,35 +265,9 @@ function descriptionText(description: Edition['description']): string | null {
     return text?.trim() || null;
 }
 
-function unique(values: string[], limit: number): string[] {
-    const seen = new Set<string>();
-    return values
-        .map((value) => value.trim())
-        .filter((value) => {
-            const key = value.toLowerCase();
-            if (!value || seen.has(key)) {
-                return false;
-            }
-            seen.add(key);
-            return true;
-        })
-        .slice(0, limit);
-}
-
-// Subjects are mostly library tags, but name characters like
-// "Ichigo Kurosaki (Fictitious character)".
-function characters(subjects: string[]): string[] {
-    return unique(
-        subjects
-            .filter((subject) => FICTIONAL_CHARACTER.test(subject))
-            .map((subject) => subject.replace(FICTIONAL_CHARACTER, '')),
-        MAX_CHARACTERS
-    );
-}
-
 /**
  * Everything about an edition beyond what identifies it. Open Library keeps
- * the description and subjects on the work more often than the edition, and
+ * the description on the work more often than the edition, and
  * the first published year only in search, so those are checked too.
  * `complete` is false when one of those extra requests failed, so the
  * caller can try again later.
@@ -260,16 +283,18 @@ async function getDetails(edition: Edition, isbn: string) {
         }
     }
 
-    const [authors, work, searchDoc] = await Promise.all([
+    const [editionAuthors, work, searchDoc] = await Promise.all([
         attempt(getAuthors(edition), editionCredits(edition)),
         attempt(getWork(edition), {}),
         attempt(getSearchDoc(isbn), {}),
     ]);
-    const subjects = [
-        ...(searchDoc.subject ?? []),
-        ...(work.subjects ?? []),
-        ...(edition.subjects ?? []),
-    ];
+    // Some editions only list their authors on the work.
+    const authors = editionAuthors.length
+        ? editionAuthors
+        : await attempt(
+              authorNames((work.authors ?? []).map(({ author }) => author.key)),
+              []
+          );
     // Open Library's subjects are library tags, not genres.
     const genres: string[] = [];
     const details = {
@@ -282,12 +307,10 @@ async function getDetails(edition: Edition, isbn: string) {
         description:
             descriptionText(edition.description) ??
             descriptionText(work.description),
-        characters: characters(subjects),
+        illustrators: creditsAs(edition, ILLUSTRATOR),
+        translators: creditsAs(edition, TRANSLATOR),
         editionName: editionName(edition.edition_name),
         physicalFormat: edition.physical_format?.trim() || null,
-        languages: (edition.languages ?? [])
-            .map((language) => languageName(keyCode(language.key)))
-            .filter((name): name is string => !!name),
         goodreadsId: edition.identifiers?.goodreads?.[0] ?? null,
         genres,
     };
@@ -347,18 +370,29 @@ export function parseVolume(
 }
 
 // Open Library dates are free text: "2016", "2019-06-04", "June 4, 2019".
-export function parseReleaseDate(raw: string | undefined): string | null {
-    if (!raw) {
-        return null;
-    }
-    const year = raw.trim().match(/^\d{4}$/);
-    if (year) {
-        return `${year[0]}-01-01`;
-    }
-    const parsed = Date.parse(raw);
-    return Number.isNaN(parsed)
-        ? null
-        : new Date(parsed).toISOString().slice(0, 10);
+/**
+ * The year and, when a day is given, the full date of a release like
+ * "September 3, 2019", "2019-09-03", "Sep 2019" or "2019".
+ */
+export function parseRelease(raw: string | undefined): {
+    releaseYear: number | null;
+    releaseDate: string | null;
+} {
+    const text = raw?.trim() ?? '';
+    const year = text.match(/(?<!\d)(\d{4})(?!\d)/)?.[1];
+    const releaseYear = year ? Number(year) : null;
+    // A day is the end of an ISO date, or a one or two digit number outside
+    // a year and month like "2019-09".
+    const hasDay =
+        /^\d{4}-\d{2}-\d{2}/.test(text) ||
+        (!/^\d{4}-\d{2}$/.test(text) && /(^|\D)\d{1,2}(\D|$)/.test(text));
+    const parsed = hasDay ? Date.parse(text) : Number.NaN;
+    return {
+        releaseYear,
+        releaseDate: Number.isNaN(parsed)
+            ? null
+            : new Date(parsed).toISOString().slice(0, 10),
+    };
 }
 
 export type BookLookup = NonNullable<
@@ -381,7 +415,7 @@ export async function lookupIsbn(isbn: string) {
             isbn,
             title: edition.title,
             ...details,
-            releaseDate: parseReleaseDate(edition.publish_date),
+            ...parseRelease(edition.publish_date),
             kind: bookKind(edition),
             series: rawSeries
                 ? cleanSeriesName(rawSeries)

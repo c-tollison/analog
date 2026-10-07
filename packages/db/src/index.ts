@@ -5,6 +5,7 @@ import { Pool, type PoolConfig } from 'pg';
 export type { Column, SQL } from 'drizzle-orm';
 export {
     and,
+    arrayContains,
     asc,
     count,
     desc,
@@ -24,7 +25,7 @@ export {
     or,
     sql,
 } from 'drizzle-orm';
-export { alias } from 'drizzle-orm/pg-core';
+export { alias, unionAll } from 'drizzle-orm/pg-core';
 export { schema };
 
 export type Database = ReturnType<typeof createDb>;

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { ProgressStatus } from '@analog/types';
 import { Badge } from '@/components/shadcn-components/badge';
-import type { StatusLabels } from '@/lib/media-types';
+import { STATUS_LABELS } from '@/lib/book-labels';
 
 defineProps<{
     status: ProgressStatus | null;
     rating: number | null;
-    labels: StatusLabels;
 }>();
 </script>
 
@@ -15,7 +14,7 @@ defineProps<{
 <template>
     <div class="flex h-5 items-center">
         <Badge v-if="rating === null && status" variant="outline">
-            {{ labels[status] }}
+            {{ STATUS_LABELS[status] }}
         </Badge>
     </div>
 </template>

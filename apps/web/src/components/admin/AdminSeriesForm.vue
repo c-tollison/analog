@@ -25,7 +25,7 @@ import WithTooltip from '@/components/WithTooltip.vue';
 import { type AdminSeries, useUpdateAdminSeries } from '@/composables/useAdmin';
 import { useAppForm } from '@/composables/useAppForm';
 import { AdminSeriesFormSchema } from '@/lib/admin-schemas';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 
 import { InfoIcon } from '@lucide/vue';
 import { watch } from 'vue';
@@ -117,7 +117,7 @@ watch(() => values.kind, saveIfChanged);
                             </PopoverTrigger>
                         </WithTooltip>
                         <PopoverContent class="w-64 text-sm">
-                            Changing the kind changes it for every item in this
+                            Changing the kind changes it for every book in this
                             series.
                         </PopoverContent>
                     </Popover>

@@ -275,12 +275,12 @@ const checkError = computed(
                                     <ArrowRightLeftIcon />
                                 </Button>
                             </WithTooltip>
-                            <WithTooltip label="Open media page">
+                            <WithTooltip label="Open book page">
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     as-child
-                                    aria-label="Open media page"
+                                    aria-label="Open book page"
                                 >
                                     <RouterLink
                                         :to="{

@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ProgressStatus } from '@analog/types';
+import {
+    EDITION_FORMAT_LABELS,
+    EditionFormat,
+    PersonRole,
+    ProgressStatus,
+} from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import AddToShelfDialog from '@/components/collections/AddToShelfDialog.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
-import EditionItem from '@/components/media/EditionItem.vue';
+import EditionCard from '@/components/media/EditionCard.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import LogButton from '@/components/progress/LogButton.vue';
 import ReviewSheet from '@/components/progress/ReviewSheet.vue';
@@ -29,7 +34,12 @@ import {
     TabsList,
     TabsTrigger,
 } from '@/components/shadcn-components/tabs';
+import {
+    ToggleGroup,
+    ToggleGroupItem,
+} from '@/components/shadcn-components/toggle-group';
 import UserAvatar from '@/components/users/UserAvatar.vue';
+import WithTooltip from '@/components/WithTooltip.vue';
 import {
     useItem,
     useItemEditions,
@@ -37,12 +47,9 @@ import {
 } from '@/composables/useItems';
 import { usePageTitle } from '@/composables/usePageTitle';
 import { useQueryParam } from '@/composables/useQueryParam';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
+import { creditLines } from '@/lib/credits';
 import { formatDate } from '@/lib/dates';
-import {
-    FORMAT_LABELS,
-    formatStatusLabels,
-    SERIES_KIND_LABELS,
-} from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
 
 import { LibraryBigIcon, PencilIcon, PlusIcon, StarIcon } from '@lucide/vue';
@@ -58,16 +65,42 @@ usePageTitle(() => item.value?.title);
 // Reviews.
 const tab = useQueryParam('tab', ['details', 'editions', 'reviews'], 'details');
 
+// The editions tab's format filter. "all" shows every edition.
+const ALL_FORMATS = 'all';
+const formatFilter = useQueryParam(
+    'format',
+    [ALL_FORMATS, ...Object.values(EditionFormat)],
+    ALL_FORMATS
+);
+const pickedFormat = computed(() =>
+    formatFilter.value === ALL_FORMATS ? null : formatFilter.value
+);
+
+// Chips for the formats this book has editions in. Editions with no format
+// only show under All.
+const formatChips = computed(() =>
+    (item.value?.editionFormats ?? []).flatMap(({ format, count }) =>
+        format ? [{ format, count }] : []
+    )
+);
+
+function onFormat(value: unknown) {
+    formatFilter.value =
+        Object.values(EditionFormat).find((format) => format === value) ??
+        ALL_FORMATS;
+}
+
 // Each list loads when its tab is first opened.
 const editions = useItemEditions(() => props.id, {
     enabled: () => tab.value === 'editions',
+    format: pickedFormat,
 });
 const reviews = useItemReviews(() => props.id, {
     enabled: () => tab.value === 'reviews',
 });
 
-const labels = computed(() =>
-    item.value ? formatStatusLabels(item.value.format) : null
+const credits = computed(() =>
+    item.value ? creditLines(item.value.credits) : []
 );
 
 const isCompleted = computed(
@@ -78,6 +111,13 @@ const hasReview = computed(
 );
 const isReviewOpen = ref(false);
 const isAddOpen = ref(false);
+// The edition the dialog opens on, or null for the whole book.
+const addingIsbn = ref<string | null>(null);
+
+function addToShelf(isbn: string | null) {
+    addingIsbn.value = isbn;
+    isAddOpen.value = true;
+}
 
 // Out of 5 stars, like the rating picker.
 const averageStars = computed(() =>
@@ -130,7 +170,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
         </div>
 
         <Tabs
-            v-if="item && labels"
+            v-if="item"
             v-model="tab"
             class="motion-safe:animate-in fade-in animation-duration-500 gap-4"
         >
@@ -164,7 +204,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                     name: 'series',
                                     params: { id: item.seriesId },
                                 }"
-                                class="text-muted-foreground text-sm hover:underline"
+                                class="text-muted-foreground text-sm underline underline-offset-4"
                             >
                                 {{ item.seriesTitle }}
                                 <template v-if="item.position !== null">
@@ -183,15 +223,31 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                             >
                                 {{ item.subtitle }}
                             </p>
-                            <p v-if="item.creators.length" class="text-sm">
-                                {{ item.creators.join(', ') }}
-                            </p>
+                            <div
+                                v-if="credits.length"
+                                class="grid gap-0.5 text-sm"
+                            >
+                                <p
+                                    v-for="line in credits"
+                                    :key="line.role"
+                                    :class="{
+                                        'text-muted-foreground':
+                                            line.role !== PersonRole.Author,
+                                    }"
+                                >
+                                    {{
+                                        line.role === PersonRole.Author
+                                            ? line.names.join(', ')
+                                            : line.text
+                                    }}
+                                </p>
+                            </div>
                             <div class="flex flex-wrap items-center gap-2 pt-1">
                                 <Badge variant="secondary">
                                     {{
                                         item.kind
                                             ? SERIES_KIND_LABELS[item.kind]
-                                            : FORMAT_LABELS[item.format]
+                                            : 'Book'
                                     }}
                                 </Badge>
                                 <span
@@ -224,8 +280,11 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                 :catalog-item-id="item.id"
                                 :title="item.title"
                                 :status="item.status"
-                                :labels="labels"
                             />
+                            <Button variant="outline" @click="addToShelf(null)">
+                                <PlusIcon />
+                                Add to shelf
+                            </Button>
                             <StarRating
                                 v-if="isCompleted && item.rating !== null"
                                 readonly
@@ -233,21 +292,11 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                             />
                         </div>
 
-                        <section class="grid gap-2">
-                            <div class="flex items-center justify-between">
-                                <h2 class="text-sm font-semibold">
-                                    On your shelves
-                                </h2>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    @click="isAddOpen = true"
-                                >
-                                    <PlusIcon />
-                                    Add to shelf
-                                </Button>
-                            </div>
-                            <ItemGroup v-if="shelves.length" class="grid gap-2">
+                        <section v-if="shelves.length" class="grid gap-2">
+                            <h2 class="text-sm font-semibold">
+                                On your shelves
+                            </h2>
+                            <ItemGroup class="grid gap-2">
                                 <Item
                                     v-for="(shelf, index) in shelves"
                                     v-bind="staggerIn(index)"
@@ -292,10 +341,32 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
             </TabsContent>
 
             <TabsContent value="editions" class="grid gap-3">
+                <ToggleGroup
+                    v-if="formatChips.length > 1"
+                    type="single"
+                    variant="outline"
+                    size="sm"
+                    :spacing="1"
+                    class="flex-wrap justify-start"
+                    :model-value="formatFilter"
+                    @update:model-value="onFormat"
+                >
+                    <ToggleGroupItem :value="ALL_FORMATS">
+                        All {{ item.editionCount }}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                        v-for="chip in formatChips"
+                        :key="chip.format"
+                        :value="chip.format"
+                    >
+                        {{ EDITION_FORMAT_LABELS[chip.format] }}
+                        {{ chip.count }}
+                    </ToggleGroupItem>
+                </ToggleGroup>
                 <PagedList :list="editions" empty-text="No editions yet.">
                     <template #default="{ items }">
                         <ItemGroup class="grid gap-2">
-                            <EditionItem
+                            <EditionCard
                                 v-for="(edition, index) in items"
                                 v-bind="staggerIn(index)"
                                 :key="edition.isbn"
@@ -312,7 +383,19 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                                 >
                                     {{ name }}
                                 </Badge>
-                            </EditionItem>
+                                <template #actions>
+                                    <WithTooltip label="Add to shelf">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            :aria-label="`Add ${edition.isbn} to a shelf`"
+                                            @click="addToShelf(edition.isbn)"
+                                        >
+                                            <LibraryBigIcon />
+                                        </Button>
+                                    </WithTooltip>
+                                </template>
+                            </EditionCard>
                         </ItemGroup>
                     </template>
                 </PagedList>
@@ -403,6 +486,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
             v-model:open="isAddOpen"
             :catalog-item-id="item.id"
             :title="item.title"
+            :isbn="addingIsbn"
         />
 
         <ReviewSheet

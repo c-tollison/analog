@@ -41,7 +41,7 @@ const collectionItems = new Hono<AppEnv>().delete(
             )
             .returning({ id: collectionItem.id });
         if (!removed) {
-            throw new HTTPException(404, { message: 'Item not found' });
+            throw new HTTPException(404, { message: 'Book not found' });
         }
         return c.body(null, 204);
     }

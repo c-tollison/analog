@@ -1,15 +1,15 @@
 import { user } from './auth.js';
+import { catalogItemGenre } from './catalog-item-genre.js';
 import { catalogItemIsbn } from './catalog-item-isbn.js';
+import { catalogItemPerson } from './catalog-item-person.js';
 import { collectionItem } from './collection-item.js';
-import { externalSource, mediaFormat, seriesKind } from './enums.js';
+import { audience, externalSource, seriesKind } from './enums.js';
 import { appSchema, id, timestamps } from './primitives.js';
 import { series } from './series.js';
 import { relations } from 'drizzle-orm';
 import {
-    date,
     index,
     integer,
-    jsonb,
     numeric,
     real,
     text,
@@ -17,28 +17,26 @@ import {
     uuid,
 } from 'drizzle-orm/pg-core';
 
-// One physical product, shared by all users. A book's ISBNs are in
-// catalog_item_isbn.
+// One book, shared by all users. Its ISBNs are in catalog_item_isbn.
 export const catalogItem = appSchema.table(
     'catalog_item',
     {
         id: id(),
-        format: mediaFormat('format').notNull(),
         kind: seriesKind('kind'),
         title: text('title').notNull(),
         seriesId: uuid('series_id').references(() => series.id, {
             onDelete: 'set null',
         }),
-        // Volume or season number within the series.
+        // Volume number within the series.
         position: numeric('position', { mode: 'number' }),
         externalSource: externalSource('external_source'),
         externalId: text('external_id'),
         coverUrl: text('cover_url'),
-        releaseDate: date('release_date'),
-        metadata: jsonb('metadata')
-            .$type<Record<string, unknown>>()
-            .notNull()
-            .default({}),
+        subtitle: text('subtitle'),
+        description: text('description'),
+        firstPublishedYear: integer('first_published_year'),
+        // Who it's written for. Volumes in a series show the series' instead.
+        audience: audience('audience'),
         // When each source last answered for this book. Null means it hasn't,
         // so the book is looked up there again.
         googleBooksFetchedAt: timestamp('google_books_fetched_at', {
@@ -80,4 +78,6 @@ export const catalogItemRelations = relations(catalogItem, ({ one, many }) => ({
     }),
     collectionItems: many(collectionItem),
     isbns: many(catalogItemIsbn),
+    people: many(catalogItemPerson),
+    genres: many(catalogItemGenre),
 }));

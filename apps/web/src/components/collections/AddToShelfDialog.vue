@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MediaFormat, normalizeIsbn } from '@analog/types';
+import { normalizeIsbn } from '@analog/types';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
 import EditionItem from '@/components/media/EditionItem.vue';
@@ -50,9 +50,9 @@ import {
     useOwnEdition,
 } from '@/composables/useItems';
 import { useSearchTerm } from '@/composables/useSearchTerm';
+import { BOOK_BARCODES } from '@/lib/book-labels';
 import { CreateCollectionSchema } from '@/lib/catalog-schemas';
 import { isPendingFor } from '@/lib/editions';
-import { MEDIA_TYPES } from '@/lib/media-types';
 import { staggerIn } from '@/lib/motion';
 import { vNoAutofill } from '@/lib/no-autofill';
 
@@ -64,6 +64,8 @@ const props = defineProps<{
     catalogItemId: string;
     // Shown for editions with no title of their own.
     title: string;
+    // Opens filtered to this one edition.
+    isbn?: string | null;
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
@@ -150,10 +152,6 @@ const canAddTyped = computed(
         !editions.items.some((edition) => edition.isbn === typedIsbn.value)
 );
 
-const bookFormats = MEDIA_TYPES.find(
-    (type) => type.value === MediaFormat.Book
-)?.formats;
-
 function onScan(isbn: string) {
     filter.value = isbn;
     isScanning.value = false;
@@ -161,7 +159,7 @@ function onScan(isbn: string) {
 
 watch(open, (isOpen) => {
     if (isOpen) {
-        filter.value = '';
+        filter.value = props.isbn ?? '';
         isScanning.value = false;
         own.reset();
         disown.reset();
@@ -274,8 +272,8 @@ const error = computed(
                     </div>
 
                     <BarcodeCamera
-                        v-if="isScanning && bookFormats"
-                        :formats="bookFormats"
+                        v-if="isScanning"
+                        :formats="BOOK_BARCODES"
                         @detect="onScan"
                     />
 

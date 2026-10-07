@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogRange, MediaFormat, ProgressStatus } from '@analog/types';
+import { LogRange } from '@analog/types';
 import {
     Card,
     CardAction,
@@ -17,7 +17,6 @@ import {
     TooltipTrigger,
 } from '@/components/shadcn-components/tooltip';
 import type { LogStats } from '@/composables/useLog';
-import { formatStatusLabels } from '@/lib/media-types';
 
 import { StarIcon } from '@lucide/vue';
 import { computed } from 'vue';
@@ -69,10 +68,6 @@ const RANGES = {
         step: (bars: number) => number;
     }
 >;
-
-// Books are the only media so far, so the counts use their words.
-const labels = formatStatusLabels(MediaFormat.Book);
-const readWord = labels[ProgressStatus.Completed].toLowerCase();
 
 // Out of 5 stars, like the rating picker.
 const averageStars = computed(() =>
@@ -133,9 +128,7 @@ const bars = computed(() => {
         <CardContent class="grid gap-4">
             <dl class="flex gap-8">
                 <div class="grid">
-                    <dt class="text-muted-foreground order-2 text-xs">
-                        {{ readWord }}
-                    </dt>
+                    <dt class="text-muted-foreground order-2 text-xs">read</dt>
                     <dd class="text-xl font-semibold tabular-nums">
                         {{ stats.read }}
                     </dd>
@@ -178,7 +171,7 @@ const bars = computed(() => {
                             </TooltipTrigger>
                             <TooltipContent>
                                 {{ bar.name }}: {{ bar.count }}
-                                {{ readWord }}
+                                read
                             </TooltipContent>
                         </Tooltip>
                         <div v-else class="max-w-10 flex-1" />
@@ -198,8 +191,7 @@ const bars = computed(() => {
             </div>
             <table class="sr-only">
                 <caption>
-                    {{ readWord }}
-                    each
+                    read each
                     {{ shown.unit }}
                 </caption>
                 <tbody>

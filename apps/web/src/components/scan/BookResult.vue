@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { languageName } from '@analog/types';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
 import SeriesPicker, {
@@ -22,8 +23,8 @@ import { useAppForm } from '@/composables/useAppForm';
 import { type IsbnLookup, useSaveBook } from '@/composables/useCatalog';
 import type { CollectionSummary } from '@/composables/useCollections';
 import { useAddBook } from '@/composables/useCollections';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { AddBookFormSchema, SeriesPickSchema } from '@/lib/catalog-schemas';
-import { SERIES_KIND_LABELS } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 import { volumeFromTitle } from '@/lib/volumes';
 
@@ -257,8 +258,11 @@ function onSeriesToggle(checked: boolean | 'indeterminate') {
                     <Badge variant="secondary">
                         {{ SERIES_KIND_LABELS[book.kind] }}
                     </Badge>
-                    <Badge v-if="book.languages.length" variant="secondary">
-                        {{ book.languages.join(', ') }}
+                    <Badge
+                        v-if="languageName(book.language)"
+                        variant="secondary"
+                    >
+                        {{ languageName(book.language) }}
                     </Badge>
                     <Badge v-if="collection && alreadyInCollection">
                         In {{ collection.name }}

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { MediaFormat } from '@analog/types';
 import FormError from '@/components/FormError.vue';
 import BarcodeCamera from '@/components/scan/BarcodeCamera.vue';
 import BookResult from '@/components/scan/BookResult.vue';
@@ -22,8 +21,8 @@ import { Input } from '@/components/shadcn-components/input';
 import { Spinner } from '@/components/shadcn-components/spinner';
 import { useAppForm } from '@/composables/useAppForm';
 import { type IsbnLookup, useIsbnLookup } from '@/composables/useCatalog';
+import { BOOK_BARCODES } from '@/lib/book-labels';
 import { IsbnLookupFormSchema } from '@/lib/catalog-schemas';
-import { MEDIA_TYPES } from '@/lib/media-types';
 import { vNoAutofill } from '@/lib/no-autofill';
 
 import { ref, watch } from 'vue';
@@ -34,10 +33,6 @@ const open = defineModel<boolean>('open', { required: true });
 const router = useRouter();
 const lookupIsbn = useIsbnLookup();
 const lookup = ref<IsbnLookup | null>(null);
-
-const bookFormats = MEDIA_TYPES.find(
-    (type) => type.value === MediaFormat.Book
-)?.formats;
 
 function openItem(id: string) {
     open.value = false;
@@ -105,9 +100,8 @@ watch(open, (isOpen) => {
                 />
                 <template v-else>
                     <BarcodeCamera
-                        v-if="bookFormats"
                         v-show="!isSubmitting"
-                        :formats="bookFormats"
+                        :formats="BOOK_BARCODES"
                         @detect="onDetect"
                     />
                     <div

@@ -1,4 +1,3 @@
-import { ExternalSource, SeriesKind } from './catalog-enums.js';
 import { IsbnSchema } from './isbn.js';
 import { PageQuerySchema } from './pagination.js';
 import { z } from 'zod';
@@ -99,35 +98,3 @@ export const ReadingGoalSchema = z.object({
 
 /** A year for goals and stats, as a route param or query. */
 export const GoalYearSchema = z.coerce.number().int().min(2000).max(2100);
-
-/** Sources a series can pull its synopsis, genres and run from. */
-export const DETAILS_SOURCES = [ExternalSource.AniList] as const;
-
-export type DetailsSource = (typeof DETAILS_SOURCES)[number];
-
-export const DetailsSourceSchema = z.enum(DETAILS_SOURCES);
-
-/** Each source's display name and the kinds of series it covers. */
-export const DETAILS_SOURCE_INFO: Record<
-    DetailsSource,
-    { label: string; kinds: readonly SeriesKind[] }
-> = {
-    [ExternalSource.AniList]: {
-        label: 'AniList',
-        kinds: [SeriesKind.Manga, SeriesKind.LightNovel],
-    },
-};
-
-/** Where a series of this kind can get more details, if anywhere. */
-export function detailsSourceFor(kind: SeriesKind): DetailsSource | null {
-    return (
-        DETAILS_SOURCES.find((source) =>
-            DETAILS_SOURCE_INFO[source].kinds.includes(kind)
-        ) ?? null
-    );
-}
-
-export const LinkDetailsSourceSchema = SetVolumeCountSchema.extend({
-    source: DetailsSourceSchema,
-    sourceId: z.string().trim().min(1).max(100),
-});

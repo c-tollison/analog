@@ -3,6 +3,7 @@ import { SERIES_VOLUME_FILTERS, type SeriesVolumeFilter } from '@analog/types';
 import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
+import AddToShelfDialog from '@/components/collections/AddToShelfDialog.vue';
 import CollectionProgressBar from '@/components/collections/CollectionProgressBar.vue';
 import FormError from '@/components/FormError.vue';
 import PagedList from '@/components/lists/PagedList.vue';
@@ -16,6 +17,7 @@ import {
     ToggleGroup,
     ToggleGroupItem,
 } from '@/components/shadcn-components/toggle-group';
+import WithTooltip from '@/components/WithTooltip.vue';
 import {
     useCollection,
     useRemoveCollectionItem,
@@ -23,16 +25,12 @@ import {
 import { usePageTitle } from '@/composables/usePageTitle';
 import { useQueryParam } from '@/composables/useQueryParam';
 import { useSeriesPage, useSeriesVolumes } from '@/composables/useSeries';
-import {
-    completedWord,
-    kindStatusLabels,
-    SERIES_KIND_LABELS,
-} from '@/lib/media-types';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { staggerIn } from '@/lib/motion';
 import { missingVolumes } from '@/lib/volumes';
 import { useSearchStore } from '@/stores/search';
 
-import { XIcon } from '@lucide/vue';
+import { LibraryBigIcon, XIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { type RouteLocationRaw, useRoute } from 'vue-router';
 
@@ -80,6 +78,15 @@ const {
 } = useRemoveCollectionItem();
 
 const removing = ref<{ id: string; title: string } | null>(null);
+
+// The volume being added to a shelf. It stays set while the dialog closes.
+const adding = ref<{ id: string; title: string } | null>(null);
+const isAddOpen = ref(false);
+
+function addToShelf(volume: { id: string; title: string }) {
+    adding.value = volume;
+    isAddOpen.value = true;
+}
 const confirmingRemove = computed({
     get: () => removing.value !== null,
     set: (open) => {
@@ -94,10 +101,6 @@ function onRemove() {
         { onSettled: () => (removing.value = null) }
     );
 }
-
-const labels = computed(() =>
-    series.value ? kindStatusLabels(series.value.kind) : null
-);
 
 // The series' size: its set volume count, or what the app has.
 const total = computed(() =>
@@ -166,7 +169,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
         </div>
 
         <div
-            v-if="series && labels"
+            v-if="series"
             class="motion-safe:animate-in fade-in animation-duration-500 flex gap-4"
         >
             <CoverImage
@@ -184,7 +187,7 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                     <span class="text-muted-foreground text-xs">
                         {{ series.ownedCount }} of {{ total }} owned ·
                         {{ series.completedCount }}
-                        {{ completedWord(labels) }}
+                        read
                     </span>
                 </div>
                 <CollectionProgressBar
@@ -194,7 +197,6 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                     :completed="series.completedCount"
                     :in-progress="series.inProgressCount"
                     :planned="series.plannedCount"
-                    :labels="labels"
                 />
             </div>
         </div>
@@ -245,11 +247,18 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
 
         <ConfirmDialog
             v-model:open="confirmingRemove"
-            :title="`Remove ${removing?.title ?? 'item'}?`"
+            :title="`Remove ${removing?.title ?? 'book'}?`"
             :description="`It'll be taken off ${shelf?.name ?? 'this shelf'}.`"
             confirm-text="Remove"
             :pending="isRemoving"
             @confirm="onRemove"
+        />
+
+        <AddToShelfDialog
+            v-if="adding"
+            v-model:open="isAddOpen"
+            :catalog-item-id="adding.id"
+            :title="adding.title"
         />
 
         <PagedList :list="volumes" :empty-text="emptyText[show]">
@@ -308,14 +317,26 @@ const back = computed<{ to: RouteLocationRaw; text: string }>(() =>
                         >
                             <XIcon />
                         </Button>
-                        <LogButton
-                            v-if="labels"
-                            block
-                            :catalog-item-id="item.id"
-                            :title="item.title"
-                            :status="item.status"
-                            :labels="labels"
-                        />
+                        <div class="flex gap-1">
+                            <div class="min-w-0 flex-1">
+                                <LogButton
+                                    block
+                                    :catalog-item-id="item.id"
+                                    :title="item.title"
+                                    :status="item.status"
+                                />
+                            </div>
+                            <WithTooltip label="Add to shelf">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    :aria-label="`Add ${item.title} to a shelf`"
+                                    @click="addToShelf(item)"
+                                >
+                                    <LibraryBigIcon />
+                                </Button>
+                            </WithTooltip>
+                        </div>
                     </li>
                 </ul>
             </template>

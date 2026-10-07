@@ -9,11 +9,7 @@ import {
     schema,
     sql,
 } from '@analog/db';
-import {
-    CollectionRole,
-    type MediaFormat,
-    ProgressStatus,
-} from '@analog/types';
+import { CollectionRole, ProgressStatus } from '@analog/types';
 
 import { visibleToVisitors } from './discovery.js';
 import { isFriendOf } from './friends.js';
@@ -130,10 +126,10 @@ const MEMBER_PREVIEW_COUNT = 3;
 type MemberPreview = Pick<typeof user.$inferSelect, 'id' | 'name' | 'image'>;
 
 /**
- * Item totals for each collection in the outer query, read in one pass over
- * its items: how many items and owned editions there are, the status counts
- * and the formats. Members get their own counts; visitors get the owner's and
- * only what they can see.
+ * Book totals for each collection in the outer query, read in one pass over
+ * its books: how many books and owned editions there are, and the status
+ * counts. Members get their own counts; visitors get the owner's and only
+ * what they can see.
  */
 function itemStats() {
     return db()
@@ -156,9 +152,6 @@ function itemStats() {
             plannedCount: statusCount(ProgressStatus.Planned).as(
                 'planned_count'
             ),
-            formats: sql<MediaFormat[]>`coalesce(
-                json_agg(distinct ${catalogItem.format}), '[]'::json
-            )`.as('formats'),
         })
         .from(collectionItem)
         .innerJoin(
@@ -201,7 +194,6 @@ export function collectionSummaries(userId: string, where: SQL | undefined) {
             completedCount: stats.completedCount,
             inProgressCount: stats.inProgressCount,
             plannedCount: stats.plannedCount,
-            formats: stats.formats,
             memberCount: sql<number>`(
                 select count(*)::int from ${collectionMember} m
                 where m.collection_id = ${collection.id}

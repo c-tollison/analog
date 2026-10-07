@@ -51,7 +51,7 @@ const error = computed(
         <div class="grid gap-1">
             <h1 class="text-lg font-semibold">Invite friends</h1>
             <p class="text-muted-foreground text-sm">
-                Once they accept, they can add and edit media in
+                Once they accept, they can add and edit books in
                 {{ collection?.name ?? 'this shelf' }}.
             </p>
         </div>

@@ -2,6 +2,7 @@
 import { AddedSort, VerifiedFilter } from '@analog/types';
 import AdminCheckRunsTable from '@/components/admin/AdminCheckRunsTable.vue';
 import AdminItemsTable from '@/components/admin/AdminItemsTable.vue';
+import AdminNamesTable from '@/components/admin/AdminNamesTable.vue';
 import AdminSeriesTable from '@/components/admin/AdminSeriesTable.vue';
 import SearchInput from '@/components/SearchInput.vue';
 import { Badge } from '@/components/shadcn-components/badge';
@@ -33,10 +34,15 @@ import { z } from 'zod';
 
 const Tab = {
     Series: 'series',
-    Media: 'media',
+    Books: 'books',
     NoCover: 'no-cover',
+    People: 'people',
+    Publishers: 'publishers',
     Checks: 'checks',
 } as const;
+
+// Tabs that list names, which have nothing to verify.
+const NAME_TABS: string[] = [Tab.People, Tab.Publishers];
 
 const STATUS_LABELS: Record<VerifiedFilter, string> = {
     [VerifiedFilter.Unverified]: 'To verify',
@@ -44,7 +50,7 @@ const STATUS_LABELS: Record<VerifiedFilter, string> = {
     [VerifiedFilter.All]: 'All',
 };
 
-// The list state lives in the URL, so going back from a media or series page
+// The list state lives in the URL, so going back from a book or series page
 // returns to the same tab, filter, search and page. Status is only there once
 // someone picks one, and then it stays until they pick another.
 const ListStateSchema = z.object({
@@ -153,8 +159,8 @@ watch(term, (q) => {
                             {{ seriesPage.total }}
                         </Badge>
                     </TabsTrigger>
-                    <TabsTrigger :value="Tab.Media">
-                        Media
+                    <TabsTrigger :value="Tab.Books">
+                        Books
                         <Badge v-if="itemsPage" variant="secondary">
                             {{ itemsPage.total }}
                         </Badge>
@@ -165,11 +171,25 @@ watch(term, (q) => {
                             {{ noCoverPage.total }}
                         </Badge>
                     </TabsTrigger>
+                    <TabsTrigger :value="Tab.People">People</TabsTrigger>
+                    <TabsTrigger :value="Tab.Publishers">
+                        Publishers
+                    </TabsTrigger>
                     <TabsTrigger :value="Tab.Checks">Checks</TabsTrigger>
                 </TabsList>
                 <div v-if="tab !== Tab.Checks" class="flex flex-1 gap-2">
-                    <SearchInput v-model="search" placeholder="Search titles" />
-                    <Select v-if="tab !== Tab.NoCover" v-model="status">
+                    <SearchInput
+                        v-model="search"
+                        :placeholder="
+                            NAME_TABS.includes(tab)
+                                ? 'Search names'
+                                : 'Search titles'
+                        "
+                    />
+                    <Select
+                        v-if="tab !== Tab.NoCover && !NAME_TABS.includes(tab)"
+                        v-model="status"
+                    >
                         <SelectTrigger
                             class="w-auto shrink-0"
                             aria-label="Show"
@@ -188,7 +208,7 @@ watch(term, (q) => {
                     </Select>
                 </div>
             </div>
-            <TabsContent :value="Tab.Media">
+            <TabsContent :value="Tab.Books">
                 <AdminItemsTable
                     v-model:page="page"
                     v-model:sort="sort"
@@ -203,6 +223,22 @@ watch(term, (q) => {
                     :q="state.q"
                     :status="VerifiedFilter.All"
                     no-cover
+                />
+            </TabsContent>
+            <TabsContent :value="Tab.People">
+                <AdminNamesTable
+                    v-model:page="page"
+                    v-model:sort="sort"
+                    kind="people"
+                    :q="state.q"
+                />
+            </TabsContent>
+            <TabsContent :value="Tab.Publishers">
+                <AdminNamesTable
+                    v-model:page="page"
+                    v-model:sort="sort"
+                    kind="publishers"
+                    :q="state.q"
                 />
             </TabsContent>
             <TabsContent :value="Tab.Checks">

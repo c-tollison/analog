@@ -1,6 +1,7 @@
 import {
     CATALOG_TITLE_MAX_LENGTH,
     ItemTitleSchema,
+    PersonRole,
     SeriesKind,
     SeriesTitleSchema,
 } from '@analog/types';
@@ -28,14 +29,6 @@ export const AdminSeriesFormSchema = z.object({
     kind: z.enum(SeriesKind),
 });
 
-// Publisher, format and language are cleaned up by the API.
-export const EditionFormSchema = z.object({
-    title: ItemTitleSchema,
-    publisher: z.string(),
-    format: z.string(),
-    language: z.string(),
-});
-
 // Empty means not known.
 const WholeNumberField = z
     .unknown()
@@ -51,21 +44,33 @@ const WholeNumberField = z
             .nullable()
     );
 
-// Lists are typed with commas between names.
-export const ItemDetailsFormSchema = z.object({
-    kind: z.enum(SeriesKind).optional(),
-    authors: z.string(),
-    genres: z.string(),
-    characters: z.string(),
-    description: z.string(),
-    publishDate: z.string(),
-    firstPublishYear: WholeNumberField,
-    pageCount: WholeNumberField,
+// Selects use NOT_SET for an empty value, and the API trims text.
+export const EditionFormSchema = z.object({
+    title: ItemTitleSchema,
     editionName: z.string(),
+    format: z.string(),
+    publisher: z.string(),
+    releaseYear: WholeNumberField,
+    releaseDate: z.string(),
+    pageCount: WholeNumberField,
+    language: z.string(),
     goodreadsId: z
         .string()
         .trim()
         .regex(/^\d*$/, 'Use the number from the Goodreads link'),
+    credits: z.array(z.object({ name: z.string(), role: z.enum(PersonRole) })),
+});
+
+export const ItemDetailsFormSchema = z.object({
+    kind: z.enum(SeriesKind).optional(),
+    genres: z.array(z.string()),
+    // Left out while hidden, for a volume in a series.
+    audience: z.string().optional(),
+    // Names in credit order.
+    authors: z.array(z.string()),
+    illustrators: z.array(z.string()),
+    description: z.string(),
+    firstPublishedYear: WholeNumberField,
 });
 
 export const SeriesItemsFormSchema = z.object({
@@ -90,3 +95,5 @@ export const ChangeSeriesFormSchema = z.object({
     series: SeriesPickSchema.nullable(),
     volume: VolumeField,
 });
+
+export { UpdateNameSchema as NameFormSchema } from '@analog/types';

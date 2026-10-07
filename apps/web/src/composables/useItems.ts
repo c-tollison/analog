@@ -1,5 +1,5 @@
 import type { InferResponseType } from '@analog/api/client';
-import type { IsbnSchema } from '@analog/types';
+import type { EditionFormat, IsbnSchema } from '@analog/types';
 import { type ApiClient, api, unwrap } from '@/lib/api';
 
 import { COLLECTIONS_KEY } from './useCollections';
@@ -82,10 +82,13 @@ export function useItemEditions(
     {
         collectionId,
         q,
+        format,
         ...options
     }: PaginatedListOptions & {
         collectionId?: MaybeRefOrGetter<string | null>;
         q?: MaybeRefOrGetter<string>;
+        // Only editions in this format.
+        format?: MaybeRefOrGetter<EditionFormat | null>;
     } = {}
 ) {
     return usePaginatedList(
@@ -94,10 +97,12 @@ export function useItemEditions(
             'editions',
             toValue(collectionId),
             toValue(q),
+            toValue(format),
         ],
         async (offset) => {
             const shelf = toValue(collectionId);
             const search = toValue(q);
+            const only = toValue(format);
             return unwrap(
                 await api.items[':id'].editions.$get({
                     param: { id: toValue(id) },
@@ -105,6 +110,7 @@ export function useItemEditions(
                         offset,
                         ...(shelf ? { collectionId: shelf } : {}),
                         ...(search ? { q: search } : {}),
+                        ...(only ? { format: only } : {}),
                     },
                 })
             );

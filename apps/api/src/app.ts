@@ -8,6 +8,7 @@ import admin from './routes/admin.js';
 import catalog from './routes/catalog.js';
 import collections from './routes/collections.js';
 import friends from './routes/friends.js';
+import genres from './routes/genres.js';
 import invites from './routes/invites.js';
 import items from './routes/items.js';
 import notifications from './routes/notifications.js';
@@ -62,6 +63,7 @@ export function createApp(config: Config) {
         .route('/items', items)
         .route('/collections', collections)
         .route('/series', series)
+        .route('/genres', genres)
         .route('/friends', friends)
         .route('/users', users)
         .route('/invites', invites)

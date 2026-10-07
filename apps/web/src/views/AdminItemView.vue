@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { MediaFormat } from '@analog/types';
 import AdminItemForm from '@/components/admin/AdminItemForm.vue';
 import CheckList from '@/components/admin/CheckList.vue';
-import EditionDialog from '@/components/admin/EditionDialog.vue';
+import IsbnEditor from '@/components/admin/IsbnEditor.vue';
 import ItemDetailsForm from '@/components/admin/ItemDetailsForm.vue';
 import MergeItemDialog from '@/components/admin/MergeItemDialog.vue';
 import VerifiedBy from '@/components/admin/VerifiedBy.vue';
@@ -10,7 +9,6 @@ import BackButton from '@/components/BackButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import CoverImage from '@/components/CoverImage.vue';
 import FormError from '@/components/FormError.vue';
-import EditionItem from '@/components/media/EditionItem.vue';
 import MediaDetails from '@/components/media/MediaDetails.vue';
 import { Badge } from '@/components/shadcn-components/badge';
 import { Button } from '@/components/shadcn-components/button';
@@ -22,24 +20,19 @@ import {
     useApproveIsbn,
     useDeleteAdminItem,
     useItemChecks,
+    useRemoveIsbn,
     useSetItemVerified,
     useSplitIsbn,
     useUploadCover,
 } from '@/composables/useAdmin';
 import { useRefreshBook } from '@/composables/useCatalog';
 import { usePageTitle } from '@/composables/usePageTitle';
+import { SERIES_KIND_LABELS } from '@/lib/book-labels';
 import { formatDate, timeAgo } from '@/lib/dates';
 import { isPendingFor } from '@/lib/editions';
-import { FORMAT_LABELS, SERIES_KIND_LABELS } from '@/lib/media-types';
 import { goBackOr } from '@/lib/navigation';
 
-import {
-    MergeIcon,
-    PencilIcon,
-    RefreshCwIcon,
-    Trash2Icon,
-    UploadIcon,
-} from '@lucide/vue';
+import { MergeIcon, RefreshCwIcon, Trash2Icon, UploadIcon } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -55,21 +48,12 @@ const setVerified = useSetItemVerified();
 const refresh = useRefreshBook();
 const remove = useDeleteAdminItem();
 const split = useSplitIsbn();
+const removeIsbn = useRemoveIsbn();
 const approve = useApproveIsbn();
 const { upload: uploadCover, choose: chooseCover } = useUploadCover();
 
 const confirmingDelete = ref(false);
 const isMergeOpen = ref(false);
-type AdminEdition = NonNullable<typeof item.value>['isbns'][number];
-
-// The ISBN being edited.
-const editing = ref<AdminEdition | null>(null);
-const isEditionOpen = ref(false);
-
-function editEdition(edition: AdminEdition) {
-    editing.value = edition;
-    isEditionOpen.value = true;
-}
 
 const facts = computed(() => {
     if (!item.value) return [];
@@ -77,7 +61,6 @@ const facts = computed(() => {
     const facts = [
         { label: 'Saves', value: String(value.saveCount) },
         { label: 'On shelves', value: String(value.collectionCount) },
-        { label: 'Format', value: FORMAT_LABELS[value.format] },
         // In a series, the series picker shows the kind.
         {
             label: 'Kind',
@@ -88,19 +71,9 @@ const facts = computed(() => {
         },
         { label: 'Added by', value: value.addedBy },
         { label: 'Added', value: formatDate(value.createdAt) },
+        { label: 'Google Books', value: timeAgo(value.googleBooksFetchedAt) },
+        { label: 'Open Library', value: timeAgo(value.openLibraryFetchedAt) },
     ];
-    if (value.format === MediaFormat.Book) {
-        facts.push(
-            {
-                label: 'Google Books',
-                value: timeAgo(value.googleBooksFetchedAt),
-            },
-            {
-                label: 'Open Library',
-                value: timeAgo(value.openLibraryFetchedAt),
-            }
-        );
-    }
     return facts.filter(
         (fact): fact is { label: string; value: string } => !!fact.value
     );
@@ -110,7 +83,6 @@ const canRefresh = computed(
     () =>
         !!item.value &&
         !item.value.verifiedAt &&
-        item.value.format === MediaFormat.Book &&
         item.value.isbns.some((edition) => edition.main)
 );
 
@@ -121,11 +93,38 @@ const error = computed(
             setVerified.error.value ??
             refresh.error.value ??
             remove.error.value ??
-            split.error.value ??
-            approve.error.value ??
             uploadCover.error.value
         )?.message ?? null
 );
+
+// Shown above the ISBNs, where these buttons are.
+const isbnError = computed(
+    () =>
+        (split.error.value ?? approve.error.value ?? removeIsbn.error.value)
+            ?.message ?? null
+);
+
+// The ISBN waiting on a confirm to be removed.
+const removing = ref<string | null>(null);
+const confirmingRemove = ref(false);
+
+function askRemove(isbn: string) {
+    removing.value = isbn;
+    confirmingRemove.value = true;
+}
+
+function onRemoveIsbn() {
+    const isbn = removing.value;
+    if (!isbn) return;
+    removeIsbn.mutate(
+        { itemId: props.id, isbn },
+        {
+            onSettled: () => {
+                confirmingRemove.value = false;
+            },
+        }
+    );
+}
 
 function onSplit(isbn: string) {
     split.mutate(
@@ -172,12 +171,6 @@ function onDelete() {
                 v-model:open="isMergeOpen"
                 :item-id="item.id"
                 :item-title="item.title"
-            />
-            <EditionDialog
-                v-if="editing"
-                v-model:open="isEditionOpen"
-                :item-id="item.id"
-                :edition="editing"
             />
 
             <div class="grid gap-6 sm:grid-cols-[12rem_1fr]">
@@ -254,39 +247,38 @@ function onDelete() {
                 </div>
             </div>
 
-            <template v-if="item.format === MediaFormat.Book">
-                <Separator />
+            <Separator />
 
-                <section class="grid gap-3">
-                    <h2 class="font-semibold">Details</h2>
-                    <!-- Rebuilt when a refresh brings new details. -->
-                    <ItemDetailsForm
-                        :key="`${item.id}:${item.googleBooksFetchedAt}:${item.openLibraryFetchedAt}`"
-                        :item="item"
-                    />
-                </section>
-            </template>
+            <section class="grid gap-3">
+                <h2 class="font-semibold">Details</h2>
+                <!-- Rebuilt when a refresh brings new details. -->
+                <ItemDetailsForm
+                    :key="`${item.id}:${item.googleBooksFetchedAt}:${item.openLibraryFetchedAt}`"
+                    :item="item"
+                />
+            </section>
 
             <template v-if="item.isbns.length">
                 <Separator />
 
                 <section class="grid gap-3">
                     <h2 class="font-semibold">ISBNs</h2>
+                    <FormError :message="isbnError" />
+                    <ConfirmDialog
+                        v-model:open="confirmingRemove"
+                        :title="`Remove ${removing}?`"
+                        description="It comes off this book, with its cover and credits. An ISBN on a shelf can't be removed."
+                        confirm-text="Remove"
+                        :pending="removeIsbn.isPending.value"
+                        @confirm="onRemoveIsbn"
+                    />
                     <ItemGroup class="gap-2">
-                        <EditionItem
+                        <IsbnEditor
                             v-for="edition in item.isbns"
                             :key="edition.isbn"
+                            :item-id="item.id"
                             :edition="edition"
-                            :fallback-title="edition.isbn"
                         >
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                @click="editEdition(edition)"
-                            >
-                                <PencilIcon />
-                                Edit
-                            </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -340,7 +332,17 @@ function onDelete() {
                                     Split off
                                 </Button>
                             </template>
-                        </EditionItem>
+                            <Button
+                                v-if="item.isbns.length > 1"
+                                variant="outline"
+                                size="sm"
+                                :disabled="removeIsbn.isPending.value"
+                                @click="askRemove(edition.isbn)"
+                            >
+                                <Trash2Icon />
+                                Remove
+                            </Button>
+                        </IsbnEditor>
                     </ItemGroup>
                 </section>
             </template>

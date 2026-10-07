@@ -8,7 +8,11 @@ import {
     ItemMedia,
     ItemTitle,
 } from '@/components/shadcn-components/item';
-import { type EditionRow, editionSummary } from '@/lib/editions';
+import {
+    type EditionRow,
+    editionCredits,
+    editionSummary,
+} from '@/lib/editions';
 
 defineProps<{
     edition: EditionRow;
@@ -32,6 +36,9 @@ defineProps<{
                 {{ edition.title ?? fallbackTitle }}
             </ItemTitle>
             <ItemDescription>{{ editionSummary(edition) }}</ItemDescription>
+            <ItemDescription v-if="edition.credits.length">
+                {{ editionCredits(edition) }}
+            </ItemDescription>
         </ItemContent>
         <ItemActions>
             <slot />

@@ -14,7 +14,6 @@ import {
 } from '@/components/shadcn-components/item';
 import UserAvatar from '@/components/users/UserAvatar.vue';
 import type { ApiClient } from '@/lib/api';
-import { formatsCompletedWord, formatsStatusLabels } from '@/lib/media-types';
 
 import { LockIcon } from '@lucide/vue';
 
@@ -70,7 +69,7 @@ defineProps<{ collection: CollectionSummary; showProgress: boolean }>();
                 {{ collection.editionCount === 1 ? 'item' : 'items' }}
                 <template v-if="collection.itemCount && !showProgress">
                     · {{ collection.completedCount }}
-                    {{ formatsCompletedWord(collection.formats) }}
+                    read
                 </template>
             </ItemDescription>
             <CollectionProgressBar
@@ -81,7 +80,6 @@ defineProps<{ collection: CollectionSummary; showProgress: boolean }>();
                 :completed="collection.completedCount"
                 :in-progress="collection.inProgressCount"
                 :planned="collection.plannedCount"
-                :labels="formatsStatusLabels(collection.formats)"
             />
         </ItemContent>
     </Item>

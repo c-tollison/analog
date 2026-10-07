@@ -11,16 +11,18 @@ import {
 } from '@analog/db';
 import { CheckTrigger, type SeriesChoiceSchema } from '@analog/types';
 
+import { inheritSeriesGenres } from './book-values.js';
 import {
     createItemClaimingIsbn,
     findBookByIsbn,
     findOrCreateBook,
-    isbnFacts,
+    isbnValues,
     kindInSeries,
     type Lookup,
     lookupBook,
     refreshSeriesCover,
     type SeriesPicker,
+    savedEditionLookup,
     saveLater,
     seriesForItem,
     type Transaction,
@@ -137,6 +139,18 @@ async function moveItemInto(
             )
         );
 
+    // Anyone credited only on the other item is credited after this one's
+    // own people.
+    const { catalogItemPerson } = schema;
+    await tx.execute(sql`
+        insert into ${catalogItemPerson}
+            (catalog_item_id, person_id, role, position)
+        select ${intoId}, person_id, role, position + 1000
+        from ${catalogItemPerson}
+        where catalog_item_id = ${fromId}
+        on conflict do nothing
+    `);
+
     await tx
         .update(catalogItemIsbn)
         .set({ catalogItemId: intoId, main: false, pending })
@@ -187,7 +201,7 @@ async function joinItem(
 export async function mergeItem(fromId: string, intoId: string): Promise<void> {
     if (fromId === intoId) {
         throw new HTTPException(400, {
-            message: "An item can't be merged into itself",
+            message: "A book can't be merged into itself",
         });
     }
     const { catalogItem } = schema;
@@ -197,7 +211,7 @@ export async function mergeItem(fromId: string, intoId: string): Promise<void> {
         )
     );
     if (!from || !into) {
-        throw new HTTPException(404, { message: 'Item not found' });
+        throw new HTTPException(404, { message: 'Book not found' });
     }
     await db().transaction(async (tx) => {
         if (!into.seriesId && from.seriesId) {
@@ -291,6 +305,7 @@ export async function upsertBook(
     }
 
     if (updated.seriesId) {
+        await inheritSeriesGenres(updated.id, updated.seriesId);
         await refreshSeriesCover(updated.seriesId);
     }
     checkInBackground(
@@ -330,7 +345,7 @@ async function moveIsbnToNewItem(
                         catalogItemId: itemId,
                         main: true,
                         pending: false,
-                        ...isbnFacts(lookup.book),
+                        ...(await isbnValues(lookup.book, tx)),
                     })
                     .where(
                         and(
@@ -478,28 +493,71 @@ export async function splitOffIsbn(
     }
     if (found.main) {
         throw new HTTPException(400, {
-            message: "This is the item's main ISBN",
+            message: "This is the book's main ISBN",
         });
     }
-    const lookup = await lookupBook(isbn, {
+    // The book sources fill the new item in. When they can't answer, it
+    // starts from the edition's saved facts, and a later refresh fills it.
+    const fetched = await lookupBook(isbn, {
         stored: null,
         google: true,
         openLibrary: true,
-        refresh: true,
-    });
+        refresh: false,
+    }).catch(() => null);
+    const lookup = fetched ?? (await savedEditionLookup(isbn));
     if (!lookup) {
-        throw new HTTPException(404, {
-            message: `No book found for ISBN ${isbn}`,
-        });
+        throw new HTTPException(404, { message: 'ISBN not found' });
     }
     const created = await moveIsbnToNewItem(itemId, isbn, lookup, userId);
     if (!created) {
         throw new HTTPException(409, {
-            message: 'Another item already has this ISBN',
+            message: 'Another book already has this ISBN',
         });
     }
-    if (lookup.later) {
-        void saveLater(created, lookup.later);
+    if (fetched?.later) {
+        void saveLater(created, fetched.later);
     }
     return created;
+}
+
+/**
+ * Takes an ISBN off an item, for one a scan added by mistake. One on a shelf
+ * stays, so nobody loses an entry. When it's the main ISBN, the next one
+ * becomes main, and an item's last ISBN can't be removed.
+ */
+export async function removeIsbn(itemId: string, isbn: string): Promise<void> {
+    const { catalogItemIsbn, collectionItemIsbn } = schema;
+    const editions = await db()
+        .select({ isbn: catalogItemIsbn.isbn, main: catalogItemIsbn.main })
+        .from(catalogItemIsbn)
+        .where(eq(catalogItemIsbn.catalogItemId, itemId))
+        .orderBy(asc(catalogItemIsbn.pending), asc(catalogItemIsbn.createdAt));
+    const found = editions.find((edition) => edition.isbn === isbn);
+    if (!found) {
+        throw new HTTPException(404, { message: 'ISBN not found' });
+    }
+    const next = editions.find((edition) => edition.isbn !== isbn);
+    if (!next) {
+        throw new HTTPException(400, {
+            message: "It's the book's only ISBN. Delete the book instead.",
+        });
+    }
+    const shelved = await db().$count(
+        collectionItemIsbn,
+        eq(collectionItemIsbn.isbn, isbn)
+    );
+    if (shelved) {
+        throw new HTTPException(400, {
+            message: `It's on ${shelved} ${shelved === 1 ? 'shelf' : 'shelves'}. Split it off instead.`,
+        });
+    }
+    await db().transaction(async (tx) => {
+        await tx.delete(catalogItemIsbn).where(eq(catalogItemIsbn.isbn, isbn));
+        if (found.main) {
+            await tx
+                .update(catalogItemIsbn)
+                .set({ main: true })
+                .where(eq(catalogItemIsbn.isbn, next.isbn));
+        }
+    });
 }

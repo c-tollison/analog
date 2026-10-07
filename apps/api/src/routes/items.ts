@@ -1,4 +1,5 @@
 import {
+    alias,
     and,
     asc,
     desc,
@@ -9,10 +10,16 @@ import {
     schema,
     sql,
 } from '@analog/db';
-import { normalizeIsbn, PageQuerySchema } from '@analog/types';
+import {
+    EditionFormat,
+    normalizeIsbn,
+    PageQuerySchema,
+    type PersonRole,
+} from '@analog/types';
 
 import type { AppEnv } from '../lib/app-env.js';
-import { itemDetails } from '../lib/books.js';
+import { creditList } from '../lib/book-values.js';
+import { bookDetails } from '../lib/books.js';
 import { requireMember } from '../lib/collections.js';
 import { visibleToVisitors } from '../lib/discovery.js';
 import { userColumns } from '../lib/friends.js';
@@ -28,12 +35,24 @@ import { z } from 'zod';
 // One catalog item's page, the same for everyone: its details, the person's
 // own status and shelves, its editions and everyone's reviews.
 
-const { catalogItem, catalogItemIsbn, progress, series, user } = schema;
+const {
+    catalogItem,
+    catalogItemIsbn,
+    catalogItemIsbnPerson,
+    person,
+    progress,
+    publisher,
+    series,
+    user,
+} = schema;
+
+const parentPublisher = alias(publisher, 'parent_publisher');
 
 const EditionsQuerySchema = PageQuerySchema.extend({
     // Marks the editions this shelf owns and lists them first.
     collectionId: z.uuid('Invalid id').optional(),
     q: z.string().trim().max(100).optional(),
+    format: z.enum(EditionFormat).optional(),
 });
 
 // Matches an ISBN typed with or without dashes, or part of a publisher or
@@ -49,7 +68,7 @@ function editionsMatching(q: string) {
         digits
             ? ilike(catalogItemIsbn.isbn, `%${escapeLike(digits)}%`)
             : undefined,
-        ilike(catalogItemIsbn.publisher, `%${escapeLike(q)}%`),
+        ilike(publisher.name, `%${escapeLike(q)}%`),
         ilike(catalogItemIsbn.title, `%${escapeLike(q)}%`)
     );
 }
@@ -71,17 +90,23 @@ const items = new Hono<AppEnv>()
             db()
                 .select({
                     id: catalogItem.id,
-                    format: catalogItem.format,
                     title: catalogItem.title,
                     coverUrl: catalogItem.coverUrl,
                     position: catalogItem.position,
-                    releaseDate: catalogItem.releaseDate,
+                    firstPublishedYear: catalogItem.firstPublishedYear,
                     seriesId: series.id,
                     seriesTitle: series.title,
                     volumeCount: series.volumeCount,
-                    author: sql<
-                        string | null
-                    >`${catalogItem.metadata}->'authors'->>0`,
+                    author: sql<string | null>`(
+                        select ${person.name} from ${catalogItemIsbnPerson}
+                        join ${person} on ${person.id} = ${catalogItemIsbnPerson.personId}
+                        join ${catalogItemIsbn} on ${catalogItemIsbn.isbn} = ${catalogItemIsbnPerson.isbn}
+                        where ${catalogItemIsbn.catalogItemId} = ${catalogItem.id}
+                        order by ${catalogItemIsbn.main} desc,
+                            ${catalogItemIsbnPerson.role},
+                            ${catalogItemIsbnPerson.position}
+                        limit 1
+                    )`,
                     saveCount: catalogItem.saveCount,
                     ratingAverage: catalogItem.ratingAverage,
                     ratingCount: catalogItem.ratingCount,
@@ -124,42 +149,79 @@ const items = new Hono<AppEnv>()
         const { item, shelves } = await requireItem(id, me);
         const owned = shelves.map((shelf) => shelf.isbn);
 
-        const [main, [mine], [reviews], [editions]] = await Promise.all([
-            db().query.catalogItemIsbn.findFirst({
-                where: and(
-                    eq(catalogItemIsbn.catalogItemId, id),
-                    eq(catalogItemIsbn.main, true)
-                ),
-            }),
-            db()
-                .select({
-                    status: progress.status,
-                    rating: progress.rating,
-                    review: progress.review,
-                    completedAt: progress.completedAt,
-                })
-                .from(progress)
-                .where(
-                    and(eq(progress.userId, me), eq(progress.catalogItemId, id))
-                ),
-            db()
-                .select({ count: sql<number>`count(*)::int` })
-                .from(progress)
-                .where(othersReviewed(id, me)),
-            db()
-                .select({ count: sql<number>`count(*)::int` })
-                .from(catalogItemIsbn)
-                .where(
-                    and(
+        const [main, [mine], [reviews], editionFormats, credits] =
+            await Promise.all([
+                db().query.catalogItemIsbn.findFirst({
+                    where: and(
                         eq(catalogItemIsbn.catalogItemId, id),
-                        visibleEditions(owned)
+                        eq(catalogItemIsbn.main, true)
+                    ),
+                    with: { publisher: { columns: { name: true } } },
+                }),
+                db()
+                    .select({
+                        status: progress.status,
+                        rating: progress.rating,
+                        review: progress.review,
+                        completedAt: progress.completedAt,
+                    })
+                    .from(progress)
+                    .where(
+                        and(
+                            eq(progress.userId, me),
+                            eq(progress.catalogItemId, id)
+                        )
+                    ),
+                db()
+                    .select({ count: sql<number>`count(*)::int` })
+                    .from(progress)
+                    .where(othersReviewed(id, me)),
+                // How many editions people can see in each format.
+                db()
+                    .select({
+                        format: catalogItemIsbn.format,
+                        count: sql<number>`count(*)::int`,
+                    })
+                    .from(catalogItemIsbn)
+                    .where(
+                        and(
+                            eq(catalogItemIsbn.catalogItemId, id),
+                            visibleEditions(owned)
+                        )
                     )
-                ),
-        ]);
+                    .groupBy(catalogItemIsbn.format)
+                    .orderBy(desc(sql`count(*)`)),
+                // Credits on editions people can see, like a translator, main
+                // first.
+                db()
+                    .select({
+                        role: catalogItemIsbnPerson.role,
+                        name: person.name,
+                    })
+                    .from(catalogItemIsbnPerson)
+                    .innerJoin(
+                        catalogItemIsbn,
+                        eq(catalogItemIsbn.isbn, catalogItemIsbnPerson.isbn)
+                    )
+                    .innerJoin(
+                        person,
+                        eq(person.id, catalogItemIsbnPerson.personId)
+                    )
+                    .where(
+                        and(
+                            eq(catalogItemIsbn.catalogItemId, id),
+                            visibleEditions(owned)
+                        )
+                    )
+                    .orderBy(
+                        desc(catalogItemIsbn.main),
+                        asc(catalogItemIsbn.createdAt),
+                        asc(catalogItemIsbnPerson.position)
+                    ),
+            ]);
 
         return c.json({
             id: item.id,
-            format: item.format,
             kind: item.kind,
             title: item.title,
             coverUrl: main?.coverUrl ?? item.coverUrl,
@@ -167,7 +229,16 @@ const items = new Hono<AppEnv>()
             seriesId: item.series?.id ?? null,
             seriesTitle: item.series?.title ?? null,
             volumeCount: item.series?.volumeCount ?? null,
-            ...itemDetails(item, main ?? null),
+            ...bookDetails(item, main ?? null),
+            // The work's own credits, then each visible edition's.
+            credits: creditList([
+                ...item.people,
+                ...credits.map(({ role, name }, position) => ({
+                    role,
+                    position: 10_000 + position,
+                    person: { name },
+                })),
+            ]),
             saveCount: item.saveCount,
             ratingAverage: item.ratingAverage,
             ratingCount: item.ratingCount,
@@ -176,7 +247,11 @@ const items = new Hono<AppEnv>()
             review: mine?.review ?? null,
             completedAt: mine?.completedAt ?? null,
             reviewCount: reviews?.count ?? 0,
-            editionCount: editions?.count ?? 0,
+            editionCount: editionFormats.reduce(
+                (total, row) => total + row.count,
+                0
+            ),
+            editionFormats,
             shelves,
         });
     })
@@ -186,7 +261,8 @@ const items = new Hono<AppEnv>()
         schemaValidator('query', EditionsQuerySchema),
         async (c) => {
             const { id } = c.req.valid('param');
-            const { collectionId, q, ...pageQuery } = c.req.valid('query');
+            const { collectionId, q, format, ...pageQuery } =
+                c.req.valid('query');
             const me = c.get('user').id;
             const { shelves } = await requireItem(id, me);
             if (collectionId) {
@@ -207,19 +283,47 @@ const items = new Hono<AppEnv>()
                         isbn: catalogItemIsbn.isbn,
                         title: catalogItemIsbn.title,
                         coverUrl: catalogItemIsbn.coverUrl,
-                        publisher: catalogItemIsbn.publisher,
+                        editionName: catalogItemIsbn.editionName,
+                        publisher: publisher.name,
+                        // The publisher an imprint belongs to.
+                        imprintOf: parentPublisher.name,
                         language: catalogItemIsbn.language,
                         format: catalogItemIsbn.format,
+                        releaseYear: catalogItemIsbn.releaseYear,
+                        releaseDate: catalogItemIsbn.releaseDate,
+                        pageCount: catalogItemIsbn.pageCount,
+                        credits: sql<
+                            { role: PersonRole; name: string }[]
+                        >`coalesce((
+                            select json_agg(json_build_object(
+                                'role', ${catalogItemIsbnPerson.role},
+                                'name', ${person.name}
+                            ) order by ${catalogItemIsbnPerson.position})
+                            from ${catalogItemIsbnPerson}
+                            join ${person} on ${person.id} = ${catalogItemIsbnPerson.personId}
+                            where ${catalogItemIsbnPerson.isbn} = ${catalogItemIsbn.isbn}
+                        ), '[]')`,
                         main: catalogItemIsbn.main,
                         pending: catalogItemIsbn.pending,
                         owned,
                     })
                     .from(catalogItemIsbn)
+                    .leftJoin(
+                        publisher,
+                        eq(publisher.id, catalogItemIsbn.publisherId)
+                    )
+                    .leftJoin(
+                        parentPublisher,
+                        eq(parentPublisher.id, publisher.parentId)
+                    )
                     .where(
                         and(
                             eq(catalogItemIsbn.catalogItemId, id),
                             visibleEditions(shelves.map((shelf) => shelf.isbn)),
-                            q ? editionsMatching(q) : undefined
+                            q ? editionsMatching(q) : undefined,
+                            format
+                                ? eq(catalogItemIsbn.format, format)
+                                : undefined
                         )
                     )
                     .orderBy(

@@ -1,5 +1,5 @@
 import { hasRole, UserRole } from '@analog/types';
-import { trackVisits } from '@/lib/navigation';
+import { trackRestores, trackVisits } from '@/lib/navigation';
 import { whenScrollable } from '@/lib/scroll';
 import { useSessionStore } from '@/stores/session';
 
@@ -99,7 +99,7 @@ export const router = createRouter({
                 {
                     path: 'items/:id',
                     name: 'item',
-                    meta: { title: 'Media' },
+                    meta: { title: 'Book' },
                     component: () => import('@/views/ItemView.vue'),
                     props: true,
                 },
@@ -174,6 +174,23 @@ export const router = createRouter({
                     meta: { title: 'Admin', requiresRole: UserRole.Admin },
                     props: true,
                 },
+                {
+                    path: 'admin/people/:id',
+                    name: 'admin-person',
+                    component: () => import('@/views/AdminNameView.vue'),
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
+                    props: (route) => ({ kind: 'people', id: route.params.id }),
+                },
+                {
+                    path: 'admin/publishers/:id',
+                    name: 'admin-publisher',
+                    component: () => import('@/views/AdminNameView.vue'),
+                    meta: { title: 'Admin', requiresRole: UserRole.Admin },
+                    props: (route) => ({
+                        kind: 'publishers',
+                        id: route.params.id,
+                    }),
+                },
             ],
         },
         {
@@ -218,6 +235,7 @@ export const router = createRouter({
 });
 
 trackVisits(router);
+trackRestores(router);
 
 router.beforeEach(async (to) => {
     if (!to.meta.requiresAuth && !to.meta.guestOnly) {

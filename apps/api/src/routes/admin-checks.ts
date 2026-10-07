@@ -42,7 +42,7 @@ async function requireItem(id: string | null) {
           })
         : undefined;
     if (!found) {
-        throw new HTTPException(404, { message: 'Item not found' });
+        throw new HTTPException(404, { message: 'Book not found' });
     }
     return found;
 }

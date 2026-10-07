@@ -14,6 +14,7 @@ import {
     MAX_SERIES_VOLUMES,
     MergeSeriesSchema,
     SeriesSearchQuerySchema,
+    SetGenresSchema,
     SetSeriesItemsSchema,
     SetVerifiedSchema,
     UpdateSeriesSchema,
@@ -27,6 +28,7 @@ import {
     whereVerified,
 } from '../lib/admin.js';
 import type { AppEnv } from '../lib/app-env.js';
+import { setVolumeGenres } from '../lib/book-values.js';
 import {
     matchSeriesKind,
     mergeSeries,
@@ -42,7 +44,7 @@ import { db } from '../lib/init.js';
 import { paginateWithTotal } from '../lib/pagination.js';
 import { IdParamSchema } from '../lib/params.js';
 import { matchesAllTerms, searchSeries, searchTerms } from '../lib/search.js';
-import { seriesDetails, seriesLinks } from '../lib/series-details.js';
+import { volumeGenres } from '../lib/series-details.js';
 import { schemaValidator } from '../lib/validator.js';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -94,7 +96,6 @@ const adminSeries = new Hono<AppEnv>()
                         coverUrl: series.coverUrl,
                         itemCount: sql<number>`coalesce(${counts.itemCount}, 0)::int`,
                         volumeCount: series.volumeCount,
-                        detailsSource: series.detailsSource,
                         createdAt: series.createdAt,
                         verifiedAt: series.verifiedAt,
                         suggestions: sql<number>`coalesce(${checks.checkCount}, 0)::int`,
@@ -134,14 +135,11 @@ const adminSeries = new Hono<AppEnv>()
                 kind: series.kind,
                 coverUrl: series.coverUrl,
                 volumeCount: series.volumeCount,
+                audience: series.audience,
+                description: series.description,
                 createdAt: series.createdAt,
                 verifiedBy: verifiedByUser.username,
                 verifiedAt: series.verifiedAt,
-                // Only read to work out the AniList link.
-                detailsSource: series.detailsSource,
-                detailsId: series.detailsId,
-                details: series.details,
-                detailsFetchedAt: series.detailsFetchedAt,
             })
             .from(series)
             .leftJoin(
@@ -152,24 +150,23 @@ const adminSeries = new Hono<AppEnv>()
         if (!row) {
             throw new HTTPException(404, { message: 'Series not found' });
         }
-        // Other series this one may duplicate, to merge.
-        const sameTitle = await db()
-            .select({ id: series.id, title: series.title })
-            .from(series)
-            .where(
-                and(
-                    ne(series.id, row.id),
-                    sql`lower(${series.title}) = lower(${row.title})`
-                )
-            );
-        const { details, detailsFetchedAt, ...found } = row;
-        const { detailsSource, detailsId, detailsTitle } = seriesDetails(row);
+        const [sameTitle, genres] = await Promise.all([
+            // Other series this one may duplicate, to merge.
+            db()
+                .select({ id: series.id, title: series.title })
+                .from(series)
+                .where(
+                    and(
+                        ne(series.id, row.id),
+                        sql`lower(${series.title}) = lower(${row.title})`
+                    )
+                ),
+            volumeGenres(row.id),
+        ]);
         return c.json({
-            ...found,
-            detailsSource,
-            detailsId,
-            detailsTitle,
-            links: seriesLinks(row),
+            ...row,
+            // Every genre its volumes have, for the picker that sets them all.
+            genres: genres.map(({ slug }) => slug),
             sameTitle,
         });
     })
@@ -201,11 +198,17 @@ const adminSeries = new Hono<AppEnv>()
         schemaValidator('json', UpdateSeriesSchema),
         async (c) => {
             const found = await requireSeries(c.req.valid('param').id);
-            const { title, kind } = c.req.valid('json');
+            const { title, kind, audience, description } = c.req.valid('json');
             await db().transaction(async (tx) => {
                 await tx
                     .update(series)
-                    .set({ title, kind, updatedAt: new Date() })
+                    .set({
+                        title,
+                        kind,
+                        audience,
+                        description,
+                        updatedAt: new Date(),
+                    })
                     .where(eq(series.id, found.id));
                 if (kind !== found.kind) {
                     await matchSeriesKind(found.id, tx);
@@ -214,6 +217,17 @@ const adminSeries = new Hono<AppEnv>()
             if (title !== found.title) {
                 await clearSeriesNameChecks(found.id);
             }
+            return c.body(null, 204);
+        }
+    )
+    // Sets these genres on every volume, replacing what they had.
+    .put(
+        '/:id/genres',
+        schemaValidator('param', IdParamSchema),
+        schemaValidator('json', SetGenresSchema),
+        async (c) => {
+            const found = await requireSeries(c.req.valid('param').id);
+            await setVolumeGenres(found.id, c.req.valid('json').genres);
             return c.body(null, 204);
         }
     )
@@ -237,7 +251,7 @@ const adminSeries = new Hono<AppEnv>()
                 );
             if (inSeries.length !== new Set(ids).size) {
                 throw new HTTPException(400, {
-                    message: "Some items aren't in this series",
+                    message: "Some books aren't in this series",
                 });
             }
             await db().transaction(async (tx) => {
@@ -301,7 +315,7 @@ const adminSeries = new Hono<AppEnv>()
         await requireSeries(id);
         if (await db().$count(catalogItem, eq(catalogItem.seriesId, id))) {
             throw new HTTPException(409, {
-                message: 'Move or merge its items before deleting it',
+                message: 'Move or merge its books before deleting it',
             });
         }
         await db().delete(series).where(eq(series.id, id));

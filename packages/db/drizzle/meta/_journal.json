@@ -211,6 +211,13 @@
       "when": 1790860613502,
       "tag": "0029_add_reading_goal",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790881029195,
+      "tag": "0030_structured_book_data",
+      "breakpoints": true
     }
   ]
 }
